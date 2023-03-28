@@ -1,4 +1,5 @@
-﻿using GameFramework;
+﻿using System.Numerics;
+using GameFramework;
 using GameFramework.ImGui;
 using GameFramework.Utilities;
 using ImGuiNET;
@@ -52,13 +53,34 @@ internal class App : GameApplication
 
         if (ImGui.BeginMainMenuBar())
         {
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
+
             foreach (var layerIndex in _layerController.Indices)
             {
+                var isSelected = layerIndex == _layerController.SelectedIndex;
+                var style = _layerController[layerIndex] as ITabStyle;
+
+                if (isSelected)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, style?.SelectedColor ?? new Vector4(0.5f, 0.3f, 0.1f, 0.5f));
+                }
+                else
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, style?.IdleColor ?? new Vector4(0.1f, 0.7f, 0.8f, 0.5f));
+                }
+
                 if (ImGui.Button(_layerController[layerIndex].ToString()))
                 {
                     _layerController.Select(layerIndex);
                 }
+
+                if (isSelected)
+                {
+                    ImGui.PopStyleColor();
+                }
             }
+
+            ImGui.PopStyleVar();
         }
 
         ImGui.EndMainMenuBar();

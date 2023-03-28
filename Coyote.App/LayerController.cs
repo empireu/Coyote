@@ -5,7 +5,10 @@ namespace Coyote.App;
 internal class LayerController
 {
     private readonly Layer[] _layers;
-    private int _selected;
+
+    public int SelectedIndex { get; private set; }
+
+    public Layer Selected => _layers[SelectedIndex];
 
     public LayerController(params Layer[] layers)
     {
@@ -16,7 +19,7 @@ internal class LayerController
             throw new ArgumentException(nameof(layers));
         }
 
-        var selected = _layers[_selected];
+        var selected = _layers[SelectedIndex];
 
         selected.Enable();
 
@@ -31,9 +34,9 @@ internal class LayerController
 
     private void SwitchSelection(int newSelection)
     {
-        _layers[_selected].IsEnabled = false;
+        _layers[SelectedIndex].IsEnabled = false;
         _layers[newSelection].IsEnabled = true;
-        _selected = newSelection;
+        SelectedIndex = newSelection;
     }
 
     public void Select(int index)

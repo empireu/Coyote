@@ -3,7 +3,7 @@ using GameFramework.Layers;
 
 namespace Coyote.App;
 
-internal class MotionEditorLayer : Layer
+internal class MotionEditorLayer : Layer, ITabStyle
 {
     protected override void Render(FrameInfo frameInfo)
     {
