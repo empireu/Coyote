@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using GameFramework;
+using GameFramework.Assets;
 using GameFramework.ImGui;
 using GameFramework.Utilities;
 using ImGuiNET;
@@ -84,5 +85,10 @@ internal class App : GameApplication
         }
 
         ImGui.EndMainMenuBar();
+    }
+
+    public static EmbeddedResourceKey Asset(string name)
+    {
+        return new EmbeddedResourceKey(typeof(App).Assembly, $"Coyote.App.Assets.{name}");
     }
 }

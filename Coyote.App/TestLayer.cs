@@ -12,6 +12,4 @@ internal class TestLayer : Layer, ITabStyle
 
         base.Render(frameInfo);
     }
-
-    Vector4 ITabStyle.SelectedColor => new(0, 1, 0, 1);
 }
