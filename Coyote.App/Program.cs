@@ -22,7 +22,9 @@ using var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<ImGuiLayer>();
         services.AddSingleton<App>();
         services.AddSingleton<GameApplication>(s => s.GetRequiredService<App>());
-        services.AddSingleton<MainLayer>();
+
+        services.AddSingleton<MotionEditorLayer>();
+        services.AddSingleton<TestLayer>();
     })
     .Build();
 
