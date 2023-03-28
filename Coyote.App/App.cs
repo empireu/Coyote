@@ -50,8 +50,6 @@ internal class App : GameApplication
     {
         Assert.NotNull(ref _layerController);
 
-        ImGui.ShowDemoWindow();
-
         if (ImGui.BeginMainMenuBar())
         {
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
@@ -75,10 +73,7 @@ internal class App : GameApplication
                     _layerController.Select(layerIndex);
                 }
 
-                if (isSelected)
-                {
-                    ImGui.PopStyleColor();
-                }
+                ImGui.PopStyleColor();
             }
 
             ImGui.PopStyleVar();
