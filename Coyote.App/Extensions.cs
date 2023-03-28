@@ -54,8 +54,16 @@ internal static class Extensions
         var world = entity.GetWorld();
 
         ref var component = ref world.Get<PositionComponent>(entity);
+        
+        var oldPosition = component.Position;
+
+        if (oldPosition == position)
+        {
+            return;
+        }
 
         component.Position = position;
-        component.UpdateCallback?.Invoke();
+
+        component.UpdateCallback?.Invoke(entity, oldPosition);
     }
 }

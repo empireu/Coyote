@@ -1,13 +1,17 @@
 ﻿using System.Numerics;
+using Arch.Core;
 using GameFramework.Renderer;
 
 namespace Coyote.App;
 
 internal struct PositionComponent
 {
+    public delegate void UpdateDelegate(Entity entity, Vector2 oldPosition);
+
     public Vector2 Position;
 
-    public Action? UpdateCallback;
+    // old position
+    public UpdateDelegate? UpdateCallback;
 }
 
 internal struct ScaleComponent
@@ -20,12 +24,24 @@ internal struct RotationComponent
     public float Angle;
 }
 
-internal struct EditorComponent
-{
-    public bool AllowDragging;
-}
-
 internal struct SpriteComponent
 {
     public Sprite Sprite;
+}
+
+internal struct TranslationPointComponent
+{
+    public static readonly Vector4 VelocityLineColor = new(1, 0, 0, 0.5f);
+    public static readonly Vector4 AccelerationLineColor = new(1, 1, 0, 0.5f);
+    public const float VelocityLineThickness = 0.01f;
+    public const float AccelerationLineThickness = 0.008f;
+
+    public Entity VelocityMarker;
+    public Entity AccelerationMarker;
+}
+
+internal struct PathLinkComponent
+{
+    public Entity Previous;
+    public Entity Next;
 }

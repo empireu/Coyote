@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
 using System.Numerics;
 using Arch.Core;
+using Arch.Core.Extensions;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
@@ -50,7 +51,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private readonly OrthographicCameraController2D _cameraController;
 
-    private readonly World _world = World.Create();
+    private readonly World _world;
+    private readonly PathEditor _path;
 
     private ToolType _selectedTool = ToolType.TranslateAdd;
 
@@ -80,15 +82,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _fieldSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.PowerPlayField.jpg"));
         _robotSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Robot.png"));
 
-        UpdatePipeline();
+        _world = World.Create();
+        _path = new PathEditor(app, _world);
 
-        _world.Create(new PositionComponent(), new ScaleComponent
-        {
-            Scale = Vector2.One
-        }, new SpriteComponent()
-        {
-            Sprite = _robotSprite
-        });
+        UpdatePipeline();
     }
 
     protected override void OnAdded()
@@ -96,28 +93,56 @@ internal class MotionEditorLayer : Layer, ITabStyle
         RegisterHandler<MouseEvent>(OnMouseEvent);
     }
 
-    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(_app.Input.MousePosition,
-        _app.Window.Width, _app.Window.Height);
+    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(
+        _app.Input.MousePosition,
+        _app.Window.Width, 
+        _app.Window.Height);
 
     private Vector2 _selectPoint;
 
     private bool OnMouseEvent(MouseEvent @event)
     {
-        if (@event is { Down: true, MouseButton: MouseButton.Left })
+        if (@event.MouseButton == MouseButton.Left)
         {
-            _selectedEntity = _world.PickEntity(MouseWorld);
-
-            if (_selectedEntity.HasValue)
+            if (@event.Down)
             {
-                var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
+                _selectedEntity = _world.PickEntity(MouseWorld);
 
-                _selectPoint = entityPosition - MouseWorld;
+                if (_selectedEntity.HasValue)
+                {
+                    var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
+
+                    _selectPoint = entityPosition - MouseWorld;
+                }
             }
-
-            return true;
+        }
+        else
+        {
+            HandleToolMouseEvent(@event);
         }
 
-        return false;
+
+        return true;
+    }
+
+    private void HandleToolMouseEvent(MouseEvent @event)
+    {
+        _selectedEntity = null;
+
+        if (_selectedTool == ToolType.TranslateAdd)
+        {
+            if(@event.Down)
+            {
+                Console.WriteLine("Add Point");
+
+                AddTranslationPoint();
+            }
+        }
+    }
+
+    private void AddTranslationPoint()
+    {
+        _path.CreateTranslationPoint(MouseWorld);
     }
 
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
@@ -214,7 +239,22 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private void RenderWorld()
     {
         _batch.Clear();
-        Systems.Render(_world, _batch);
+
+        if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive())
+        {
+            var selected = _selectedEntity.Value;
+            var rectangle = selected.GetRectangle();
+
+            _batch.Quad(
+                new Vector2(rectangle.CenterX(), rectangle.CenterY()),
+                Vector2.One * new Vector2(rectangle.Width, rectangle.Height), 
+                new RgbaFloat4(0, 1, 0, 0.5f));
+        }
+
+        Systems.RenderSprites(_world, _batch);
+        Systems.RenderConnections(_world, _batch);
+        _path.DrawPaths(_batch);
+
         _batch.Submit(framebuffer: _processor.InputFramebuffer);
     }
 

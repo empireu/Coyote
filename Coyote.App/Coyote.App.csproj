@@ -8,18 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Assets\Images\AccelerationMarker.png" />
+    <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
+    <None Remove="Assets\Images\VelocityMarker.png" />
     <None Remove="tuke0aai.2w1~" />
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Assets\Images\AccelerationMarker.png" />
+    <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
     <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />
+    <EmbeddedResource Include="Assets\Images\VelocityMarker.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Arch" Version="1.2.3.2-beta" />
+    <PackageReference Include="Arch" Version="1.2.3" />
     <PackageReference Include="ImGui.NET" Version="1.89.4" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
     <PackageReference Include="Serilog" Version="2.12.0" />
