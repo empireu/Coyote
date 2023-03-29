@@ -11,11 +11,12 @@ namespace Coyote.App;
 
 internal sealed class PathEditor
 {
-    private const float InitialTranslation = 0.025f;
+    private const float InitialTranslation = 0.1f;
     private const float InitialKnobSize = 0.025f;
     private const float PositionKnobSize = 0.05f;
     private const float IndicatorSize = 0.025f;
     private const float KnobSensitivity = 5;
+    private const float AddToEndThreshold = 0.05f;
 
     private readonly World _world;
     private readonly List<Entity> _translationPoints = new();
@@ -52,7 +53,33 @@ internal sealed class PathEditor
             new TranslationPointComponent { VelocityMarker = velocityKnob, AccelerationMarker = accelerationKnob },
             new SpriteComponent { Sprite = _positionSprite });
 
-        _translationPoints.Add(entity);
+        if (_translationPoints.Count >= 2)
+        {
+            var projection = TranslationSpline.Project(position);
+
+            if (projection < AddToEndThreshold)
+            {
+                _translationPoints.Insert(0, entity);
+            }
+            else if (projection > (1 - AddToEndThreshold))
+            {
+                _translationPoints.Add(entity);   
+            }
+            else
+            {
+                var closestTwo = _translationPoints.OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, position)).Take(2).ToArray();
+
+                var index = Math.Clamp(
+                    (_translationPoints.IndexOf(closestTwo[0]) + _translationPoints.IndexOf(closestTwo[1])) / 2 + 1, 0,
+                    _translationPoints.Count);
+
+                _translationPoints.Insert(index, entity);
+            }
+        }
+        else
+        {
+            _translationPoints.Add(entity);
+        }
 
         OnTranslationChanged();
     }
@@ -89,7 +116,36 @@ internal sealed class PathEditor
             _ => throw new ArgumentOutOfRangeException($"Unknown derivative {derivative}")
         };
 
-        var position = initialPosition + InitialTranslation * Vector2.One * (1 + derivative);
+        var direction = Vector2.One;
+
+        if (_translationPoints.Count == 1)
+        {
+            var closest = _translationPoints
+                .MinBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, initialPosition))
+                .Get<PositionComponent>().Position;
+
+            if (Vector2.DistanceSquared(closest, initialPosition) > 0.001)
+            {
+                // Prevents NaN and infinity
+
+                direction = Vector2.Normalize(initialPosition - closest);
+            }
+        }
+        else if (_translationPoints.Count >= 2)
+        {
+            var points = _translationPoints
+                .OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, initialPosition))
+                .Select(x=>x.Get<PositionComponent>().Position)
+                .Take(2)
+                .ToArray();
+
+            if (Vector2.DistanceSquared(points[0], points[1]) > 0.001)
+            {
+                direction = Vector2.Normalize(points[0] - points[1]);
+            }
+        }
+
+        var position = initialPosition + InitialTranslation * direction * (1 + derivative);
         var scale = InitialKnobSize * Vector2.One / (1 + derivative);
 
         var entity = _world.Create(

@@ -1,10 +1,8 @@
-﻿using System.Diagnostics;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework;
-using GameFramework.Assets;
 using GameFramework.Extensions;
 using GameFramework.ImGui;
 using GameFramework.Layers;
@@ -182,7 +180,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         if (_selectedTool == ToolType.TranslateAdd)
         {
-            AddTranslationPoint();
+            _path.CreateTranslationPoint(MouseWorld);
         }
 
         if (_selectedTool == ToolType.TranslateDelete)
@@ -198,11 +196,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
         }
     }
 
-    private void AddTranslationPoint()
-    {
-        _path.CreateTranslationPoint(MouseWorld);
-    }
-
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
         if (!IsEnabled)
@@ -212,10 +205,13 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         if (ImGui.Begin("Tools"))
         {
+            ImGui.TextColored(new Vector4(1, 1, 0, 1), "Path Tools");
+            ImGui.BeginGroup();
+
             foreach (var value in Enum.GetValues<ToolType>())
             {
                 ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(1, 0, 0, 0.5f) : new Vector4(0, 1, 0, 0.3f));
-                
+
                 if (ImGui.Button(ToolDescriptions[value]))
                 {
                     _selectedTool = value;
@@ -226,12 +222,21 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 }
 
                 ImGui.PopStyleColor();
+
+                ImGui.Separator();
             }
 
+            ImGui.EndGroup();
+
+            ImGui.TextColored(new Vector4(1, 1, 0, 1), "Review");
+            ImGui.BeginGroup();
+            
             if (ImGui.Button("Player"))
             {
                 _showPlayer = true;
             }
+            
+            ImGui.EndGroup();
         }
 
         ImGui.End();
