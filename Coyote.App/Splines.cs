@@ -38,6 +38,8 @@ internal readonly struct QuinticSplineSegment
 
 internal class UniformQuinticSpline
 {
+    private const int ProjectionSamples = 128;
+    
     private const int SamplesPerSegment = 64;
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
@@ -49,11 +51,17 @@ internal class UniformQuinticSpline
     public void Clear()
     {
         Segments.Clear();
+        ClearRenderPoints();
     }
 
     public void Add(QuinticSplineSegment segment)
     {
         Segments.Add(segment);
+    }
+
+    public void ClearRenderPoints()
+    {
+        _renderPoints = Array.Empty<Vector2>();
     }
 
     public void UpdateRenderPoints()
@@ -97,25 +105,25 @@ internal class UniformQuinticSpline
         }
     }
 
-    private void GetIndices(float progress, out int index, out float t)
-    {
-        progress = Math.Clamp(progress, 0, 1);
-
-        progress *= Segments.Count;
-        index = Math.Clamp((int)progress, 0, Segments.Count - 1);
-        t = progress - index;
-    }
-
     public Vector2 Evaluate(float progress)
     {
-        GetIndices(progress, out var index, out var t);
-        return Segments[index].Evaluate(t);
+        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
+        return Segments[index].Evaluate((float)t);
+    }
+
+    public void Evaluate(double progress, out double dx, out double dy)
+    {
+        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
+        var segment = Segments[index];
+
+        dx = Splines.HermiteQuintic(segment.P0.X, segment.V0.X, segment.A0.X, segment.A1.X, segment.V1.X, segment.P1.X, t);
+        dy = Splines.HermiteQuintic(segment.P0.Y, segment.V0.Y, segment.A0.Y, segment.A1.Y, segment.V1.Y, segment.P1.Y, t);
     }
 
     public Vector2 EvaluateDerivative1(float progress)
     {
-        GetIndices(progress, out var index, out var t);
-        return Segments[index].EvaluateDerivative1(t);
+        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
+        return Segments[index].EvaluateDerivative1((float)t);
     }
 
     public float ComputeArcLength(int points = 1024)
@@ -134,10 +142,46 @@ internal class UniformQuinticSpline
 
         return (float)result;
     }
+
+    public float Project(Vector2 position)
+    {
+        if (Segments.Count == 0)
+        {
+            return 0;
+        }
+
+        var closest = 0f;
+        var closestDistance = float.MaxValue;
+
+        for (var sample = 0; sample < ProjectionSamples; sample++)
+        {
+            var t = sample / (ProjectionSamples - 1f);
+
+            var splinePoint = Evaluate(t);
+
+            var distance = Vector2.DistanceSquared(position, splinePoint);
+
+            if (distance < closestDistance)
+            {
+                closest = t;
+                closestDistance = distance;
+            }
+        }
+
+        return closest;
+    }
 }
 
 internal static class Splines
 {
+    public static void GetIndicesUniform(int segments, double progress, out int index, out double t)
+    {
+        progress = Math.Clamp(progress, 0, 1);
+        progress *= segments;
+        index = Math.Clamp((int)progress, 0, segments - 1);
+        t = progress - index;
+    }
+
     public static double HermiteCubic(double p0, double v0, double v1, double p1, double t)
     {
         var t2 = t * t;

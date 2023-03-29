@@ -14,6 +14,8 @@ internal class App : GameApplication
 
     private LayerController? _layerController;
 
+    private bool _initialized;
+
     public App(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
@@ -36,6 +38,8 @@ internal class App : GameApplication
         {
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
             ImGuiStyles.Dark();
+
+            ImGui.LoadIniSettingsFromDisk("imgui.ini");
 
             imGui.Submit += ImGuiOnSubmit;
         });

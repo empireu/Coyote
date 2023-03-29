@@ -57,6 +57,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private Framebuffer? _playerFramebuffer;
     private nint _playerBinding;
     private Point _playerSize = new(-1, -1);
+    private bool _showPlayer;
 
     private readonly CommandList _commandList;
 
@@ -73,6 +74,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private Entity? _selectedEntity;
 
     private float _playTime;
+
+    private int _pickIndex;
 
     public MotionEditorLayer(GameApplication app, ImGuiLayer imGuiLayer)
     {
@@ -127,20 +130,36 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private Vector2 _selectPoint;
 
+    private void SelectEntity()
+    {
+        var entities = _world.Clip(MouseWorld);
+
+        if (entities.Count == 0)
+        {
+            _selectedEntity = null;
+        }
+        else
+        {
+            if (_pickIndex >= entities.Count)
+            {
+                _pickIndex = 0;
+            }
+
+            _selectedEntity = entities[_pickIndex++];
+
+            var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
+
+            _selectPoint = entityPosition - MouseWorld;
+        }
+    }
+
     private bool OnMouseEvent(MouseEvent @event)
     {
         if (@event.MouseButton == MouseButton.Left)
         {
             if (@event.Down)
             {
-                _selectedEntity = _world.PickEntity(MouseWorld);
-
-                if (_selectedEntity.HasValue)
-                {
-                    var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
-
-                    _selectPoint = entityPosition - MouseWorld;
-                }
+                SelectEntity();
             }
         }
         else
@@ -168,12 +187,14 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         if (_selectedTool == ToolType.TranslateDelete)
         {
-            var picked = _world.PickEntity(MouseWorld);
+            SelectEntity();
 
-            if (picked.HasValue && picked.Value.IsAlive() && _path.IsTranslationPoint(picked.Value))
+            if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsTranslationPoint(_selectedEntity.Value))
             {
-                _path.DeleteTranslationPoints(picked.Value);
+                _path.DeleteTranslationPoints(_selectedEntity.Value);
             }
+
+            _selectedEntity = null;
         }
     }
 
@@ -193,12 +214,23 @@ internal class MotionEditorLayer : Layer, ITabStyle
         {
             foreach (var value in Enum.GetValues<ToolType>())
             {
+                ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(1, 0, 0, 0.5f) : new Vector4(0, 1, 0, 0.3f));
+                
                 if (ImGui.Button(ToolDescriptions[value]))
                 {
                     _selectedTool = value;
 
+                    ImGui.PopStyleColor();
+
                     break;
                 }
+
+                ImGui.PopStyleColor();
+            }
+
+            if (ImGui.Button("Player"))
+            {
+                _showPlayer = true;
             }
         }
 
@@ -211,26 +243,29 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         ImGui.End();
 
-        if (ImGui.Begin("Player"))
+        if (_showPlayer)
         {
-            var wndSize = ImGui.GetWindowSize();
-
-            var min = new Vector2(Math.Min(wndSize.X, wndSize.Y));
-
-            var imageSize = (min * 0.95f).ToPoint();
-
-            if (imageSize != _playerSize)
+            if (ImGui.Begin("Player", ref _showPlayer))
             {
-                _playerSize = imageSize;
-                UpdatePlayerPipeline();
+                var wndSize = ImGui.GetWindowSize();
+
+                var min = new Vector2(Math.Min(wndSize.X, wndSize.Y));
+
+                var imageSize = (min * 0.95f).ToPoint();
+
+                if (imageSize != _playerSize)
+                {
+                    _playerSize = imageSize;
+                    UpdatePlayerPipeline();
+                }
+
+                RenderPlayer();
+
+                ImGui.Image(_playerBinding, imageSize.ToVector2());
             }
 
-            RenderPlayer();
-
-            ImGui.Image(_playerBinding, imageSize.ToVector2());
+            ImGui.End();
         }
-
-        ImGui.End();
     }
 
     protected override void Resize(Size size)
@@ -276,24 +311,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _playerBinding = ImGuiRenderer.GetOrCreateImGuiBinding(_app.Resources.Factory, _playerTexture!);
     }
 
-
-    Vector2 CentralDifference(Func<float, Vector2> function, float x, float epsilon)
-    {
-        return (function(x + epsilon) - function(x - epsilon)) / (2 * epsilon);
-    }
-
-    static double CentralDifference2(Func<double, double> function, double x, double epsilon)
-    {
-        return (function(x + epsilon) - function(x - epsilon)) / (2 * epsilon);
-    }
-
-
     private void RenderPlayer()
     {
-        Vector2 Map(Vector2 v)
-        {
-            return new Vector2(v.X, -v.Y);
-        }
+        Vector2 Map(Vector2 v) => new(v.X, -v.Y);
 
         var framebuffer = Assert.NotNull(_playerFramebuffer);
 
@@ -325,8 +345,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
             }
             else
             {
-                var translation = Map(_path.EditorSpline.Evaluate(t));
-                var tangent = Map(_path.EditorSpline.EvaluateDerivative1(t));
+                var translation = Map(_path.TranslationSpline.Evaluate(t));
+                var tangent = Map(_path.TranslationSpline.EvaluateDerivative1(t));
 
                 var pose = new Pose(translation, tangent);
 
@@ -396,7 +416,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         Systems.RenderSprites(_world, _editorBatch);
         Systems.RenderConnections(_world, _editorBatch);
+        
         _path.DrawTranslationPath(_editorBatch);
+        _path.DrawIndicator(_editorBatch, MouseWorld);
 
         _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
     }

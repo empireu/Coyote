@@ -2,6 +2,7 @@
 using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework;
+using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using Veldrid;
@@ -13,6 +14,7 @@ internal sealed class PathEditor
     private const float InitialTranslation = 0.025f;
     private const float InitialKnobSize = 0.025f;
     private const float PositionKnobSize = 0.05f;
+    private const float IndicatorSize = 0.025f;
     private const float KnobSensitivity = 5;
 
     private readonly World _world;
@@ -148,5 +150,18 @@ internal sealed class PathEditor
     public void DrawTranslationPath(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
     {
         TranslationSpline.Render(batch, mapping);
+    }
+
+    public void DrawIndicator(QuadBatch batch, Vector2 position)
+    {
+        if (TranslationSpline.Segments.Count == 0)
+        {
+            return;
+        }
+
+        batch.TexturedQuad(
+            TranslationSpline.Evaluate(TranslationSpline.Project(position)),
+            Vector2.One * IndicatorSize, 
+            _positionSprite.Texture);
     }
 }

@@ -31,9 +31,10 @@ internal static class Extensions
         return new RectangleF(position.X - scale.X / 2, position.Y - scale.Y / 2, scale.X, scale.Y);
     }
 
-    public static Entity? PickEntity(this World world, Vector2 pickPosition)
+    public static List<Entity> Clip(this World world, Vector2 pickPosition)
     {
         var query = world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent>());
+        var results = new List<Entity>();
 
         foreach (var chunk in query)
         {
@@ -41,12 +42,12 @@ internal static class Extensions
             {
                 if (entity.IsAlive() && entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
                 {
-                    return entity;
+                    results.Add(entity);
                 }
             }
         }
 
-        return null;
+        return results;
     }
 
     public static void Move(this Entity entity, Vector2 position)
