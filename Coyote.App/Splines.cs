@@ -1,11 +1,12 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using GameFramework.Extensions;
 using GameFramework.Renderer.Batch;
 using Veldrid;
 
 namespace Coyote.App;
 
-public struct QuinticSplineSegment
+internal readonly struct QuinticSplineSegment
 {
     public Vector2 P0 { get; }
     public Vector2 V0 { get; }
@@ -23,13 +24,23 @@ public struct QuinticSplineSegment
         V1 = v1;
         P1 = p1;
     }
+
+    public Vector2 Evaluate(float t)
+    {
+        return Splines.HermiteQuintic2(P0, V0, A0, A1, V1, P1, t);
+    }
+
+    public Vector2 EvaluateDerivative1(float t)
+    {
+        return Splines.HermiteQuintic2Derivative1(P0, V0, A0, A1, V1, P1, t);
+    }
 }
 
-internal class UniformSpline
+internal class UniformQuinticSpline
 {
-    private const int SubSamples = 128;
+    private const int SamplesPerSegment = 64;
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
-    private const float LineThickness = 0.02f;
+    private const float LineThickness = 0.015f;
 
     public List<QuinticSplineSegment> Segments { get; } = new();
 
@@ -53,15 +64,12 @@ internal class UniformSpline
         }
 
         var points = new List<Vector2>();
-
-        foreach (var p in Segments)
+        var samples = Segments.Count * SamplesPerSegment;
+        for (var subSampleIndex = 0; subSampleIndex < samples; subSampleIndex++)
         {
-            for (var subSampleIndex = 1; subSampleIndex < SubSamples; subSampleIndex++)
-            {
-                var t0 = (subSampleIndex - 1) / (SubSamples - 1f);
+            var t0 = subSampleIndex / (samples - 1f);
 
-                points.Add(Hermite5(p.P0, p.V0, p.A0, p.A1, p.V1, p.P1, t0));
-            }
+            points.Add(Evaluate(t0));
         }
 
         _renderPoints = points.ToArray();
@@ -89,21 +97,110 @@ internal class UniformSpline
         }
     }
 
-    private static Vector2 Hermite5(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, float t)
+    private void GetIndices(float progress, out int index, out float t)
+    {
+        progress = Math.Clamp(progress, 0, 1);
+
+        progress *= Segments.Count;
+        index = Math.Clamp((int)progress, 0, Segments.Count - 1);
+        t = progress - index;
+    }
+
+    public Vector2 Evaluate(float progress)
+    {
+        GetIndices(progress, out var index, out var t);
+        return Segments[index].Evaluate(t);
+    }
+
+    public Vector2 EvaluateDerivative1(float progress)
+    {
+        GetIndices(progress, out var index, out var t);
+        return Segments[index].EvaluateDerivative1(t);
+    }
+
+    public float ComputeArcLength(int points = 1024)
+    {
+        double result = 0;
+
+        var sampleSize = 1d / points;
+
+        for (var i = 1; i < points; i++)
+        {
+            var t0 = (i - 1) * sampleSize;
+            var t1 = t0 + sampleSize;
+
+            result += (double)(Vector2.Distance(Evaluate((float)t0), Evaluate((float)t1)));
+        }
+
+        return (float)result;
+    }
+}
+
+internal static class Splines
+{
+    public static double HermiteCubic(double p0, double v0, double v1, double p1, double t)
+    {
+        var t2 = t * t;
+        var t3 = t2 * t;
+
+        var h1 = -v0 / 2d + 3d * p0 / 2d - 3d * p1 / 2d + v1 / 2d;
+        var h2 = v0 - 5d * p0 / 2d + 2d * p1 - v1 / 2d;
+        var h3 = -v0 / 2d + p1 / 2d;
+
+        return h1 * t3 + h2 * t2 + h3 * t + p0;
+    }
+
+    public static Vector2 HermiteCubic2(Vector2 p0, Vector2 v0, Vector2 v1, Vector2 p1, float t)
+    {
+        return new Vector2(
+            (float)HermiteCubic(p0.X, v0.X, v1.X, p1.X, t),
+            (float)HermiteCubic(p0.Y, v0.Y, v1.Y, p1.Y, t));
+    }
+
+    public static double HermiteQuintic(double p0, double v0, double a0, double a1, double v1, double p1, double t)
     {
         var t2 = t * t;
         var t3 = t2 * t;
         var t4 = t3 * t;
         var t5 = t4 * t;
 
-        var h0 = 1 - 10 * t3 + 15 * t4 - 6 * t5;
-        var h1 = t - 6 * t3 + 8 * t4 - 3 * t5;
-        var h2 = 1 / 2f * t2 - 3 / 2f * t3 + 3 / 2f * t4 - 1 / 2f * t5;
-        var h3 = 1 / 2f * t3 - t4 + 1 / 2f * t5;
-        var h4 = -4 * t3 + 7 * t4 - 3 * t5;
-        var h5 = 10 * t3 - 15 * t4 + 6 * t5;
+        var h0 = 1d - 10d * t3 + 15d * t4 - 6d * t5;
+        var h1 = t - 6d * t3 + 8d * t4 - 3d * t5;
+        var h2 = 1d / 2d * t2 - 3d / 2d * t3 + 3d / 2d * t4 - 1d / 2d * t5;
+        var h3 = 1d / 2d * t3 - t4 + 1d / 2d * t5;
+        var h4 = -4d * t3 + 7d * t4 - 3d * t5;
+        var h5 = 10d * t3 - 15d * t4 + 6d * t5;
 
         return h0 * p0 + h1 * v0 + h2 * a0 +
                h3 * a1 + h4 * v1 + h5 * p1;
+    }
+
+    public static Vector2 HermiteQuintic2(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
+    {
+        return new Vector2(
+            (float)HermiteQuintic(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            (float)HermiteQuintic(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static double HermiteQuinticDerivative1(double p0, double v0, double a0, double a1, double v1, double p1, double t)
+    {
+        var t2 = t * t;
+
+        var h0 = -30d * ((t - 1d) * (t - 1d)) * t2;
+        var h1 = -((t - 1d) * (t - 1d)) * (15d * t2 - 2d * t - 1d);
+        var h2 = -1d / 2d * ((t - 1d) * (t - 1d)) * t * (5d * t - 2d);
+        var h3 = 1d / 2d * t2 * (5d * t2 - 8d * t + 3d);
+        var h4 = t2 * (-15d * t2 + 28d * t - 12d);
+        var h5 = 30d * ((t - 1d) * (t - 1d)) * t2;
+
+        return h0 * p0 + h1 * v0 + h2 * a0 +
+               h3 * a1 + h4 * v1 + h5 * p1;
+    }
+
+    public static Vector2 HermiteQuintic2Derivative1(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
+    {
+        return new Vector2(
+            (float)HermiteQuinticDerivative1(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            (float)HermiteQuinticDerivative1(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
     }
 }

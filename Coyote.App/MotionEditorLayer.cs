@@ -72,7 +72,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private Entity? _selectedEntity;
 
-    private readonly Stopwatch _playerWatch = Stopwatch.StartNew();
+    private float _playTime;
 
     public MotionEditorLayer(GameApplication app, ImGuiLayer imGuiLayer)
     {
@@ -247,25 +247,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _editorBatch.UpdatePipelines(outputDescription: _editorProcessor.InputFramebuffer.OutputDescription);
     }
 
-    private void RenderPlayer()
-    {
-        var framebuffer = Assert.NotNull(_playerFramebuffer);
-
-        _commandList.Begin();
-        _commandList.SetFramebuffer(framebuffer);
-        _commandList.ClearColorTarget(0, RgbaFloat.Clear);
-        _commandList.End();
-        _app.Device.SubmitCommands(_commandList);
-
-        _playerBatch.Clear();
-        _playerBatch.TexturedQuad(Vector2.Zero, new Vector2(FieldSize, -FieldSize), _fieldSprite.Texture);
-        _playerBatch.Submit(framebuffer: framebuffer); _playerBatch.Submit(framebuffer: framebuffer);
-
-        _playerBatch.Clear();
-        _path.DrawTranslationPath(_playerBatch, v => v with { Y = -v.Y });
-        _playerBatch.Submit(framebuffer: framebuffer);
-    }
-
     private void UpdatePlayerPipeline()
     {
         if (_playerTexture != null)
@@ -293,6 +274,69 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _playerBatch.UpdatePipelines(outputDescription: _playerFramebuffer!.OutputDescription);
 
         _playerBinding = ImGuiRenderer.GetOrCreateImGuiBinding(_app.Resources.Factory, _playerTexture!);
+    }
+
+
+    Vector2 CentralDifference(Func<float, Vector2> function, float x, float epsilon)
+    {
+        return (function(x + epsilon) - function(x - epsilon)) / (2 * epsilon);
+    }
+
+    static double CentralDifference2(Func<double, double> function, double x, double epsilon)
+    {
+        return (function(x + epsilon) - function(x - epsilon)) / (2 * epsilon);
+    }
+
+
+    private void RenderPlayer()
+    {
+        Vector2 Map(Vector2 v)
+        {
+            return new Vector2(v.X, -v.Y);
+        }
+
+        var framebuffer = Assert.NotNull(_playerFramebuffer);
+
+        _commandList.Begin();
+        _commandList.SetFramebuffer(framebuffer);
+        _commandList.ClearColorTarget(0, RgbaFloat.Clear);
+        _commandList.End();
+        _app.Device.SubmitCommands(_commandList);
+
+        _playerBatch.Clear();
+        _playerBatch.TexturedQuad(Vector2.Zero, Map(new Vector2(FieldSize, FieldSize)), _fieldSprite.Texture);
+        _playerBatch.Submit(framebuffer: framebuffer); _playerBatch.Submit(framebuffer: framebuffer);
+
+        _playerBatch.Clear();
+        _path.DrawTranslationPath(_playerBatch, Map);
+        _playerBatch.Submit(framebuffer: framebuffer);
+
+        _playerBatch.Clear();
+
+        const float speed = 1.5f;
+
+        if (_path.ArcLength > 0)
+        {
+            var t = (_playTime / (_path.ArcLength / speed));
+
+            if (t > 1)
+            {
+                _playTime = 0;
+            }
+            else
+            {
+                var translation = Map(_path.EditorSpline.Evaluate(t));
+                var tangent = Map(_path.EditorSpline.EvaluateDerivative1(t));
+
+                var pose = new Pose(translation, tangent);
+
+                pose -= MathF.PI / 2f;
+
+                _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
+            }
+        }
+
+        _playerBatch.Submit(framebuffer: framebuffer);
     }
 
     private void UpdateCamera(FrameInfo frameInfo)
@@ -329,8 +373,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     protected override void Update(FrameInfo frameInfo)
     {
-       UpdateCamera(frameInfo);
-       UpdateSelection(frameInfo);
+        _playTime += frameInfo.DeltaTime;
+
+        UpdateCamera(frameInfo);
+        UpdateSelection(frameInfo);
     }
 
     private void RenderEditor()

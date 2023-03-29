@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using Vortice.Mathematics;
 
-namespace DashViu.Plugins.FieldViewer.World;
+namespace Coyote.App;
 
 internal readonly struct Pose
 {

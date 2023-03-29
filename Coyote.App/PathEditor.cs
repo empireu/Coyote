@@ -22,7 +22,9 @@ internal sealed class PathEditor
     private readonly Sprite _velocitySprite;
     private readonly Sprite _accelerationSprite;
 
-    public UniformSpline Spline { get; } = new();
+    public float ArcLength { get; private set; }
+
+    public UniformQuinticSpline TranslationSpline { get; } = new();
 
     public PathEditor(GameApplication app, World world)
     {
@@ -110,7 +112,8 @@ internal sealed class PathEditor
 
     private void OnTranslationChanged()
     {
-        Spline.Clear();
+        TranslationSpline.Clear();
+        ArcLength = 0;
 
         if (_translationPoints.Count < 2)
         {
@@ -122,10 +125,12 @@ internal sealed class PathEditor
             UnpackTranslation(_translationPoints[i - 1], out var p0, out var v0, out var a0);
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
-            Spline.Add(new QuinticSplineSegment(p0, v0, a0, a1, v1, p1));
+            TranslationSpline.Add(new QuinticSplineSegment(p0, v0, a0, a1, v1, p1));
         }
 
-        Spline.UpdateRenderPoints();
+        TranslationSpline.UpdateRenderPoints();
+
+        ArcLength = TranslationSpline.ComputeArcLength();
     }
 
     private static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
@@ -142,6 +147,6 @@ internal sealed class PathEditor
 
     public void DrawTranslationPath(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
     {
-        Spline.Render(batch, mapping);
+        TranslationSpline.Render(batch, mapping);
     }
 }
