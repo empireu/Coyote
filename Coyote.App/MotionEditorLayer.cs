@@ -319,12 +319,20 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private void SaveProject()
     {
-        
+        var motionProject = MotionProject.FromPath(_path);
+
+        _app.Project.MotionProjects[_motionProjectName] = motionProject;
+
+        _app.Project.Save();
     }
 
-    private void LoadProject(string project)
+    private void LoadProject(string motionProjectName)
     {
+        var motionProject = _app.Project.MotionProjects[motionProjectName];
 
+        _world.Clear();
+
+        motionProject.Load(_path);
     }
 
     protected override void Resize(Size size)

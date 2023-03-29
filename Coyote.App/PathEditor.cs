@@ -20,6 +20,8 @@ internal sealed class PathEditor
     private readonly World _world;
     private readonly List<Entity> _translationPoints = new();
 
+    public IReadOnlyList<Entity> TranslationPoints => _translationPoints;
+
     private readonly Sprite _positionSprite;
     private readonly Sprite _velocitySprite;
     private readonly Sprite _accelerationSprite;
@@ -37,22 +39,22 @@ internal sealed class PathEditor
         _accelerationSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.AccelerationMarker.png"));
     }
 
-    public void CreateTranslationPoint(Vector2 position)
+    public Entity CreateTranslationPoint(Vector2 position, bool rebuildPath = true, bool addToEnd = false)
     {
-        var velocityKnob = CreateDerivativeKnob(0, position, OnTranslationChanged);
-        var accelerationKnob = CreateDerivativeKnob(1, position, OnTranslationChanged);
+        var velocityKnob = CreateDerivativeKnob(0, position, RebuildTranslation);
+        var accelerationKnob = CreateDerivativeKnob(1, position, RebuildTranslation);
 
         var entity = _world.Create(
             new PositionComponent 
             {
                 Position = position, 
-                UpdateCallback = (entity, pos) => OnTranslationPointChanged(entity, pos, OnTranslationChanged, velocityKnob, accelerationKnob)
+                UpdateCallback = (entity, pos) => OnTranslationPointChanged(entity, pos, RebuildTranslation, velocityKnob, accelerationKnob)
             },
             new ScaleComponent { Scale = Vector2.One * PositionKnobSize },
             new TranslationPointComponent { VelocityMarker = velocityKnob, AccelerationMarker = accelerationKnob },
             new SpriteComponent { Sprite = _positionSprite });
 
-        if (_translationPoints.Count >= 2)
+        if (!addToEnd && _translationPoints.Count >= 2)
         {
             var projection = TranslationSpline.Project(position);
 
@@ -80,7 +82,18 @@ internal sealed class PathEditor
             _translationPoints.Add(entity);
         }
 
-        OnTranslationChanged();
+        if (rebuildPath)
+        {
+            RebuildTranslation();
+        }
+
+        return entity;
+    }
+
+    public void Clear()
+    {
+        _translationPoints.Clear();
+        ArcLength = 0;
     }
 
     public bool IsTranslationPoint(Entity entity)
@@ -103,7 +116,7 @@ internal sealed class PathEditor
         _world.Destroy(entity);
         _translationPoints.Remove(entity);
 
-        OnTranslationChanged();
+        RebuildTranslation();
     }
 
     private Entity CreateDerivativeKnob(int derivative, Vector2 initialPosition, Action changeCallback)
@@ -167,7 +180,7 @@ internal sealed class PathEditor
         trajectoryCallback();
     }
 
-    private void OnTranslationChanged()
+    public void RebuildTranslation()
     {
         TranslationSpline.Clear();
         ArcLength = 0;
@@ -190,7 +203,7 @@ internal sealed class PathEditor
         ArcLength = TranslationSpline.ComputeArcLength();
     }
 
-    private static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
+    public static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
     {
         position = translationPoint.Get<PositionComponent>().Position;
         var markers = translationPoint.Get<TranslationPointComponent>();

@@ -1,22 +1,29 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using Exception = System.Exception;
 
 namespace Coyote.App;
 
 internal sealed class Project
 {
-    public string FileName { get; init; }
+    [JsonIgnore]
+    public string FileName { get; private set; }
 
+    [JsonInclude]
     public Dictionary<string, MotionProject> MotionProjects { get; init; }
 
     public void Save()
     {
-
+        File.WriteAllText(FileName, JsonSerializer.Serialize(this));
     }
 
     public static Project Load(string fileName)
     {
-        return JsonSerializer.Deserialize<Project>(File.ReadAllText(fileName)) ?? throw new Exception("Failed to open project");
+        var project = JsonSerializer.Deserialize<Project>(File.ReadAllText(fileName)) ?? throw new Exception("Failed to open project");
+
+        project.FileName = fileName;
+
+        return project;
     }
 
     public static Project Create(string fileName)

@@ -114,6 +114,11 @@ internal class App : GameApplication
             }
 
             ImGui.PopStyleVar();
+
+            if(ImGui.Button("Save"))
+            {
+                Project.Save();
+            }
         }
 
         ImGui.EndMainMenuBar();
