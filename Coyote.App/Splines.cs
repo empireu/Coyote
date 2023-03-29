@@ -2,6 +2,8 @@
 using System.Numerics;
 using GameFramework.Extensions;
 using GameFramework.Renderer.Batch;
+using GameFramework.Utilities;
+using SixLabors.ImageSharp.Drawing.Processing;
 using Veldrid;
 
 namespace Coyote.App;
@@ -215,6 +217,198 @@ internal class UniformQuinticSpline
         }
 
         return (float)optimizedClosest;
+    }
+}
+
+internal readonly struct CubicSplineSegment
+{
+    public CubicSplineSegment(double keyStart, double keyEnd, double p0, double v0, double v1, double p1)
+    {
+        KeyStart = keyStart;
+        KeyEnd = keyEnd;
+        P0 = p0;
+        V0 = v0;
+        V1 = v1;
+        P1 = p1;
+    }
+
+    public double KeyStart { get; }
+    public double KeyEnd { get; }
+
+    public double P0 { get; }
+    public double V0 { get; }
+    public double V1 { get; }
+    public double P1 { get; }
+
+    public double Evaluate(double t)
+    {
+        return Splines.HermiteCubic(P0, V0, V1, P1, t);
+    }
+}
+
+internal class MappedCubicSpline
+{
+    private readonly List<CubicSplineSegment> _segments = new();
+    
+    public void Insert(CubicSplineSegment segment)
+    {
+        if (segment.KeyEnd <= segment.KeyStart)
+        {
+            throw new Exception("Invalid segment direction");
+        }
+
+        if (_segments.Count > 0)
+        {
+            var last = _segments.Last();
+
+            if (!last.KeyEnd.Equals(segment.KeyStart))
+            {
+                throw new Exception("Spline continuity broken");
+            }
+        }
+
+        _segments.Add(segment);
+    }
+
+    public double StartKey => _segments.First().KeyStart;
+
+    public double EndKey => _segments.Last().KeyEnd;
+
+    public double Evaluate(double key)
+    {
+        if (_segments.Count == 0)
+        {
+            throw new InvalidOperationException("Cannot evaluate spline with 0 segments");
+        }
+
+        if (key <= StartKey)
+        {
+            return _segments.First().Evaluate(0);
+        }
+
+        if (key >= EndKey)
+        {
+            return _segments.Last().Evaluate(1);
+        }
+
+        CubicSplineSegment segment = default;
+
+        var found = false;
+
+        for (var index = 0; index < _segments.Count; index++)
+        {
+            segment = _segments[index];
+
+            if (segment.KeyStart <= key && segment.KeyEnd >= key)
+            {
+                found = true;
+
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            // Shouldn't happen since we checked continuities on adding and we have those key conditions at the start of the method.
+
+            throw new Exception("Did not find segment");
+        }
+
+        var progress = MathUtilities.MapRange(
+            key,
+            segment.KeyStart,
+            segment.KeyEnd,
+            0,
+            1);
+
+        Console.WriteLine($"Prog: {progress}, sv: {segment.P0}->{segment.P1}");
+
+        return segment.Evaluate(progress);
+    }
+}
+
+internal class MappedCubicSplineBuilder
+{
+    private struct SplinePoint
+    {
+        public double Key;
+        public double Value;
+        public double Tension;
+    }
+
+    private readonly List<SplinePoint> _points = new();
+
+    public void Add(double key, double value, double tension = 1)
+    {
+        if (_points.Count > 0)
+        {
+            if (key <= _points.Last().Key)
+            {
+                throw new ArgumentException("Key precedes the key of the previous point.");
+            }
+        }
+
+        _points.Add(new SplinePoint
+        {
+            Key = key,
+            Value = value,
+            Tension = tension
+        });
+
+        return this;
+    }
+
+    public bool IsValid()
+    {
+        return _points.Count > 1;
+    }
+
+    public MappedCubicSpline Build()
+    {
+        if (!IsValid())
+        {
+            throw new InvalidOperationException("Cannot build spline with specified point set");
+        }
+
+        SplinePoint Get(int index)
+        {
+            if (index < 0)
+            {
+                return _points[0];
+            }
+
+            if (index >= _points.Count)
+            {
+                return _points.Last();
+            }
+
+            return _points[index];
+        }
+
+        var spline = new MappedCubicSpline();
+
+        for (var i = 1; i < _points.Count; i++)
+        {
+            var previous = Get(i - 2);
+            var left = Get(i - 1);
+            var right = Get(i);
+            var next = Get(i + 1);
+
+            spline.Insert(new CubicSplineSegment(
+                left.Key, 
+                right.Key,
+                left.Value, 
+                previous.Value * left.Tension, 
+                next.Value * right.Tension, 
+                right.Value));
+        }
+
+        return spline;
+    }
+
+    public void Clear()
+    {
+        _points.Clear();
     }
 }
 

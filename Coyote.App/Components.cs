@@ -39,3 +39,12 @@ internal struct TranslationPointComponent
     public Entity VelocityMarker;
     public Entity AccelerationMarker;
 }
+
+internal struct RotationPointComponent
+{
+    public static readonly Vector4 HeadingLineColor = new(0, 1, 0, 0.9f);
+
+    public const float HeadingLineThickness = 0.01f;
+
+    public Entity HeadingMarker;
+}

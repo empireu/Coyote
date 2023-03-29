@@ -18,9 +18,12 @@ internal sealed class PathEditor
     private const float AddToEndThreshold = 0.05f;
 
     private readonly World _world;
+    
     private readonly List<Entity> _translationPoints = new();
+    private readonly List<Entity> _rotationPoints = new();
 
     public IReadOnlyList<Entity> TranslationPoints => _translationPoints;
+    public IReadOnlyList<Entity> RotationPoints => _rotationPoints;
 
     private readonly Sprite _positionSprite;
     private readonly Sprite _velocitySprite;
@@ -48,7 +51,7 @@ internal sealed class PathEditor
             new PositionComponent 
             {
                 Position = position, 
-                UpdateCallback = (entity, pos) => OnTranslationPointChanged(entity, pos, RebuildTranslation, velocityKnob, accelerationKnob)
+                UpdateCallback = (entity, pos) => OnControlPointChanged(entity, pos, RebuildTranslation, velocityKnob, accelerationKnob)
             },
             new ScaleComponent { Scale = Vector2.One * PositionKnobSize },
             new TranslationPointComponent { VelocityMarker = velocityKnob, AccelerationMarker = accelerationKnob },
@@ -89,6 +92,57 @@ internal sealed class PathEditor
 
         return entity;
     }
+
+    public Entity CreateRotationPoint(Vector2 position, bool rebuildPath = true, bool addToEnd = false)
+    {
+        var headingKnob = CreateDerivativeKnob(0, position, RebuildRotation);
+
+        var entity = _world.Create(
+            new PositionComponent
+            {
+                Position = position,
+                UpdateCallback = (entity, pos) => OnControlPointChanged(entity, pos, RebuildRotation, headingKnob)
+            },
+            new ScaleComponent { Scale = Vector2.One * PositionKnobSize },
+            new RotationPointComponent { HeadingMarker = headingKnob },
+            new SpriteComponent { Sprite = _velocitySprite });
+
+        if (!addToEnd && _rotationPoints.Count >= 2)
+        {
+            var translationPosition = TranslationSpline.Project(position);
+
+            if (translationPosition < AddToEndThreshold)
+            {
+                _translationPoints.Insert(0, entity);
+            }
+            else if (translationPosition > (1 - AddToEndThreshold))
+            {
+                _translationPoints.Add(entity);
+            }
+            else
+            {
+                var closestTwo = _translationPoints.OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, position)).Take(2).ToArray();
+
+                var index = Math.Clamp(
+                    (_translationPoints.IndexOf(closestTwo[0]) + _translationPoints.IndexOf(closestTwo[1])) / 2 + 1, 0,
+                    _translationPoints.Count);
+
+                _translationPoints.Insert(index, entity);
+            }
+        }
+        else
+        {
+            _translationPoints.Add(entity);
+        }
+
+        if (rebuildPath)
+        {
+            RebuildTranslation();
+        }
+
+        return entity;
+    }
+
 
     public void Clear()
     {
@@ -168,7 +222,7 @@ internal sealed class PathEditor
         return entity;
     }
 
-    private void OnTranslationPointChanged(Entity entity, Vector2 oldPosition, Action trajectoryCallback, params Entity[] knobs)
+    private void OnControlPointChanged(Entity entity, Vector2 oldPosition, Action trajectoryCallback, params Entity[] knobs)
     {
         var displacement = entity.Get<PositionComponent>().Position - oldPosition;
 
@@ -201,6 +255,11 @@ internal sealed class PathEditor
         TranslationSpline.UpdateRenderPoints();
 
         ArcLength = TranslationSpline.ComputeArcLength();
+    }
+
+    public void RebuildRotation()
+    {
+
     }
 
     public static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
