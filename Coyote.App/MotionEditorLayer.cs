@@ -257,7 +257,15 @@ internal class MotionEditorLayer : Layer, ITabStyle
                     {
                         if (!string.IsNullOrEmpty(_motionProjectName))
                         {
+                            var overwrote = _app.Project.MotionProjects.ContainsKey(_motionProjectName);
+
                             SaveProject();
+
+                            _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_motionProjectName}");
+                        }
+                        else
+                        {
+                            _app.ToastError("Invalid project name!");
                         }
                     }
 
@@ -274,6 +282,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
                     {
                         _motionProjectName = items[_selectedProject];
                         LoadProject(_motionProjectName);
+
+                        _app.ToastInfo($"Loaded project {_motionProjectName}");
                     }
 
                     ImGui.EndTabItem();
@@ -468,6 +478,12 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private void RenderEditor()
     {
+        void Draw()
+        {
+            _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
+            _editorBatch.Clear();
+        }
+
         _editorBatch.Clear();
 
         if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive())
@@ -482,12 +498,13 @@ internal class MotionEditorLayer : Layer, ITabStyle
         }
 
         Systems.RenderSprites(_world, _editorBatch);
-        Systems.RenderConnections(_world, _editorBatch);
-        
+        Draw();
         _path.DrawTranslationPath(_editorBatch);
+        Draw();
         _path.DrawIndicator(_editorBatch, MouseWorld);
-
-        _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
+        Draw();
+        Systems.RenderConnections(_world, _editorBatch);
+        Draw();
     }
 
     protected override void Render(FrameInfo frameInfo)

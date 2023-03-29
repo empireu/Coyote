@@ -1,7 +1,11 @@
-﻿using System.Numerics;
+﻿using System.Drawing;
+using System.Numerics;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.ImGui;
+using GameFramework.Renderer.Batch;
+using GameFramework.Renderer.Text;
+using GameFramework.Scene;
 using GameFramework.Utilities;
 using ImGuiNET;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +18,10 @@ internal class App : GameApplication
     private const string Extension = "awoo";
 
     private readonly IServiceProvider _serviceProvider;
+    
+    public SdfFont Font { get; }
+    public ToastManager ToastManager { get; }
+    private readonly QuadBatch _toastBatch;
 
     private LayerController? _layerController;
 
@@ -25,6 +33,8 @@ internal class App : GameApplication
     private int _selectedIndex;
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
+
+    private readonly OrthographicCameraController2D _toastCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
 
     public App(IServiceProvider serviceProvider)
     {
@@ -40,6 +50,26 @@ internal class App : GameApplication
         }
 
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
+
+        Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
+        Font.Options.SetWeight(0.46f);
+
+        ToastManager = new ToastManager(this);
+        _toastBatch = new QuadBatch(this);
+
+        ResizeToastCamera();
+    }
+
+    private void ResizeToastCamera()
+    {
+        _toastCamera.Camera.AspectRatio = Window.Width / (float)Window.Height;
+    }
+
+    protected override void Resize(Size size)
+    {
+        ResizeToastCamera();
+
+        base.Resize(size);
     }
 
     protected override IServiceProvider BuildLayerServiceProvider(ServiceCollection registeredServices)
@@ -124,6 +154,16 @@ internal class App : GameApplication
         ImGui.EndMainMenuBar();
     }
 
+    public void ToastInfo(string message)
+    {
+        ToastManager.Add(new ToastNotification(ToastNotificationType.Information, message));
+    }
+
+    public void ToastError(string message)
+    {
+        ToastManager.Add(new ToastNotification(ToastNotificationType.Error, message));
+    }
+
     private void SubmitProjectLoad()
     {
         if (ImGui.Begin("Project Manager"))
@@ -143,6 +183,10 @@ internal class App : GameApplication
                             if (!File.Exists(name))
                             {
                                 _project = Project.Create(name);
+
+                                ToastInfo("Created Project");
+
+                                _layerController!.Selected.Enable();
                             }
                         }
                     }
@@ -159,6 +203,10 @@ internal class App : GameApplication
                         if (_selectedIndex >= 0 && _selectedIndex < _detectedFiles.Length)
                         {
                             _project = Project.Load(_detectedFiles[_selectedIndex]);
+
+                            ToastInfo("Loaded Project");
+
+                            _layerController!.Selected.Enable();
                         }
                     }
 
@@ -175,5 +223,17 @@ internal class App : GameApplication
     public static EmbeddedResourceKey Asset(string name)
     {
         return new EmbeddedResourceKey(typeof(App).Assembly, $"Coyote.App.Assets.{name}");
+    }
+
+    protected override void AfterRender(FrameInfo frameInfo)
+    {
+        _toastBatch.Clear();
+        _toastBatch.Effects = QuadBatchEffects.Transformed(_toastCamera.Camera.CameraMatrix);
+
+        ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.90f);
+
+        _toastBatch.Submit();
+
+        base.AfterRender(frameInfo);
     }
 }
