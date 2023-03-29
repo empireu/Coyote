@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
@@ -11,9 +12,11 @@ using GameFramework.PostProcessing;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Scene;
+using GameFramework.Utilities;
 using GameFramework.Utilities.Extensions;
 using ImGuiNET;
 using Veldrid;
+using Point = System.Drawing.Point;
 
 namespace Coyote.App;
 
@@ -25,7 +28,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
         TranslateDelete,
     }
 
-    private static readonly Dictionary<ToolType, string> ToolDescriptions = new Dictionary<ToolType, string>
+    private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
     {
         { ToolType.TranslateAdd , "Add Translation Points" },
         { ToolType.TranslateDelete, "Delete Translation Points" }
@@ -43,9 +46,18 @@ internal class MotionEditorLayer : Layer, ITabStyle
     
     private ImGuiRenderer ImGuiRenderer => _imGuiLayer.Renderer;
 
-    private readonly QuadBatch _batch;
+    private readonly QuadBatch _editorBatch;
+    private readonly QuadBatch _playerBatch;
 
-    private readonly PostProcessor _processor;
+    // Used by the editor (translation and rotation)"
+    private readonly PostProcessor _editorProcessor;
+
+    // Used by the player window:
+    private Texture? _playerTexture;
+    private Framebuffer? _playerFramebuffer;
+    private nint _playerBinding;
+    private Point _playerSize = new(-1, -1);
+
     private readonly CommandList _commandList;
 
     private readonly Sprite _fieldSprite;
@@ -59,6 +71,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private ToolType _selectedTool = ToolType.TranslateAdd;
 
     private Entity? _selectedEntity;
+
+    private readonly Stopwatch _playerWatch = Stopwatch.StartNew();
 
     public MotionEditorLayer(GameApplication app, ImGuiLayer imGuiLayer)
     {
@@ -74,10 +88,21 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         _cameraController.FutureZoom = FieldSize;
 
-        _batch = new QuadBatch(app);
+        _editorBatch = new QuadBatch(app);
+        _playerBatch = new QuadBatch(app)
+        {
+            Effects = QuadBatchEffects.None with
+            {
+                Transform = Matrix4x4.CreateOrthographic(
+                    FieldSize,
+                    FieldSize,
+                    -1,
+                    1)
+            }
+        };
 
-        _processor = new PostProcessor(app);
-        _processor.BackgroundColor = new RgbaFloat(25f / 255f, 25f / 255f, 25f / 255f, 1f);
+        _editorProcessor = new PostProcessor(app);
+        _editorProcessor.BackgroundColor = new RgbaFloat(25f / 255f, 25f / 255f, 25f / 255f, 1f);
 
         _commandList = app.Device.ResourceFactory.CreateCommandList();
 
@@ -87,7 +112,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _world = World.Create();
         _path = new PathEditor(app, _world);
 
-        UpdatePipeline();
+        UpdateEditorPipeline();
     }
 
     protected override void OnAdded()
@@ -164,8 +189,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
             return;
         }
 
-        ImGui.DockSpaceOverViewport(ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode);
-
         if (ImGui.Begin("Tools"))
         {
             foreach (var value in Enum.GetValues<ToolType>())
@@ -187,21 +210,89 @@ internal class MotionEditorLayer : Layer, ITabStyle
         }
 
         ImGui.End();
+
+        if (ImGui.Begin("Player"))
+        {
+            var wndSize = ImGui.GetWindowSize();
+
+            var min = new Vector2(Math.Min(wndSize.X, wndSize.Y));
+
+            var imageSize = (min * 0.95f).ToPoint();
+
+            if (imageSize != _playerSize)
+            {
+                _playerSize = imageSize;
+                UpdatePlayerPipeline();
+            }
+
+            RenderPlayer();
+
+            ImGui.Image(_playerBinding, imageSize.ToVector2());
+        }
+
+        ImGui.End();
     }
 
     protected override void Resize(Size size)
     {
-        UpdatePipeline();
+        UpdateEditorPipeline();
     }
 
-    private void UpdatePipeline()
+    private void UpdateEditorPipeline()
     {
         _cameraController.Camera.AspectRatio = _app.Window.Width / (float)_app.Window.Height;
 
-        _processor.ResizeInputs(_app.Window.Size() * 2);
-        _processor.SetOutput(_app.Device.SwapchainFramebuffer);
-        _batch.UpdatePipelines(outputDescription: _processor.InputFramebuffer.OutputDescription);
-        _path.UpdatePipelines(_processor.InputFramebuffer.OutputDescription);
+        _editorProcessor.ResizeInputs(_app.Window.Size() * 2);
+        _editorProcessor.SetOutput(_app.Device.SwapchainFramebuffer);
+        _editorBatch.UpdatePipelines(outputDescription: _editorProcessor.InputFramebuffer.OutputDescription);
+    }
+
+    private void RenderPlayer()
+    {
+        var framebuffer = Assert.NotNull(_playerFramebuffer);
+
+        _commandList.Begin();
+        _commandList.SetFramebuffer(framebuffer);
+        _commandList.ClearColorTarget(0, RgbaFloat.Clear);
+        _commandList.End();
+        _app.Device.SubmitCommands(_commandList);
+
+        _playerBatch.Clear();
+        _playerBatch.TexturedQuad(Vector2.Zero, new Vector2(FieldSize, -FieldSize), _fieldSprite.Texture);
+        _playerBatch.Submit(framebuffer: framebuffer); _playerBatch.Submit(framebuffer: framebuffer);
+
+        _playerBatch.Clear();
+        _path.DrawTranslationPath(_playerBatch, v => v with { Y = -v.Y });
+        _playerBatch.Submit(framebuffer: framebuffer);
+    }
+
+    private void UpdatePlayerPipeline()
+    {
+        if (_playerTexture != null)
+        {
+            ImGuiRenderer.RemoveImGuiBinding(_playerTexture);
+            _playerTexture.Dispose();
+        }
+
+        _playerTexture = _app.Device.ResourceFactory.CreateTexture(TextureDescription.Texture2D(
+            (uint)(_playerSize.X * 2),
+            (uint)(_playerSize.Y * 2),
+            1,
+            1,
+            PixelFormat.R8_G8_B8_A8_UNorm,
+            TextureUsage.Sampled
+        ));
+
+        _playerFramebuffer?.Dispose();
+        _playerFramebuffer = _app.Device.ResourceFactory.CreateFramebuffer(
+            new FramebufferDescription(null, colorTargets: new[]
+            {
+                new FramebufferAttachmentDescription(_playerTexture!, 0)
+            }));
+
+        _playerBatch.UpdatePipelines(outputDescription: _playerFramebuffer!.OutputDescription);
+
+        _playerBinding = ImGuiRenderer.GetOrCreateImGuiBinding(_app.Resources.Factory, _playerTexture!);
     }
 
     private void UpdateCamera(FrameInfo frameInfo)
@@ -242,44 +333,40 @@ internal class MotionEditorLayer : Layer, ITabStyle
        UpdateSelection(frameInfo);
     }
 
-    private void RenderBackground()
+    private void RenderEditor()
     {
-        _batch.Clear();
-        _batch.TexturedQuad(Vector2.Zero, Vector2.One * FieldSize, _fieldSprite.Texture);
-        _batch.Submit(framebuffer: _processor.InputFramebuffer);
-    }
-
-    private void RenderWorld()
-    {
-        _batch.Clear();
+        _editorBatch.Clear();
 
         if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive())
         {
             var selected = _selectedEntity.Value;
             var rectangle = selected.GetRectangle();
 
-            _batch.Quad(
+            _editorBatch.Quad(
                 new Vector2(rectangle.CenterX(), rectangle.CenterY()),
                 Vector2.One * new Vector2(rectangle.Width, rectangle.Height), 
                 new RgbaFloat4(0, 1, 0, 0.5f));
         }
 
-        Systems.RenderSprites(_world, _batch);
-        Systems.RenderConnections(_world, _batch);
-        _path.DrawPaths(_processor.InputFramebuffer, _cameraController.Camera.CameraMatrix);
+        Systems.RenderSprites(_world, _editorBatch);
+        Systems.RenderConnections(_world, _editorBatch);
+        _path.DrawTranslationPath(_editorBatch);
 
-        _batch.Submit(framebuffer: _processor.InputFramebuffer);
+        _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
     }
 
     protected override void Render(FrameInfo frameInfo)
     {
-        _batch.Effects = QuadBatchEffects.Transformed(_cameraController.Camera.CameraMatrix);
+        _editorBatch.Effects = QuadBatchEffects.Transformed(_cameraController.Camera.CameraMatrix);
 
-        _processor.ClearColor();
-        
-        RenderBackground();
-        RenderWorld();
+        _editorProcessor.ClearColor();
 
-        _processor.Render();
+        _editorBatch.Clear();
+        _editorBatch.TexturedQuad(Vector2.Zero, Vector2.One * FieldSize, _fieldSprite.Texture);
+        _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
+
+        RenderEditor();
+
+        _editorProcessor.Render();
     }
 }

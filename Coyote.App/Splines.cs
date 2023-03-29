@@ -33,6 +33,8 @@ internal class UniformSpline
 
     public List<QuinticSplineSegment> Segments { get; } = new();
 
+    private Vector2[] _renderPoints = Array.Empty<Vector2>();
+
     public void Clear()
     {
         Segments.Clear();
@@ -43,7 +45,7 @@ internal class UniformSpline
         Segments.Add(segment);
     }
 
-    public void Render(QuadBatch batch)
+    public void UpdateRenderPoints()
     {
         if (Segments.Count == 0)
         {
@@ -62,9 +64,28 @@ internal class UniformSpline
             }
         }
 
-        for (var i = 1; i < points.Count; i++)
+        _renderPoints = points.ToArray();
+    }
+
+    public void Render(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
+    {
+        if (_renderPoints.Length < 2)
         {
-            batch.Line(points[i - 1], points[i], LineColor, LineThickness);
+            return;
+        }
+
+        for (var i = 1; i < _renderPoints.Length; i++)
+        {
+            var start = _renderPoints[i - 1];
+            var end = _renderPoints[i];
+
+            if (mapping != null)
+            {
+                start = mapping(start);
+                end = mapping(end);
+            }
+            
+            batch.Line(start, end, LineColor, LineThickness);
         }
     }
 

@@ -1,12 +1,9 @@
-﻿using System;
-using System.Numerics;
+﻿using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework;
-using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
-using GameFramework.Utilities;
 using Veldrid;
 
 namespace Coyote.App;
@@ -18,8 +15,6 @@ internal sealed class PathEditor
     private const float PositionKnobSize = 0.05f;
     private const float KnobSensitivity = 5;
 
-   
-
     private readonly World _world;
     private readonly List<Entity> _translationPoints = new();
 
@@ -27,14 +22,11 @@ internal sealed class PathEditor
     private readonly Sprite _velocitySprite;
     private readonly Sprite _accelerationSprite;
 
-    private readonly QuadBatch _lineBatch;
-
-    private readonly UniformSpline _spline = new();
+    public UniformSpline Spline { get; } = new();
 
     public PathEditor(GameApplication app, World world)
     {
         _world = world;
-        _lineBatch = new QuadBatch(app);
 
         _positionSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.PositionMarker.png"));
         _velocitySprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.VelocityMarker.png"));
@@ -118,8 +110,7 @@ internal sealed class PathEditor
 
     private void OnTranslationChanged()
     {
-        _lineBatch.Clear();
-        _spline.Clear();
+        Spline.Clear();
 
         if (_translationPoints.Count < 2)
         {
@@ -131,10 +122,10 @@ internal sealed class PathEditor
             UnpackTranslation(_translationPoints[i - 1], out var p0, out var v0, out var a0);
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
-            _spline.Add(new QuinticSplineSegment(p0, v0, a0, a1, v1, p1));
+            Spline.Add(new QuinticSplineSegment(p0, v0, a0, a1, v1, p1));
         }
-        
-        _spline.Render(_lineBatch);
+
+        Spline.UpdateRenderPoints();
     }
 
     private static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
@@ -149,15 +140,8 @@ internal sealed class PathEditor
         acceleration *= KnobSensitivity;
     }
 
-    public void UpdatePipelines(OutputDescription description)
+    public void DrawTranslationPath(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
     {
-        _lineBatch.UpdatePipelines(outputDescription: description);
-    }
-
-    public void DrawPaths(Framebuffer framebuffer, Matrix4x4 transform)
-    {
-        _lineBatch.Effects = QuadBatchEffects.Transformed(transform);
-      
-        _lineBatch.Submit(framebuffer: framebuffer);
+        Spline.Render(batch, mapping);
     }
 }

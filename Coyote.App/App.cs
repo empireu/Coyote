@@ -50,6 +50,8 @@ internal class App : GameApplication
     {
         Assert.NotNull(ref _layerController);
 
+        ImGui.DockSpaceOverViewport(ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode);
+
         if (ImGui.BeginMainMenuBar())
         {
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
