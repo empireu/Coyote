@@ -2,7 +2,9 @@
 using System.Numerics;
 using GameFramework;
 using GameFramework.Assets;
+using GameFramework.Extensions;
 using GameFramework.ImGui;
+using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Renderer.Text;
 using GameFramework.Scene;
@@ -21,7 +23,9 @@ internal class App : GameApplication
     
     public SdfFont Font { get; }
     public ToastManager ToastManager { get; }
+
     private readonly QuadBatch _toastBatch;
+    private readonly QuadBatch _slideshowBatch;
 
     private LayerController? _layerController;
 
@@ -34,7 +38,9 @@ internal class App : GameApplication
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
-    private readonly OrthographicCameraController2D _toastCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
+    private readonly OrthographicCameraController2D _fullCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
+
+    private readonly Sprite _wallpaper;
 
     public App(IServiceProvider serviceProvider)
     {
@@ -56,18 +62,21 @@ internal class App : GameApplication
 
         ToastManager = new ToastManager(this);
         _toastBatch = new QuadBatch(this);
+        _slideshowBatch = new QuadBatch(this);
 
-        ResizeToastCamera();
+        _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
+
+        ResizeCamera();
     }
 
-    private void ResizeToastCamera()
+    private void ResizeCamera()
     {
-        _toastCamera.Camera.AspectRatio = Window.Width / (float)Window.Height;
+        _fullCamera.Camera.AspectRatio = Window.Width / (float)Window.Height;
     }
 
     protected override void Resize(Size size)
     {
-        ResizeToastCamera();
+        ResizeCamera();
 
         base.Resize(size);
     }
@@ -225,10 +234,20 @@ internal class App : GameApplication
         return new EmbeddedResourceKey(typeof(App).Assembly, $"Coyote.App.Assets.{name}");
     }
 
+    protected override void Render(FrameInfo frameInfo)
+    {
+        _slideshowBatch.Clear();
+        _slideshowBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
+        _slideshowBatch.TexturedQuad(Vector2.Zero, Vector2.Normalize(new Vector2(3840, 1920)) * 3, _wallpaper.Texture);
+        _slideshowBatch.Submit();
+
+        base.Render(frameInfo);
+    }
+
     protected override void AfterRender(FrameInfo frameInfo)
     {
         _toastBatch.Clear();
-        _toastBatch.Effects = QuadBatchEffects.Transformed(_toastCamera.Camera.CameraMatrix);
+        _toastBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
 
         ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.90f);
 

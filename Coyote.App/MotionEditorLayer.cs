@@ -209,7 +209,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         if (ImGui.Begin("Tools"))
         {
-            ImGui.TextColored(new Vector4(1, 1, 0, 1), "Path Tools");
+            ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
             ImGui.BeginGroup();
 
             foreach (var value in Enum.GetValues<ToolType>())
@@ -232,7 +232,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
             ImGui.EndGroup();
 
-            ImGui.TextColored(new Vector4(1, 1, 0, 1), "Review");
+            ImGui.TextColored(new Vector4(1, 1, 1, 1), "Review");
             ImGui.BeginGroup();
             
             if (ImGui.Button("Player"))

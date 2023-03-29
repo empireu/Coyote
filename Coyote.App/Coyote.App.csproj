@@ -13,6 +13,7 @@
     <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
+    <None Remove="Assets\Images\Slideshow0.png" />
     <None Remove="Assets\Images\VelocityMarker.png" />
     <None Remove="tuke0aai.2w1~" />
   </ItemGroup>
@@ -23,6 +24,7 @@
     <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
     <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />
+    <EmbeddedResource Include="Assets\Images\Slideshow0.png" />
     <EmbeddedResource Include="Assets\Images\VelocityMarker.png" />
   </ItemGroup>
 
