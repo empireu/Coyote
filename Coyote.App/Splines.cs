@@ -39,6 +39,8 @@ internal readonly struct QuinticSplineSegment
 internal class UniformQuinticSpline
 {
     private const int ProjectionSamples = 128;
+    private const int DescentSteps = 32;
+    private const double DescentFalloff = 1.25;
     
     private const int SamplesPerSegment = 64;
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
@@ -168,7 +170,51 @@ internal class UniformQuinticSpline
             }
         }
 
-        return closest;
+        static double CentralFiniteDifference(Func<double, double> function, double x, double epsilon)
+        {
+            return (function(x + epsilon) - function(x - epsilon)) / (2d * epsilon);
+        }
+
+        double ProjectError(double t)
+        {
+            Evaluate(Math.Clamp(t, 0, 1), out var x, out var y);
+
+            var dx = x - position.X;
+            var dy = y - position.Y;
+
+            return dx * dx + dy * dy;
+        }
+
+        var optimizedClosest = (double)closest;
+        var descentRate = 1d / ProjectionSamples;
+
+        for (var i = 0; i < DescentSteps; i++)
+        {
+            var errorLeft = ProjectError(optimizedClosest - descentRate);
+            var errorRight= ProjectError(optimizedClosest + descentRate);
+
+            var step = -descentRate;
+            var adjustedError = errorLeft;
+
+            if (errorRight < errorLeft)
+            {
+                step = descentRate;
+                adjustedError = errorRight;
+            }
+
+            var currentError = ProjectError(optimizedClosest);
+
+            if (adjustedError > currentError)
+            {
+                descentRate = Math.Pow(descentRate, DescentFalloff);
+
+                continue;
+            }
+
+            optimizedClosest += step;
+        }
+
+        return (float)optimizedClosest;
     }
 }
 
