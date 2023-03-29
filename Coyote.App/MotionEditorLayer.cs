@@ -39,7 +39,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private const float MinZoom = 1f;
     private const float MaxZoom = 5f;
 
-    private readonly GameApplication _app;
+    private readonly App _app;
     private readonly ImGuiLayer _imGuiLayer;
     
     private ImGuiRenderer ImGuiRenderer => _imGuiLayer.Renderer;
@@ -75,9 +75,13 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private int _pickIndex;
 
-    public MotionEditorLayer(GameApplication app, ImGuiLayer imGuiLayer)
+    private string _motionProjectName = "My Project";
+    private int _selectedProject;
+
+    public MotionEditorLayer(App app, ImGuiLayer imGuiLayer)
     {
         _app = app;
+
         _imGuiLayer = imGuiLayer;
 
         imGuiLayer.Submit += ImGuiLayerOnSubmit;
@@ -241,6 +245,46 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         ImGui.End();
 
+        if (ImGui.Begin("Project"))
+        {
+            if (ImGui.BeginTabBar("Motion Projects"))
+            {
+                if (ImGui.BeginTabItem("Save"))
+                {
+                    ImGui.InputText("Name", ref _motionProjectName, 100);
+
+                    if (ImGui.Button("OK"))
+                    {
+                        if (!string.IsNullOrEmpty(_motionProjectName))
+                        {
+                            SaveProject();
+                        }
+                    }
+
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Open"))
+                {
+                    var items = _app.Project.MotionProjects.Keys.ToArray();
+
+                    ImGui.Combo("Projects", ref _selectedProject, items, items.Length);
+
+                    if (ImGui.Button("OK") && _selectedProject >= 0 && _selectedProject < items.Length)
+                    {
+                        _motionProjectName = items[_selectedProject];
+                        LoadProject(_motionProjectName);
+                    }
+
+                    ImGui.EndTabItem();
+                }
+            }
+
+            ImGui.EndTabBar();
+        }
+
+        ImGui.End();
+
         if (ImGui.Begin("Inspector"))
         {
 
@@ -271,6 +315,16 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
             ImGui.End();
         }
+    }
+
+    private void SaveProject()
+    {
+        
+    }
+
+    private void LoadProject(string project)
+    {
+
     }
 
     protected override void Resize(Size size)

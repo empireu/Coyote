@@ -10,11 +10,21 @@ using Veldrid;
 namespace Coyote.App;
 internal class App : GameApplication
 {
+    private const string ProjectDirectory = "./projects/";
+    private const string Extension = "awoo";
+
     private readonly IServiceProvider _serviceProvider;
 
     private LayerController? _layerController;
 
-    private bool _initialized;
+    private Project? _project;
+
+    private readonly string[] _detectedFiles;
+
+    private string _projectName = "";
+    private int _selectedIndex;
+
+    public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
     public App(IServiceProvider serviceProvider)
     {
@@ -23,6 +33,13 @@ internal class App : GameApplication
         ClearColor = RgbaFloat.Black;
 
         Window.Title = "Coyote";
+
+        if (!Directory.Exists(ProjectDirectory))
+        {
+            Directory.CreateDirectory(ProjectDirectory);
+        }
+
+        _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
     }
 
     protected override IServiceProvider BuildLayerServiceProvider(ServiceCollection registeredServices)
@@ -36,7 +53,8 @@ internal class App : GameApplication
 
         Layers.ConstructLayer<ImGuiLayer>(imGui =>
         {
-            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable;
+            var io = ImGui.GetIO();
+            io.ConfigFlags |= ImGuiConfigFlags.DockingEnable;
             ImGuiStyles.Dark();
 
             ImGui.LoadIniSettingsFromDisk("imgui.ini");
@@ -48,6 +66,13 @@ internal class App : GameApplication
             Layers.ConstructLayer<MotionEditorLayer>(),
             Layers.ConstructLayer<TestLayer>()
         );
+
+        _layerController.Selected.Disable();
+    }
+
+    private string GetProjectFile(string name)
+    {
+        return $"{ProjectDirectory}{name}.{Extension}";
     }
 
     private void ImGuiOnSubmit(ImGuiRenderer obj)
@@ -55,6 +80,12 @@ internal class App : GameApplication
         Assert.NotNull(ref _layerController);
 
         ImGui.DockSpaceOverViewport(ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode);
+
+        if (_project == null)
+        {
+            SubmitProjectLoad();
+            return;
+        }
 
         if (ImGui.BeginMainMenuBar())
         {
@@ -86,6 +117,54 @@ internal class App : GameApplication
         }
 
         ImGui.EndMainMenuBar();
+    }
+
+    private void SubmitProjectLoad()
+    {
+        if (ImGui.Begin("Project Manager"))
+        {
+            if(ImGui.BeginTabBar("Create or Load"))
+            {
+                if (ImGui.BeginTabItem("Create"))
+                {
+                    ImGui.InputText("Name", ref _projectName, 100);
+
+                    if (ImGui.Button("OK"))
+                    {
+                        if (!string.IsNullOrEmpty(_projectName))
+                        {
+                            var name = GetProjectFile(_projectName);
+
+                            if (!File.Exists(name))
+                            {
+                                _project = Project.Create(name);
+                            }
+                        }
+                    }
+
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Load"))
+                {
+                    ImGui.Combo("Projects", ref _selectedIndex, _detectedFiles, _detectedFiles.Length);
+
+                    if (ImGui.Button("OK"))
+                    {
+                        if (_selectedIndex >= 0 && _selectedIndex < _detectedFiles.Length)
+                        {
+                            _project = Project.Load(_detectedFiles[_selectedIndex]);
+                        }
+                    }
+
+                    ImGui.EndTabItem();
+                }
+            }
+
+            ImGui.EndTabBar();
+        }
+
+        ImGui.End();
     }
 
     public static EmbeddedResourceKey Asset(string name)

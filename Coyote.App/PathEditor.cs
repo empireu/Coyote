@@ -5,7 +5,6 @@ using GameFramework;
 using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
-using Veldrid;
 
 namespace Coyote.App;
 
