@@ -31,17 +31,11 @@ internal struct SpriteComponent
 
 internal struct TranslationPointComponent
 {
-    public static readonly Vector4 VelocityLineColor = new(1, 0, 0, 0.5f);
-    public static readonly Vector4 AccelerationLineColor = new(1, 1, 0, 0.5f);
+    public static readonly Vector4 VelocityLineColor = new(1, 0, 0, 0.9f);
+    public static readonly Vector4 AccelerationLineColor = new(1, 1, 0, 0.9f);
     public const float VelocityLineThickness = 0.01f;
     public const float AccelerationLineThickness = 0.008f;
 
     public Entity VelocityMarker;
     public Entity AccelerationMarker;
-}
-
-internal struct PathLinkComponent
-{
-    public Entity Previous;
-    public Entity Next;
 }

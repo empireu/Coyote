@@ -21,12 +21,14 @@ internal class MotionEditorLayer : Layer, ITabStyle
 {
     private enum ToolType
     {
-        TranslateAdd
+        TranslateAdd,
+        TranslateDelete,
     }
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new Dictionary<ToolType, string>
     {
-        { ToolType.TranslateAdd , "Add Translation Points" }
+        { ToolType.TranslateAdd , "Add Translation Points" },
+        { ToolType.TranslateDelete, "Delete Translation Points" }
     };
 
     public const float FieldSize = 3.66f;
@@ -129,13 +131,23 @@ internal class MotionEditorLayer : Layer, ITabStyle
     {
         _selectedEntity = null;
 
+        if (!@event.Down)
+        {
+            return;
+        }
+
         if (_selectedTool == ToolType.TranslateAdd)
         {
-            if(@event.Down)
-            {
-                Console.WriteLine("Add Point");
+            AddTranslationPoint();
+        }
 
-                AddTranslationPoint();
+        if (_selectedTool == ToolType.TranslateDelete)
+        {
+            var picked = _world.PickEntity(MouseWorld);
+
+            if (picked.HasValue && picked.Value.IsAlive() && _path.IsTranslationPoint(picked.Value))
+            {
+                _path.DeleteTranslationPoints(picked.Value);
             }
         }
     }
@@ -189,6 +201,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _processor.ResizeInputs(_app.Window.Size() * 2);
         _processor.SetOutput(_app.Device.SwapchainFramebuffer);
         _batch.UpdatePipelines(outputDescription: _processor.InputFramebuffer.OutputDescription);
+        _path.UpdatePipelines(_processor.InputFramebuffer.OutputDescription);
     }
 
     private void UpdateCamera(FrameInfo frameInfo)
@@ -253,7 +266,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         Systems.RenderSprites(_world, _batch);
         Systems.RenderConnections(_world, _batch);
-        _path.DrawPaths(_batch);
+        _path.DrawPaths(_processor.InputFramebuffer, _cameraController.Camera.CameraMatrix);
 
         _batch.Submit(framebuffer: _processor.InputFramebuffer);
     }

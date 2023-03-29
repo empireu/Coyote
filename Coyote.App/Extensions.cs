@@ -39,7 +39,7 @@ internal static class Extensions
         {
             foreach (var entity in chunk.Entities)
             {
-                if (entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
+                if (entity.IsAlive() && entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
                 {
                     return entity;
                 }
@@ -65,5 +65,10 @@ internal static class Extensions
         component.Position = position;
 
         component.UpdateCallback?.Invoke(entity, oldPosition);
+    }
+
+    public static Vector2 Xy(this Vector3 v)
+    {
+        return new Vector2(v.X, v.Y);
     }
 }
