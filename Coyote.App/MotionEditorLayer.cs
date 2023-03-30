@@ -24,12 +24,14 @@ internal class MotionEditorLayer : Layer, ITabStyle
     {
         TranslateAdd,
         TranslateDelete,
+        RotateAdd
     }
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
     {
         { ToolType.TranslateAdd , "Add Translation Points" },
-        { ToolType.TranslateDelete, "Delete Translation Points" }
+        { ToolType.TranslateDelete, "Delete Translation Points" },
+        { ToolType.RotateAdd, "Add Rotation Point" }
     };
 
     public const float FieldSize = 3.66f;
@@ -182,21 +184,28 @@ internal class MotionEditorLayer : Layer, ITabStyle
             return;
         }
 
-        if (_selectedTool == ToolType.TranslateAdd)
+        switch (_selectedTool)
         {
-            _path.CreateTranslationPoint(MouseWorld);
-        }
-
-        if (_selectedTool == ToolType.TranslateDelete)
-        {
-            SelectEntity();
-
-            if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsTranslationPoint(_selectedEntity.Value))
+            case ToolType.TranslateAdd:
+                _path.CreateTranslationPoint(MouseWorld);
+                break;
+            case ToolType.TranslateDelete:
             {
-                _path.DeleteTranslationPoints(_selectedEntity.Value);
-            }
+                SelectEntity();
 
-            _selectedEntity = null;
+                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsTranslationPoint(_selectedEntity.Value))
+                {
+                    _path.DestroyTranslationPoint(_selectedEntity.Value);
+                }
+
+                _selectedEntity = null;
+                break;
+            }
+            case ToolType.RotateAdd:
+                _path.CreateRotationPoint(MouseWorld);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
     }
 
@@ -410,7 +419,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         _playerBatch.Clear();
 
-        const float speed = 1.5f;
+        const float speed = 1f;
 
         if (_path.ArcLength > 0)
         {
@@ -423,9 +432,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
             else
             {
                 var translation = Map(_path.TranslationSpline.Evaluate(t));
-                var tangent = Map(_path.TranslationSpline.EvaluateDerivative1(t));
 
-                var pose = new Pose(translation, tangent);
+                var pose = _path.RotationSpline.IsEmpty 
+                    ? new Pose(translation, Map(_path.TranslationSpline.EvaluateDerivative1(t))) // Spline Tangent Heading
+                    : new Pose(translation, -(float)_path.RotationSpline.Evaluate(t)); // Spline Spline Heading
 
                 pose -= MathF.PI / 2f;
 

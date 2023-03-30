@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Numerics;
 using GameFramework.Extensions;
 using GameFramework.Renderer.Batch;
@@ -249,7 +250,10 @@ internal readonly struct CubicSplineSegment
 internal class MappedCubicSpline
 {
     private readonly List<CubicSplineSegment> _segments = new();
-    
+
+    public IReadOnlyList<CubicSplineSegment> Segments => _segments;
+    public bool IsEmpty => Segments.Count == 0;
+
     public void Insert(CubicSplineSegment segment)
     {
         if (segment.KeyEnd <= segment.KeyStart)
@@ -321,9 +325,12 @@ internal class MappedCubicSpline
             0,
             1);
 
-        Console.WriteLine($"Prog: {progress}, sv: {segment.P0}->{segment.P1}");
-
         return segment.Evaluate(progress);
+    }
+
+    public void Clear()
+    {
+        _segments.Clear();
     }
 }
 
@@ -354,8 +361,6 @@ internal class MappedCubicSplineBuilder
             Value = value,
             Tension = tension
         });
-
-        return this;
     }
 
     public bool IsValid()
@@ -363,7 +368,7 @@ internal class MappedCubicSplineBuilder
         return _points.Count > 1;
     }
 
-    public MappedCubicSpline Build()
+    public void Build(MappedCubicSpline spline)
     {
         if (!IsValid())
         {
@@ -385,8 +390,6 @@ internal class MappedCubicSplineBuilder
             return _points[index];
         }
 
-        var spline = new MappedCubicSpline();
-
         for (var i = 1; i < _points.Count; i++)
         {
             var previous = Get(i - 2);
@@ -402,8 +405,6 @@ internal class MappedCubicSplineBuilder
                 next.Value * right.Tension, 
                 right.Value));
         }
-
-        return spline;
     }
 
     public void Clear()

@@ -36,5 +36,14 @@ internal static class Systems
                 TranslationPointComponent.AccelerationLineColor,
                 TranslationPointComponent.AccelerationLineThickness);
         });
+
+        world.Query(new QueryDescription().WithAll<PositionComponent, RotationPointComponent>(), (ref PositionComponent positionComponent, ref RotationPointComponent rotationPointComponent) =>
+        {
+            batch.Line(
+                positionComponent.Position,
+                rotationPointComponent.HeadingMarker.Get<PositionComponent>().Position,
+                RotationPointComponent.HeadingLineColor,
+                RotationPointComponent.HeadingLineThickness);
+        });
     }
 }

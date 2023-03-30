@@ -12,6 +12,8 @@ internal struct PositionComponent
 
     // old position
     public UpdateDelegate? UpdateCallback;
+
+    public bool NonMovable;
 }
 
 internal struct ScaleComponent
@@ -47,4 +49,5 @@ internal struct RotationPointComponent
     public const float HeadingLineThickness = 0.01f;
 
     public Entity HeadingMarker;
+    public float Parameter;
 }
