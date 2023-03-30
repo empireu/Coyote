@@ -24,14 +24,16 @@ internal class MotionEditorLayer : Layer, ITabStyle
     {
         TranslateAdd,
         TranslateDelete,
-        RotateAdd
+        RotateAdd,
+        RotateRemove
     }
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
     {
         { ToolType.TranslateAdd , "Add Translation Points" },
         { ToolType.TranslateDelete, "Delete Translation Points" },
-        { ToolType.RotateAdd, "Add Rotation Point" }
+        { ToolType.RotateAdd, "Add Rotation Points" },
+        { ToolType.RotateRemove, "Delete Rotation Points"}
     };
 
     public const float FieldSize = 3.66f;
@@ -204,6 +206,18 @@ internal class MotionEditorLayer : Layer, ITabStyle
             case ToolType.RotateAdd:
                 _path.CreateRotationPoint(MouseWorld);
                 break;
+            case ToolType.RotateRemove:
+            {
+                SelectEntity();
+
+                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsRotationPoint(_selectedEntity.Value))
+                {
+                    _path.DestroyRotationPoint(_selectedEntity.Value);
+                }
+
+                _selectedEntity = null;
+                break;
+            }
             default:
                 throw new ArgumentOutOfRangeException();
         }
