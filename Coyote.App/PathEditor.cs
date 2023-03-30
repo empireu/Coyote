@@ -6,6 +6,7 @@ using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
+using Vortice.Mathematics;
 
 namespace Coyote.App;
 
@@ -422,15 +423,47 @@ internal sealed class PathEditor
 
         var builder = new MappedCubicSplineBuilder();
 
-        foreach (var rotationPoint in _rotationPoints)
-        {
-            UnpackRotation(rotationPoint, out var position, out var heading, out var parameter);
+        var previousAngle = 0f;
 
-            builder.Add(parameter, MathF.Atan2(heading.Y, heading.X));
+        for (var index = 0; index < _rotationPoints.Count; index++)
+        {
+            var rotationPoint = _rotationPoints[index];
+            UnpackRotation(rotationPoint, out _, out var headingVector, out var parameter);
+            var angle = MathF.Atan2(headingVector.Y, headingVector.X);
+
+            if (index > 0)
+            {
+                UnpackRotation(_rotationPoints[index - 1], out _, out _, out var previousParameter);
+
+                // Prevent rare occurrence of equal parameters (e.g. when two points get snapped to the end of the spline)
+                if (parameter.ApproxEquals(previousParameter))
+                {
+                    continue;
+                }
+
+                angle = previousAngle + Mathematics.DeltaAngle(angle, previousAngle);
+            }
+
+            previousAngle = angle;
+
+            builder.Add(parameter, angle);
         }
 
         builder.Build(RotationSpline);
     }
+
+    public static float Closest(float a, float b)
+    {
+        var dir = b % MathF.Tau - a % MathF.Tau;
+
+        if (MathF.Abs(dir) > MathF.PI)
+        {
+            dir = -(MathF.Sign(dir) * MathF.Tau) + dir;
+        }
+
+        return dir;
+    }
+
 
     /// <summary>
     ///     Retrieves translation-specific data from the translation point.

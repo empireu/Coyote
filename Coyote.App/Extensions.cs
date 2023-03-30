@@ -72,4 +72,14 @@ internal static class Extensions
     {
         return new Vector2(v.X, v.Y);
     }
+
+    public static bool ApproxEquals(this float f, float other, float threshold = 10e-6f)
+    {
+        return Math.Abs(f - other) < threshold;
+    }
+
+    public static bool ApproxEquals(this double d, double other, double threshold = 10e-6)
+    {
+        return Math.Abs(d - other) < threshold;
+    }
 }

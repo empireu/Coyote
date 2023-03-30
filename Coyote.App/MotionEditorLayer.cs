@@ -343,7 +343,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                 RenderPlayer();
 
-                ImGui.Image(_playerBinding, imageSize.ToVector2());
+                // Fixes inverted Y coordinate by inverting Y in the texture coordinate.
+                ImGui.Image(_playerBinding, imageSize.ToVector2(), Vector2.Zero, new Vector2(1f, -1f));
             }
 
             ImGui.End();
@@ -413,8 +414,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private void RenderPlayer()
     {
-        Vector2 Map(Vector2 v) => new(v.X, -v.Y);
-
         var framebuffer = Assert.NotNull(_playerFramebuffer);
 
         _commandList.Begin();
@@ -424,16 +423,16 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _app.Device.SubmitCommands(_commandList);
 
         _playerBatch.Clear();
-        _playerBatch.TexturedQuad(Vector2.Zero, Map(new Vector2(FieldSize, FieldSize)), _fieldSprite.Texture);
+        _playerBatch.TexturedQuad(Vector2.Zero, new Vector2(FieldSize, FieldSize), _fieldSprite.Texture);
         _playerBatch.Submit(framebuffer: framebuffer); _playerBatch.Submit(framebuffer: framebuffer);
 
         _playerBatch.Clear();
-        _path.DrawTranslationPath(_playerBatch, Map);
+        _path.DrawTranslationPath(_playerBatch);
         _playerBatch.Submit(framebuffer: framebuffer);
 
         _playerBatch.Clear();
 
-        const float speed = 1f;
+        const float speed = 2.5f;
 
         if (_path.ArcLength > 0)
         {
@@ -445,11 +444,11 @@ internal class MotionEditorLayer : Layer, ITabStyle
             }
             else
             {
-                var translation = Map(_path.TranslationSpline.Evaluate(t));
+                var translation = _path.TranslationSpline.Evaluate(t);
 
                 var pose = _path.RotationSpline.IsEmpty 
-                    ? new Pose(translation, Map(_path.TranslationSpline.EvaluateDerivative1(t))) // Spline Tangent Heading
-                    : new Pose(translation, -(float)_path.RotationSpline.Evaluate(t)); // Spline Spline Heading
+                    ? new Pose(translation, _path.TranslationSpline.EvaluateDerivative1(t)) // Spline Tangent Heading
+                    : new Pose(translation, (float)_path.RotationSpline.Evaluate(t)); // Spline Spline Heading
 
                 pose -= MathF.PI / 2f;
 

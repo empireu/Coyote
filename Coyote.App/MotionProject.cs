@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-using System.Text.Json.Serialization;
-using Arch.Core;
+﻿using System.Text.Json.Serialization;
 using Arch.Core.Extensions;
 
 namespace Coyote.App;
@@ -17,10 +15,25 @@ internal struct JsonTranslationPoint
     public JsonVector2 Acceleration { get; set; }
 }
 
+internal struct JsonRotationPoint
+{
+    [JsonInclude]
+    public JsonVector2 Position { get; set; }
+
+    [JsonInclude]
+    public JsonVector2 Heading { get; set; }
+
+    [JsonInclude]
+    public float Parameter { get; set; }
+}
+
 internal class MotionProject
 {
     [JsonInclude]
     public JsonTranslationPoint[] TranslationPoints { get; set; }
+
+    [JsonInclude]
+    public JsonRotationPoint[] RotationPoints { get; set; }
 
     public void Load(PathEditor editor)
     {
@@ -36,14 +49,26 @@ internal class MotionProject
             component.AccelerationMarker.Move(point.Acceleration);
         }
 
+        foreach (var point in RotationPoints)
+        {
+            var entity = editor.CreateRotationPoint(point.Position, false);
+
+            ref var component = ref entity.Get<RotationPointComponent>();
+
+            component.HeadingMarker.Get<PositionComponent>().Position = point.Heading;
+            component.Parameter = point.Parameter;
+        }
+
         editor.RebuildTranslation();
+        editor.RebuildRotationSpline();
     }
 
     public static MotionProject FromPath(PathEditor editor)
     {
         var project = new MotionProject
         {
-            TranslationPoints = new JsonTranslationPoint[editor.TranslationPoints.Count]
+            TranslationPoints = new JsonTranslationPoint[editor.TranslationPoints.Count],
+            RotationPoints = new JsonRotationPoint[editor.RotationPoints.Count]
         };
 
         for (var i = 0; i < editor.TranslationPoints.Count; i++)
@@ -55,6 +80,21 @@ internal class MotionProject
                 Position = entity.Get<PositionComponent>().Position,
                 Velocity = entity.Get<TranslationPointComponent>().VelocityMarker.Get<PositionComponent>().Position,
                 Acceleration = entity.Get<TranslationPointComponent>().AccelerationMarker.Get<PositionComponent>().Position
+            };
+        }
+
+        var sortedRotationPoints =
+            editor.RotationPoints.OrderBy(x => x.Get<RotationPointComponent>().Parameter).ToArray();
+
+        for (var i = 0; i < editor.RotationPoints.Count; i++)
+        {
+            var entity = sortedRotationPoints[i];
+
+            project.RotationPoints[i] = new JsonRotationPoint
+            {
+                Position = entity.Get<PositionComponent>().Position,
+                Heading = entity.Get<RotationPointComponent>().HeadingMarker.Get<PositionComponent>().Position,
+                Parameter = entity.Get<RotationPointComponent>().Parameter
             };
         }
 
