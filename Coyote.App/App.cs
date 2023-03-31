@@ -34,8 +34,10 @@ internal class App : GameApplication
 
     private readonly string[] _detectedFiles;
 
+
     private string _projectName = "";
     private int _selectedIndex;
+    private bool _showProjectSettings;
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
@@ -159,6 +161,34 @@ internal class App : GameApplication
             {
                 Project.Save();
             }
+
+            if (ImGui.Button("Project Settings"))
+            {
+                _showProjectSettings = true;
+            }
+
+            if (_showProjectSettings)
+            {
+                if (ImGui.Begin("Project Settings", ref _showProjectSettings))
+                {
+                    var maxVelocity = _project.Constraints.MaxVelocity;
+                    var maxAcceleration = _project.Constraints.MaxAcceleration;
+
+                    var changed = false;
+
+                    changed |= ImGui.SliderFloat("Max Velocity", ref maxVelocity, 0, 5);
+                    changed |= ImGui.SliderFloat("Max Acceleration", ref maxAcceleration, 0, 5);
+
+                    _project.Constraints = new MotionConstraints(maxVelocity, maxAcceleration);
+
+                    if (changed)
+                    {
+                        Project.SetChanged();
+                    }
+                }
+
+                ImGui.End();
+            }
         }
 
         ImGui.EndMainMenuBar();
@@ -192,10 +222,8 @@ internal class App : GameApplication
 
                             if (!File.Exists(name))
                             {
-                                _project = Project.Create(name);
-
+                                CreateProject(name);
                                 ToastInfo("Created Project");
-
                                 _layerController!.Selected.Enable();
                             }
                         }
@@ -228,6 +256,20 @@ internal class App : GameApplication
         }
 
         ImGui.End();
+    }
+
+    private void CreateProject(string name)
+    {
+        Assert.IsTrue(_project == null);
+
+        _project =  new Project
+        {
+            FileName = name,
+            MotionProjects = new Dictionary<string, MotionProject>(),
+            Constraints = MotionConstraints.Default
+        };
+
+        _project.SetChanged();
     }
 
     public static EmbeddedResourceKey Asset(string name)

@@ -2,11 +2,15 @@
 
 namespace Coyote.App.Movement;
 
-internal readonly struct MotionConstraints
+internal struct MotionConstraints
 {
-    [JsonInclude] public float MaxVelocity { get; }
+    public static readonly MotionConstraints Default = new MotionConstraints(1.5f, 1f);
 
-    [JsonInclude] public float MaxAcceleration { get; }
+    [JsonInclude] 
+    public float MaxVelocity { get; set; }
+
+    [JsonInclude] 
+    public float MaxAcceleration { get; set; }
 
     public MotionConstraints(float maxVelocity, float maxAcceleration)
     {

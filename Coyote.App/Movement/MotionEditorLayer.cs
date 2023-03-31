@@ -123,7 +123,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         _world = World.Create();
         _path = new PathEditor(app, _world);
-        _simulator = new Simulator(_path);
+        _simulator = new Simulator(app, _path);
 
         UpdateEditorPipeline();
     }

@@ -4,14 +4,15 @@ namespace Coyote.App.Movement;
 
 internal class Simulator
 {
+    private readonly App _app;
     private readonly PathEditor _editor;
-    public static readonly MotionConstraints Constraints = new(1.7f, 1.52f);
 
     private ArcParameterizedQuinticSpline? _parameterizedQuinticSpline;
     private float _playTime;
 
-    public Simulator(PathEditor editor)
+    public Simulator(App app, PathEditor editor)
     {
+        _app = app;
         _editor = editor;
 
         _editor.OnTranslationChanged += OnTranslationChanged;
@@ -38,7 +39,7 @@ internal class Simulator
 
         _parameterizedQuinticSpline ??= new ArcParameterizedQuinticSpline(_editor.TranslationSpline.Segments);
 
-        if (!TrapezoidalProfile.Evaluate(Constraints, _parameterizedQuinticSpline.ArcLength, _playTime, out var motionState))
+        if (!TrapezoidalProfile.Evaluate(_app.Project.Constraints, _parameterizedQuinticSpline.ArcLength, _playTime, out var motionState))
         {
             _playTime = 0;
             

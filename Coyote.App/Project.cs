@@ -8,14 +8,26 @@ namespace Coyote.App;
 internal sealed class Project
 {
     [JsonIgnore]
-    public string FileName { get; private set; }
+    public string FileName { get; set; }
 
     [JsonInclude]
     public Dictionary<string, MotionProject> MotionProjects { get; init; }
 
+    [JsonInclude]
+    public MotionConstraints Constraints { get; set; }
+
+    [JsonIgnore]
+    public bool IsChanged { get; private set; }
+
+    public void SetChanged()
+    {
+        IsChanged = true;
+    }
+
     public void Save()
     {
         File.WriteAllText(FileName, JsonSerializer.Serialize(this));
+        IsChanged = false;
     }
 
     public static Project Load(string fileName)
@@ -25,14 +37,5 @@ internal sealed class Project
         project.FileName = fileName;
 
         return project;
-    }
-
-    public static Project Create(string fileName)
-    {
-        return new Project
-        {
-            FileName = fileName,
-            MotionProjects = new Dictionary<string, MotionProject>()
-        };
     }
 }
