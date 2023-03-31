@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using Vortice.Mathematics;
 
-namespace Coyote.App;
+namespace Coyote.App.Movement;
 
 internal readonly struct Pose
 {
@@ -18,7 +18,7 @@ internal readonly struct Pose
     [JsonIgnore]
     public Vector2 RotationVector => new Vector2(MathF.Cos(Rotation), MathF.Sin(Rotation));
 
-    [JsonIgnore] 
+    [JsonIgnore]
     public Vector2 Translation => new(X, Y);
 
     [JsonConstructor]
@@ -31,7 +31,7 @@ internal readonly struct Pose
 
     public Pose(Vector2 translation, float rotation = 0f) : this(translation.X, translation.Y, rotation)
     {
-        
+
     }
 
     public Pose(Vector2 translation, Vector2 tangent) : this(translation, MathF.Atan2(tangent.Y, tangent.X))

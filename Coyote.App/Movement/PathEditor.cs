@@ -8,7 +8,7 @@ using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
 using Vortice.Mathematics;
 
-namespace Coyote.App;
+namespace Coyote.App.Movement;
 
 internal sealed class PathEditor
 {
@@ -21,7 +21,7 @@ internal sealed class PathEditor
     private const float AddToEndThreshold = 0.05f;
 
     private readonly World _world;
-    
+
     private readonly List<Entity> _translationPoints = new();
     private readonly List<Entity> _rotationPoints = new();
 
@@ -89,7 +89,7 @@ internal sealed class PathEditor
             {
                 _translationPoints.Insert(0, entity);
             }
-            else if (projection > (1 - AddToEndThreshold))
+            else if (projection > 1 - AddToEndThreshold)
             {
                 _translationPoints.Add(entity);
             }
@@ -137,21 +137,21 @@ internal sealed class PathEditor
         var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
 
         var entity = _world.Create(new PositionComponent
+        {
+            Position = projectedPosition,
+            UpdateCallback = (entity, pos) =>
             {
-                Position = projectedPosition,
-                UpdateCallback = (entity, pos) =>
-                {
-                    OnControlPointChanged(entity, pos, () => {}, headingKnob);
+                OnControlPointChanged(entity, pos, () => { }, headingKnob);
 
-                    // Remap position after projection.
-                    pos = entity.Get<PositionComponent>().Position;
+                // Remap position after projection.
+                pos = entity.Get<PositionComponent>().Position;
 
-                    ReProjectRotationPoint(entity);
+                ReProjectRotationPoint(entity);
 
-                    // Also move the knob to the re-projected position and re-build the spline.
-                    OnControlPointChanged(entity, pos, RebuildRotationSpline, headingKnob);
-                }
-            },
+                // Also move the knob to the re-projected position and re-build the spline.
+                OnControlPointChanged(entity, pos, RebuildRotationSpline, headingKnob);
+            }
+        },
             new ScaleComponent { Scale = Vector2.One * RotationKnobSize },
             new RotationPointComponent { HeadingMarker = headingKnob, Parameter = translationParameter },
             new SpriteComponent { Sprite = _velocitySprite });
@@ -238,7 +238,7 @@ internal sealed class PathEditor
     private void DestroyRotationPoints()
     {
         var points = _rotationPoints.ToArray();
-       
+
         foreach (var rotationPoint in points)
         {
             DestroyRotationPoint(rotationPoint);
@@ -285,7 +285,7 @@ internal sealed class PathEditor
         {
             var points = _translationPoints
                 .OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, initialPosition))
-                .Select(x=>x.Get<PositionComponent>().Position)
+                .Select(x => x.Get<PositionComponent>().Position)
                 .Take(2)
                 .ToArray();
 
@@ -354,6 +354,8 @@ internal sealed class PathEditor
 
         RefitRotationPoints();
         RebuildRotationSpline();
+
+        OnTranslationChanged?.Invoke();
     }
 
     /// <summary>
@@ -514,7 +516,9 @@ internal sealed class PathEditor
 
         batch.TexturedQuad(
             TranslationSpline.Evaluate(TranslationSpline.Project(position)),
-            Vector2.One * IndicatorSize, 
+            Vector2.One * IndicatorSize,
             _positionSprite.Texture);
     }
+
+    public event Action? OnTranslationChanged;
 }

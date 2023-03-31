@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Arch.Core.Extensions;
 
-namespace Coyote.App;
+namespace Coyote.App.Movement;
 
 internal struct JsonTranslationPoint
 {
@@ -42,7 +42,7 @@ internal class MotionProject
         foreach (var point in TranslationPoints)
         {
             var entity = editor.CreateTranslationPoint(point.Position, false);
-            
+
             ref var component = ref entity.Get<TranslationPointComponent>();
 
             component.VelocityMarker.Move(point.Velocity);
@@ -74,7 +74,7 @@ internal class MotionProject
         for (var i = 0; i < editor.TranslationPoints.Count; i++)
         {
             var entity = editor.TranslationPoints[i];
-            
+
             project.TranslationPoints[i] = new JsonTranslationPoint
             {
                 Position = entity.Get<PositionComponent>().Position,

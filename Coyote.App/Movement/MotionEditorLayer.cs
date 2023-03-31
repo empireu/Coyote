@@ -16,7 +16,7 @@ using ImGuiNET;
 using Veldrid;
 using Point = System.Drawing.Point;
 
-namespace Coyote.App;
+namespace Coyote.App.Movement;
 
 internal class MotionEditorLayer : Layer, ITabStyle
 {
@@ -45,7 +45,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private readonly App _app;
     private readonly ImGuiLayer _imGuiLayer;
-    
+
     private ImGuiRenderer ImGuiRenderer => _imGuiLayer.Renderer;
 
     private readonly QuadBatch _editorBatch;
@@ -75,12 +75,15 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private Entity? _selectedEntity;
 
-    private float _playTime;
 
     private int _pickIndex;
 
     private string _motionProjectName = "My Project";
     private int _selectedProject;
+
+    private readonly Simulator _simulator;
+
+    private float _dt;
 
     public MotionEditorLayer(App app, ImGuiLayer imGuiLayer)
     {
@@ -120,6 +123,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         _world = World.Create();
         _path = new PathEditor(app, _world);
+        _simulator = new Simulator(_path);
 
         UpdateEditorPipeline();
     }
@@ -131,7 +135,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(
         _app.Input.MousePosition,
-        _app.Window.Width, 
+        _app.Window.Width,
         _app.Window.Height);
 
     private Vector2 _selectPoint;
@@ -192,32 +196,32 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 _path.CreateTranslationPoint(MouseWorld);
                 break;
             case ToolType.TranslateDelete:
-            {
-                SelectEntity();
-
-                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsTranslationPoint(_selectedEntity.Value))
                 {
-                    _path.DestroyTranslationPoint(_selectedEntity.Value);
-                }
+                    SelectEntity();
 
-                _selectedEntity = null;
-                break;
-            }
+                    if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsTranslationPoint(_selectedEntity.Value))
+                    {
+                        _path.DestroyTranslationPoint(_selectedEntity.Value);
+                    }
+
+                    _selectedEntity = null;
+                    break;
+                }
             case ToolType.RotateAdd:
                 _path.CreateRotationPoint(MouseWorld);
                 break;
             case ToolType.RotateRemove:
-            {
-                SelectEntity();
-
-                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsRotationPoint(_selectedEntity.Value))
                 {
-                    _path.DestroyRotationPoint(_selectedEntity.Value);
-                }
+                    SelectEntity();
 
-                _selectedEntity = null;
-                break;
-            }
+                    if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsRotationPoint(_selectedEntity.Value))
+                    {
+                        _path.DestroyRotationPoint(_selectedEntity.Value);
+                    }
+
+                    _selectedEntity = null;
+                    break;
+                }
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -257,12 +261,12 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
             ImGui.TextColored(new Vector4(1, 1, 1, 1), "Review");
             ImGui.BeginGroup();
-            
+
             if (ImGui.Button("Player"))
             {
                 _showPlayer = true;
             }
-            
+
             ImGui.EndGroup();
         }
 
@@ -430,33 +434,12 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _path.DrawTranslationPath(_playerBatch);
         _playerBatch.Submit(framebuffer: framebuffer);
 
-        _playerBatch.Clear();
-
-        const float speed = 2.5f;
-
-        if (_path.ArcLength > 0)
+        if (_simulator.Update(_dt, out var pose))
         {
-            var t = (_playTime / (_path.ArcLength / speed));
-
-            if (t > 1)
-            {
-                _playTime = 0;
-            }
-            else
-            {
-                var translation = _path.TranslationSpline.Evaluate(t);
-
-                var pose = _path.RotationSpline.IsEmpty 
-                    ? new Pose(translation, _path.TranslationSpline.EvaluateDerivative1(t)) // Spline Tangent Heading
-                    : new Pose(translation, (float)_path.RotationSpline.Evaluate(t)); // Spline Spline Heading
-
-                pose -= MathF.PI / 2f;
-
-                _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
-            }
+            _playerBatch.Clear();
+            _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
+            _playerBatch.Submit(framebuffer: framebuffer);
         }
-
-        _playerBatch.Submit(framebuffer: framebuffer);
     }
 
     private void UpdateCamera(FrameInfo frameInfo)
@@ -493,7 +476,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     protected override void Update(FrameInfo frameInfo)
     {
-        _playTime += frameInfo.DeltaTime;
+        _dt = frameInfo.DeltaTime;
 
         UpdateCamera(frameInfo);
         UpdateSelection(frameInfo);
@@ -516,7 +499,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
             _editorBatch.Quad(
                 new Vector2(rectangle.CenterX(), rectangle.CenterY()),
-                Vector2.One * new Vector2(rectangle.Width, rectangle.Height), 
+                Vector2.One * new Vector2(rectangle.Width, rectangle.Height),
                 new RgbaFloat4(0, 1, 0, 0.5f));
         }
 

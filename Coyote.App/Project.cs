@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Coyote.App.Movement;
 using Exception = System.Exception;
 
 namespace Coyote.App;

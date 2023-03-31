@@ -1,13 +1,99 @@
-﻿using System;
-using System.Diagnostics;
-using System.Numerics;
+﻿using System.Numerics;
 using GameFramework.Extensions;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
-using SixLabors.ImageSharp.Drawing.Processing;
 using Veldrid;
 
-namespace Coyote.App;
+namespace Coyote.App.Movement;
+
+class ArcParameterizedQuinticSpline
+{
+    private const int Segments = 8192;
+
+    private readonly struct ArcSegment
+    {
+        public ArcSegment(float arc0, float arc1, float t0, float t1)
+        {
+            Arc0 = arc0;
+            Arc1 = arc1;
+            T0 = t0;
+            T1 = t1;
+        }
+
+        public float Arc0 { get; }
+        public float Arc1 { get; }
+        public float T0 { get; }
+        public float T1 { get; }
+
+        public float EvaluateParameter(float arc)
+        {
+            return MathUtilities.MapRange(Math.Clamp(arc, Arc0, Arc1), Arc0, Arc1, T0, T1);
+        }
+    }
+
+    private readonly UniformQuinticSpline _spline = new();
+
+    public Vector2 EvaluateUnderlying(float t)
+    {
+        return _spline.Evaluate(t);
+    }
+
+    public Vector2 EvaluateUnderlyingDerivative1(float t)
+    {
+        return _spline.EvaluateDerivative1(t);
+    }
+
+    private readonly SegmentTree<ArcSegment> _segmentTree;
+    
+    public ArcParameterizedQuinticSpline(IEnumerable<QuinticSplineSegment> segments)
+    {
+        foreach (var quinticSplineSegment in segments)
+        {
+            _spline.Add(quinticSplineSegment);
+        }
+
+        var builder = new SegmentTreeBuilder<ArcSegment>();
+
+        var currentArc = 0f;
+
+        for (var segmentIndex = 1; segmentIndex < Segments; segmentIndex++)
+        {
+            var t0 = (segmentIndex - 1) / (Segments - 1f);
+            var t1 = segmentIndex / (Segments - 1f);
+
+            var segmentLength = Vector2.Distance(_spline.Evaluate(t0), _spline.Evaluate(t1));
+
+            var arcEnd = currentArc + segmentLength;
+
+            builder.Insert(new ArcSegment(currentArc, arcEnd, t0, t1), new SegmentRange(currentArc, arcEnd));
+
+            currentArc = arcEnd;
+        }
+
+        ArcLength = currentArc;
+
+        _segmentTree = builder.Build();
+    }
+
+    public float ArcLength { get; }
+
+    public float EvaluateParameter(float arcLength)
+    {
+        arcLength = Math.Clamp(arcLength, _segmentTree.Range.Start, _segmentTree.Range.End);
+
+        return _segmentTree.Query(arcLength).EvaluateParameter(arcLength);
+    }
+
+    public Vector2 Evaluate(float arcLength)
+    {
+        return _spline.Evaluate(EvaluateParameter(arcLength));
+    }
+
+    public Vector2 EvaluateDerivative1(float arcLength)
+    {
+        return _spline.EvaluateDerivative1(EvaluateParameter(arcLength));
+    }
+}
 
 internal readonly struct QuinticSplineSegment
 {
@@ -44,7 +130,7 @@ internal class UniformQuinticSpline
     private const int ProjectionSamples = 128;
     private const int DescentSteps = 32;
     private const double DescentFalloff = 1.25;
-    
+
     private const int SamplesPerSegment = 64;
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
@@ -105,7 +191,7 @@ internal class UniformQuinticSpline
                 start = mapping(start);
                 end = mapping(end);
             }
-            
+
             batch.Line(start, end, LineColor, LineThickness);
         }
     }
@@ -121,8 +207,10 @@ internal class UniformQuinticSpline
         Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
         var segment = Segments[index];
 
-        dx = Splines.HermiteQuintic(segment.P0.X, segment.V0.X, segment.A0.X, segment.A1.X, segment.V1.X, segment.P1.X, t);
-        dy = Splines.HermiteQuintic(segment.P0.Y, segment.V0.Y, segment.A0.Y, segment.A1.Y, segment.V1.Y, segment.P1.Y, t);
+        dx = Splines.HermiteQuintic(segment.P0.X, segment.V0.X, segment.A0.X, segment.A1.X, segment.V1.X, segment.P1.X,
+            t);
+        dy = Splines.HermiteQuintic(segment.P0.Y, segment.V0.Y, segment.A0.Y, segment.A1.Y, segment.V1.Y, segment.P1.Y,
+            t);
     }
 
     public Vector2 EvaluateDerivative1(float progress)
@@ -142,7 +230,7 @@ internal class UniformQuinticSpline
             var t0 = (i - 1) * sampleSize;
             var t1 = t0 + sampleSize;
 
-            result += (double)(Vector2.Distance(Evaluate((float)t0), Evaluate((float)t1)));
+            result += (double)Vector2.Distance(Evaluate((float)t0), Evaluate((float)t1));
         }
 
         return (float)result;
@@ -194,7 +282,7 @@ internal class UniformQuinticSpline
         for (var i = 0; i < DescentSteps; i++)
         {
             var errorLeft = ProjectError(optimizedClosest - descentRate);
-            var errorRight= ProjectError(optimizedClosest + descentRate);
+            var errorRight = ProjectError(optimizedClosest + descentRate);
 
             var step = -descentRate;
             var adjustedError = errorLeft;
@@ -398,11 +486,11 @@ internal class MappedCubicSplineBuilder
             var next = Get(i + 1);
 
             spline.Insert(new CubicSplineSegment(
-                left.Key, 
+                left.Key,
                 right.Key,
-                left.Value, 
-                previous.Value * left.Tension, 
-                next.Value * right.Tension, 
+                left.Value,
+                previous.Value * left.Tension,
+                next.Value * right.Tension,
                 right.Value));
         }
     }
@@ -460,14 +548,16 @@ internal static class Splines
                h3 * a1 + h4 * v1 + h5 * p1;
     }
 
-    public static Vector2 HermiteQuintic2(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
+    public static Vector2 HermiteQuintic2(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1,
+        double t)
     {
         return new Vector2(
             (float)HermiteQuintic(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
             (float)HermiteQuintic(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
     }
 
-    public static double HermiteQuinticDerivative1(double p0, double v0, double a0, double a1, double v1, double p1, double t)
+    public static double HermiteQuinticDerivative1(double p0, double v0, double a0, double a1, double v1, double p1,
+        double t)
     {
         var t2 = t * t;
 
@@ -482,7 +572,8 @@ internal static class Splines
                h3 * a1 + h4 * v1 + h5 * p1;
     }
 
-    public static Vector2 HermiteQuintic2Derivative1(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
+    public static Vector2 HermiteQuintic2Derivative1(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1,
+        Vector2 p1, double t)
     {
         return new Vector2(
             (float)HermiteQuinticDerivative1(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
