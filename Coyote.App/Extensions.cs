@@ -2,6 +2,7 @@
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Mathematics;
 
 namespace Coyote.App;
 
@@ -81,5 +82,20 @@ internal static class Extensions
     public static bool ApproxEquals(this double d, double other, double threshold = 10e-6)
     {
         return Math.Abs(d - other) < threshold;
+    }
+
+    public static Real<TUnit> ToReal<TUnit>(this float f) where TUnit : IUnit
+    {
+        return (Real<TUnit>)f;
+    }
+
+    public static Real<TUnit> ToReal<TUnit>(this double d) where TUnit : IUnit
+    {
+        return (Real<TUnit>)d;
+    }
+
+    public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v) where TUnit : IUnit
+    {
+        return (Real2<TUnit>)v;
     }
 }

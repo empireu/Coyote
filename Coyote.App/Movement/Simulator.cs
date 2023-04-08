@@ -1,4 +1,5 @@
-﻿using GameFramework.Utilities;
+﻿using Coyote.App.Mathematics;
+using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
 
@@ -53,7 +54,7 @@ internal class Simulator
         var translation = _parameterizedQuinticSpline.EvaluateUnderlying(parameter);
 
         pose = _editor.RotationSpline.IsEmpty
-            ? new Pose(translation, _parameterizedQuinticSpline.EvaluateUnderlyingDerivative1(parameter)) // Spline Tangent Heading
+            ? new Pose(translation, _parameterizedQuinticSpline.EvaluateUnderlyingVelocity(parameter)) // Spline Tangent Heading
             : new Pose(translation, (float)_editor.RotationSpline.Evaluate(parameter)); // Spline Spline Heading
 
         pose -= MathF.PI / 2f;

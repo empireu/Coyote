@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Mathematics;
 using GameFramework;
 using GameFramework.Extensions;
 using GameFramework.Renderer;
@@ -40,7 +41,7 @@ internal sealed class PathEditor
     /// <summary>
     ///     Gets the translation spline.
     /// </summary>
-    public UniformQuinticSpline TranslationSpline { get; } = new();
+    public QuinticSpline TranslationSpline { get; } = new();
 
     /// <summary>
     ///     Gets the rotation spline. This spline may be empty if no rotation points are specified.
@@ -82,7 +83,7 @@ internal sealed class PathEditor
         {
             // We find the best position on the spline to insert this.
 
-            var projection = TranslationSpline.Project(position);
+            var projection = TranslationSpline.Project(position.ToReal2<Displacement>());
 
             // It is close enough to the ends that we can add it there:
             if (projection < AddToEndThreshold)
@@ -131,10 +132,10 @@ internal sealed class PathEditor
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(position);
+        var translationParameter = TranslationSpline.Project(position.ToReal2<Displacement>());
         var projectedPosition = TranslationSpline.Evaluate(translationParameter);
 
-        var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
+        var headingKnob = CreateDerivativeKnob(0, projectedPosition.ToV2(), RebuildRotationSpline);
 
         var entity = _world.Create(new PositionComponent
         {
@@ -345,7 +346,13 @@ internal sealed class PathEditor
             UnpackTranslation(_translationPoints[i - 1], out var p0, out var v0, out var a0);
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
-            TranslationSpline.Add(new QuinticSplineSegment(p0, v0, a0, a1, v1, p1));
+            TranslationSpline.Add(new QuinticSplineSegment(
+                p0.ToReal2<Displacement>(), 
+                v0.ToReal2<Velocity>(), 
+                a0.ToReal2<Acceleration>(), 
+                a1.ToReal2<Acceleration>(), 
+                v1.ToReal2<Velocity>(), 
+                p1.ToReal2<Displacement>()));
         }
 
         TranslationSpline.UpdateRenderPoints();
@@ -385,7 +392,7 @@ internal sealed class PathEditor
             ref var component = ref rotationPoint.Get<RotationPointComponent>();
 
             // Refit rotation point on arc (assuming the arc was edited):
-            component.Parameter = TranslationSpline.Project(position);
+            component.Parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
 
             // Remove projection errors by updating the position again:
             position = TranslationSpline.Evaluate(component.Parameter);
@@ -402,7 +409,7 @@ internal sealed class PathEditor
     private void ReProjectRotationPoint(Entity point)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(position);
+        var parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
 
         point.Get<RotationPointComponent>().Parameter = parameter;
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter);
@@ -443,7 +450,7 @@ internal sealed class PathEditor
                     continue;
                 }
 
-                angle = previousAngle + Mathematics.DeltaAngle(angle, previousAngle);
+                angle = previousAngle + Angles.DeltaAngle(angle, previousAngle);
             }
 
             previousAngle = angle;
@@ -515,7 +522,7 @@ internal sealed class PathEditor
         }
 
         batch.TexturedQuad(
-            TranslationSpline.Evaluate(TranslationSpline.Project(position)),
+            TranslationSpline.Evaluate(TranslationSpline.Project(position.ToReal2<Displacement>())),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);
     }

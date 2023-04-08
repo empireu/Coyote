@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using Arch.Core;
+using Coyote.App.Mathematics;
 using GameFramework.Renderer;
 
 namespace Coyote.App;
@@ -35,6 +36,7 @@ internal struct TranslationPointComponent
 {
     public static readonly Vector4 VelocityLineColor = new(1, 0, 0, 0.9f);
     public static readonly Vector4 AccelerationLineColor = new(1, 1, 0, 0.9f);
+
     public const float VelocityLineThickness = 0.01f;
     public const float AccelerationLineThickness = 0.008f;
 
@@ -49,5 +51,5 @@ internal struct RotationPointComponent
     public const float HeadingLineThickness = 0.01f;
 
     public Entity HeadingMarker;
-    public float Parameter;
+    public Real<Percentage> Parameter;
 }

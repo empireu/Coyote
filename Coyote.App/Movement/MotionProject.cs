@@ -1,5 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using Arch.Core.Extensions;
+using Coyote.App.Mathematics;
 
 namespace Coyote.App.Movement;
 
@@ -56,7 +57,7 @@ internal class MotionProject
             ref var component = ref entity.Get<RotationPointComponent>();
 
             component.HeadingMarker.Get<PositionComponent>().Position = point.Heading;
-            component.Parameter = point.Parameter;
+            component.Parameter = point.Parameter.ToReal<Percentage>();
         }
 
         editor.RebuildTranslation();
