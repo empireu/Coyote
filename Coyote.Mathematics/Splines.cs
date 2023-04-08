@@ -1,20 +1,39 @@
 ﻿using System.Numerics;
-using Coyote.App.Movement;
-using GameFramework.Extensions;
-using GameFramework.Renderer.Batch;
+using Coyote.Data;
 using GameFramework.Utilities;
-using Veldrid;
 
-namespace Coyote.App.Mathematics;
+namespace Coyote.Mathematics;
 
-interface ISpline
+#region Interfaces
+
+public interface IPositionSpline
 {
-    Real2<Displacement> Evaluate(Real<Percentage> t);
-    Real2<Velocity> EvaluateVelocity(Real<Percentage> t);
-    Real<Curvature> EvaluateCurvature(Real<Percentage> t);
+    Translation EvaluateTranslation(Real<Percentage> progress);
 }
 
-class ArcParameterizedQuinticSpline
+public interface IVelocitySpline
+{
+    Real2<Velocity> EvaluateVelocity(Real<Percentage> progress);
+}
+
+public interface IAccelerationSpline
+{
+    Real2<Acceleration> EvaluateAcceleration(Real<Percentage> progress);
+}
+
+public interface ICurvatureSpline
+{
+    Real<Curvature> EvaluateCurvature(Real<Percentage> progress);
+}
+
+public interface ICurvePoseSpline
+{
+    CurvePose EvaluateCurvePose(Real<Percentage> progress);
+}
+
+#endregion
+
+public sealed class ArcParameterizedQuinticSpline
 {
     private const int Segments = 8192;
 
@@ -83,7 +102,7 @@ class ArcParameterizedQuinticSpline
         _segmentTree = builder.Build();
     }
 
-    public float ArcLength { get; }
+    public double ArcLength { get; }
 
     public Real<Percentage> EvaluateParameter(Real<Displacement> arcLength)
     {
@@ -103,7 +122,7 @@ class ArcParameterizedQuinticSpline
     }
 }
 
-internal readonly struct QuinticSplineSegment
+public readonly struct QuinticSplineSegment
 {
     public Real2<Displacement> P0 { get; }
     public Real2<Velocity> V0 { get; }
@@ -124,126 +143,72 @@ internal readonly struct QuinticSplineSegment
 
     public Real2<Displacement> Evaluate(Real<Percentage> t)
     {
-        return Splines.HermiteQuintic2(
-            P0.ToV2(), 
-            V0.ToV2(), 
-            A0.ToV2(), 
-            A1.ToV2(), 
-            V1.ToV2(), 
-            P1.ToV2(), 
-            t.Value).ToReal2<Displacement>();
+        return Splines.HermiteQuintic2(P0, V0, A0, A1, V1, P1, t);
     }
 
     public Real2<Velocity> EvaluateVelocity(Real<Percentage> t)
     {
-        return Splines.HermiteQuintic2Derivative1(
-            P0.ToV2(), 
-            V0.ToV2(), 
-            A0.ToV2(), 
-            A1.ToV2(), 
-            V1.ToV2(), 
-            P1.ToV2(), 
-            t.Value).ToReal2<Velocity>();
+        return Splines.HermiteQuintic2Derivative1(P0, V0, A0, A1, V1, P1, t);
+    }
+
+    public Real2<Acceleration> EvaluateAcceleration(Real<Percentage> t)
+    {
+        return Splines.HermiteQuintic2Derivative2(P0, V0, A0, A1, V1, P1, t);
+    }
+
+    public Real<Curvature> EvaluateCurvature(Real<Percentage> t)
+    {
+        return Splines.HermiteQuintic2Curvature(P0, V0, A0, A1, V1, P1, t);
     }
 }
 
-internal class QuinticSpline : ISpline
+/// <summary>
+///     Represents a piecewise quintic polynomial with a 0-1 parameter range.
+/// </summary>
+public sealed class QuinticSpline : IPositionSpline, IVelocitySpline, IAccelerationSpline, ICurvatureSpline, ICurvePoseSpline
 {
+    /// <summary>
+    ///     The number of samples to use for the rough projection estimate.
+    /// </summary>
     private const int ProjectionSamples = 128;
+
+    /// <summary>
+    ///     The number of descent steps to use for optimizing the rough projection estimate.
+    /// </summary>
     private const int DescentSteps = 32;
+
+    /// <summary>
+    ///     The overshoot descent rate falloff to use.
+    /// </summary>
     private const double DescentFalloff = 1.25;
 
-    private const int SamplesPerSegment = 64;
-    private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
-    private const float LineThickness = 0.015f;
-
     public List<QuinticSplineSegment> Segments { get; } = new();
-
-    private Vector2[] _renderPoints = Array.Empty<Vector2>();
-
-    public void Clear()
-    {
-        Segments.Clear();
-        ClearRenderPoints();
-    }
 
     public void Add(QuinticSplineSegment segment)
     {
         Segments.Add(segment);
     }
 
-    public void ClearRenderPoints()
+    public void Clear()
     {
-        _renderPoints = Array.Empty<Vector2>();
-    }
-
-    public void UpdateRenderPoints()
-    {
-        if (Segments.Count == 0)
-        {
-            return;
-        }
-
-        var points = new List<Vector2>();
-        var samples = Segments.Count * SamplesPerSegment;
-        for (var subSampleIndex = 0; subSampleIndex < samples; subSampleIndex++)
-        {
-            var t0 = subSampleIndex / (samples - 1f);
-
-            points.Add(Evaluate(t0.ToReal<Percentage>()).ToV2());
-        }
-
-        _renderPoints = points.ToArray();
-    }
-
-    public void Render(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
-    {
-        if (_renderPoints.Length < 2)
-        {
-            return;
-        }
-
-        for (var i = 1; i < _renderPoints.Length; i++)
-        {
-            var start = _renderPoints[i - 1];
-            var end = _renderPoints[i];
-
-            if (mapping != null)
-            {
-                start = mapping(start);
-                end = mapping(end);
-            }
-
-            batch.Line(start, end, LineColor, LineThickness);
-        }
+        Segments.Clear();
     }
 
     public void Evaluate(double progress, out double dx, out double dy)
     {
-        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
+        Splines.GetUniformIndices(Segments.Count, progress, out var index, out var t);
         var segment = Segments[index];
 
-        dx = Splines.HermiteQuintic(segment.P0.X.Value, segment.V0.X, segment.A0.X, segment.A1.X, segment.V1.X, segment.P1.X, t);
-        dy = Splines.HermiteQuintic(segment.P0.Y.Value, segment.V0.Y, segment.A0.Y, segment.A1.Y, segment.V1.Y, segment.P1.Y, t);
+        dx = Splines.HermiteQuintic(segment.P0.X, segment.V0.X, segment.A0.X, segment.A1.X, segment.V1.X, segment.P1.X, t);
+        dy = Splines.HermiteQuintic(segment.P0.Y, segment.V0.Y, segment.A0.Y, segment.A1.Y, segment.V1.Y, segment.P1.Y, t);
     }
 
     public Real2<Displacement> Evaluate(Real<Percentage> progress)
     {
-        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
+        Splines.GetUniformIndices(Segments.Count, progress, out var index, out var t);
         var position = Segments[index].Evaluate(t);
 
         return new Real2<Displacement>(new Real<Displacement>(position.X), new Real<Displacement>(position.Y));
-    }
-
-    public Real2<Velocity> EvaluateVelocity(Real<Percentage> progress)
-    {
-        Splines.GetIndicesUniform(Segments.Count, progress, out var index, out var t);
-        return Segments[index].EvaluateVelocity(t);
-    }
-
-    public Real<Curvature> EvaluateCurvature(Real<Percentage> progress)
-    {
-        throw new NotImplementedException();
     }
 
     public Real<Displacement> ComputeArcLength(int points = 1024)
@@ -257,7 +222,9 @@ internal class QuinticSpline : ISpline
             var t0 = (i - 1) * sampleSize;
             var t1 = t0 + sampleSize;
 
-            result += Real2<Displacement>.Distance(Evaluate(t0.ToReal<Percentage>()), Evaluate(t1.ToReal<Percentage>()));
+            result += Real2<Displacement>.Distance(
+                Evaluate(t0.ToReal<Percentage>()), 
+                Evaluate(t1.ToReal<Percentage>()));
         }
 
         return result.ToReal<Displacement>();
@@ -275,7 +242,7 @@ internal class QuinticSpline : ISpline
 
         for (var sample = 0; sample < ProjectionSamples; sample++)
         {
-            var t = (sample / (ProjectionSamples - 1f)).ToReal<Percentage>();
+            var t = (sample / (ProjectionSamples - 1d)).ToReal<Percentage>();
 
             var splinePoint = Evaluate(t);
 
@@ -288,18 +255,15 @@ internal class QuinticSpline : ISpline
             }
         }
 
-        double ProjectError(double t)
+        Real<Displacement> ProjectError(Real<Percentage> t)
         {
-            Evaluate(Math.Clamp(t, 0, 1), out var x, out var y);
+            var p = Evaluate(t.Clamped(0, 1));
 
-            var dx = x - position.X;
-            var dy = y - position.Y;
-
-            return dx * dx + dy * dy;
+            return Real2<Displacement>.DistanceSquared(p, position);
         }
 
-        var optimizedClosest = (double)closest;
-        var descentRate = 1d / ProjectionSamples;
+        var optimizedClosest = closest;
+        var descentRate = (1d / ProjectionSamples).ToReal<Percentage>();
 
         for (var i = 0; i < DescentSteps; i++)
         {
@@ -319,7 +283,7 @@ internal class QuinticSpline : ISpline
 
             if (adjustedError > currentError)
             {
-                descentRate = Math.Pow(descentRate, DescentFalloff);
+                descentRate = descentRate.Pow(DescentFalloff);
 
                 continue;
             }
@@ -327,11 +291,48 @@ internal class QuinticSpline : ISpline
             optimizedClosest += step;
         }
 
-        return optimizedClosest.ToReal<Percentage>();
+        return optimizedClosest;
     }
+
+    public Pose EvaluatePose(Real<Percentage> progress)
+    {
+        return new Pose(EvaluateTranslation(progress), EvaluateVelocity(progress).ToRotation());
+    }
+
+    #region Interface
+
+    public Translation EvaluateTranslation(Real<Percentage> progress)
+    {
+        return Evaluate(progress);
+    }
+
+    public Real2<Velocity> EvaluateVelocity(Real<Percentage> progress)
+    {
+        Splines.GetUniformIndices(Segments.Count, progress, out var index, out var t);
+        return Segments[index].EvaluateVelocity(t);
+    }
+
+    public Real2<Acceleration> EvaluateAcceleration(Real<Percentage> progress)
+    {
+        Splines.GetUniformIndices(Segments.Count, progress, out var index, out var t);
+        return Segments[index].EvaluateAcceleration(t);
+    }
+
+    public Real<Curvature> EvaluateCurvature(Real<Percentage> progress)
+    {
+        Splines.GetUniformIndices(Segments.Count, progress, out var index, out var t);
+        return Segments[index].EvaluateCurvature(t);
+    }
+
+    public CurvePose EvaluateCurvePose(Real<Percentage> progress)
+    {
+        return new CurvePose(EvaluatePose(progress), EvaluateCurvature(progress));
+    }
+
+    #endregion
 }
 
-internal readonly struct CubicSplineSegment
+public readonly struct CubicSplineSegment
 {
     public CubicSplineSegment(double keyStart, double keyEnd, Real<Displacement> p0, Real<Velocity> v0, Real<Velocity> v1, Real<Displacement> p1)
     {
@@ -357,11 +358,15 @@ internal readonly struct CubicSplineSegment
     }
 }
 
-internal class MappedCubicSpline
+/// <summary>
+///     Represents a piecewise cubic polynomial with an arbitrary parameter range.
+/// </summary>
+public sealed class MappedCubicSpline
 {
     private readonly List<CubicSplineSegment> _segments = new();
 
     public IReadOnlyList<CubicSplineSegment> Segments => _segments;
+
     public bool IsEmpty => Segments.Count == 0;
 
     public void Insert(CubicSplineSegment segment)
@@ -444,7 +449,7 @@ internal class MappedCubicSpline
     }
 }
 
-internal class MappedCubicSplineBuilder
+public sealed class MappedCubicSplineBuilder
 {
     private struct SplinePoint
     {
@@ -523,9 +528,9 @@ internal class MappedCubicSplineBuilder
     }
 }
 
-internal static class Splines
+public static class Splines
 {
-    public static void GetIndicesUniform(int segments, double progress, out int index, out double t)
+    public static void GetUniformIndices(int segments, double progress, out int index, out double t)
     {
         progress = Math.Clamp(progress, 0, 1);
         progress *= segments;
@@ -533,12 +538,11 @@ internal static class Splines
         t = progress - index;
     }
 
-    public static void GetIndicesUniform(int segments, Real<Percentage> progress, out int index, out Real<Percentage> t)
+    public static void GetUniformIndices(int segments, Real<Percentage> progress, out int index, out Real<Percentage> t)
     {
-        GetIndicesUniform(segments, progress.Value, out index, out var t2);
+        GetUniformIndices(segments, progress.Value, out index, out var t2);
         t = ((float)t2).ToReal<Percentage>();
     }
-
 
     public static double HermiteCubic(double p0, double v0, double v1, double p1, double t)
     {
@@ -585,8 +589,21 @@ internal static class Splines
             (float)HermiteQuintic(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
     }
 
-    public static double HermiteQuinticDerivative1(double p0, double v0, double a0, double a1, double v1, double p1,
-        double t)
+    public static Real2<Displacement> HermiteQuintic2(
+        Real2<Displacement> p0, 
+        Real2<Velocity> v0, 
+        Real2<Acceleration> a0, 
+        Real2<Acceleration> a1, 
+        Real2<Velocity> v1, 
+        Real2<Displacement> p1,
+        Real<Percentage> t)
+    {
+        return new Real2<Displacement>(
+            HermiteQuintic(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            HermiteQuintic(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static double HermiteQuinticDerivative1(double p0, double v0, double a0, double a1, double v1, double p1, double t)
     {
         var t2 = t * t;
 
@@ -601,11 +618,78 @@ internal static class Splines
                h3 * a1 + h4 * v1 + h5 * p1;
     }
 
-    public static Vector2 HermiteQuintic2Derivative1(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1,
-        Vector2 p1, double t)
+    public static Vector2 HermiteQuintic2Derivative1(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
     {
         return new Vector2(
             (float)HermiteQuinticDerivative1(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
             (float)HermiteQuinticDerivative1(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static Real2<Velocity> HermiteQuintic2Derivative1(
+        Real2<Displacement> p0,
+        Real2<Velocity> v0,
+        Real2<Acceleration> a0,
+        Real2<Acceleration> a1,
+        Real2<Velocity> v1,
+        Real2<Displacement> p1,
+        Real<Percentage> t)
+    {
+        return new Real2<Velocity>(
+            HermiteQuinticDerivative1(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            HermiteQuinticDerivative1(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static double HermiteQuinticDerivative2(double p0, double v0, double a0, double a1, double v1, double p1, double t)
+    {
+        var t2 = t * t;
+        var t3 = t2 * t;
+
+        var h0 = -60 * t * (2 * t2 - 3 * t + 1);
+        var h1 = -12 * t * (5 * t2 - 8 * t + 3);
+        var h2 = -10 * t3 + 18 * t2 - 9 * t + 1;
+        var h3 = t * (10 * t2 - 12 * t + 3);
+        var h4 = -12 * t * (5 * t2 - 7 * t + 2);
+        var h5 = 60 * t * (2 * t2 - 3 * t + 1);
+
+        return h0 * p0 + h1 * v0 + h2 * a0 +
+               h3 * a1 + h4 * v1 + h5 * p1;
+    }
+
+    public static Vector2 HermiteQuintic2Derivative2(Vector2 p0, Vector2 v0, Vector2 a0, Vector2 a1, Vector2 v1, Vector2 p1, double t)
+    {
+        return new Vector2(
+            (float)HermiteQuinticDerivative2(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            (float)HermiteQuinticDerivative2(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static Real2<Acceleration> HermiteQuintic2Derivative2(
+        Real2<Displacement> p0,
+        Real2<Velocity> v0,
+        Real2<Acceleration> a0,
+        Real2<Acceleration> a1,
+        Real2<Velocity> v1,
+        Real2<Displacement> p1,
+        Real<Percentage> t)
+    {
+        return new Real2<Acceleration>(
+            HermiteQuinticDerivative2(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t),
+            HermiteQuinticDerivative2(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t));
+    }
+
+    public static Real<Curvature> HermiteQuintic2Curvature(
+        Real2<Displacement> p0,
+        Real2<Velocity> v0,
+        Real2<Acceleration> a0,
+        Real2<Acceleration> a1,
+        Real2<Velocity> v1,
+        Real2<Displacement> p1,
+        Real<Percentage> t)
+    {
+        var dx = HermiteQuinticDerivative1(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t);
+        var dy = HermiteQuinticDerivative1(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t);
+        var ddx = HermiteQuinticDerivative2(p0.X, v0.X, a0.X, a1.X, v1.X, p1.X, t);
+        var ddy = HermiteQuinticDerivative2(p0.Y, v0.Y, a0.Y, a1.Y, v1.Y, p1.Y, t);
+
+        return new Real<Curvature>((dx * ddy - ddx * dy) / ((dx * dx + dy * dy) * Math.Sqrt(dx * dx + dy * dy)));
     }
 }

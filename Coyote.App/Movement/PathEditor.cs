@@ -1,13 +1,12 @@
 ﻿using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
-using Coyote.App.Mathematics;
+using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
-using Vortice.Mathematics;
 
 namespace Coyote.App.Movement;
 
@@ -36,7 +35,7 @@ internal sealed class PathEditor
     /// <summary>
     ///     Gets the arc length of the translation path.
     /// </summary>
-    public float ArcLength { get; private set; }
+    public Real<Displacement> ArcLength { get; private set; }
 
     /// <summary>
     ///     Gets the translation spline.
@@ -47,6 +46,8 @@ internal sealed class PathEditor
     ///     Gets the rotation spline. This spline may be empty if no rotation points are specified.
     /// </summary>
     public MappedCubicSpline RotationSpline { get; } = new();
+
+    private readonly SplineRenderer _pathRenderer = new();
 
     public PathEditor(GameApplication app, World world)
     {
@@ -83,7 +84,7 @@ internal sealed class PathEditor
         {
             // We find the best position on the spline to insert this.
 
-            var projection = TranslationSpline.Project(position.ToReal2<Displacement>());
+            var projection = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
 
             // It is close enough to the ends that we can add it there:
             if (projection < AddToEndThreshold)
@@ -132,10 +133,10 @@ internal sealed class PathEditor
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+        var translationParameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
         var projectedPosition = TranslationSpline.Evaluate(translationParameter);
 
-        var headingKnob = CreateDerivativeKnob(0, projectedPosition.ToV2(), RebuildRotationSpline);
+        var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
 
         var entity = _world.Create(new PositionComponent
         {
@@ -175,7 +176,7 @@ internal sealed class PathEditor
     {
         _translationPoints.Clear();
         _rotationPoints.Clear();
-        ArcLength = 0;
+        ArcLength = Real<Displacement>.Zero;
     }
 
     public bool IsTranslationPoint(Entity entity)
@@ -332,7 +333,9 @@ internal sealed class PathEditor
     public void RebuildTranslation()
     {
         TranslationSpline.Clear();
-        ArcLength = 0;
+        _pathRenderer.Clear();
+
+        ArcLength = Real<Displacement>.Zero;
 
         if (_translationPoints.Count < 2)
         {
@@ -355,7 +358,10 @@ internal sealed class PathEditor
                 p1.ToReal2<Displacement>()));
         }
 
-        TranslationSpline.UpdateRenderPoints();
+        if (TranslationSpline.Segments.Count > 0)
+        {
+            _pathRenderer.Update(TranslationSpline, TranslationSpline.Segments.Count);
+        }
 
         ArcLength = TranslationSpline.ComputeArcLength();
 
@@ -392,7 +398,7 @@ internal sealed class PathEditor
             ref var component = ref rotationPoint.Get<RotationPointComponent>();
 
             // Refit rotation point on arc (assuming the arc was edited):
-            component.Parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+            component.Parameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
 
             // Remove projection errors by updating the position again:
             position = TranslationSpline.Evaluate(component.Parameter);
@@ -409,7 +415,7 @@ internal sealed class PathEditor
     private void ReProjectRotationPoint(Entity point)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+        var parameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
 
         point.Get<RotationPointComponent>().Parameter = parameter;
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter);
@@ -432,13 +438,13 @@ internal sealed class PathEditor
 
         var builder = new MappedCubicSplineBuilder();
 
-        var previousAngle = 0f;
+        var previousAngle = Rotation.Zero;
 
         for (var index = 0; index < _rotationPoints.Count; index++)
         {
             var rotationPoint = _rotationPoints[index];
             UnpackRotation(rotationPoint, out _, out var headingVector, out var parameter);
-            var angle = MathF.Atan2(headingVector.Y, headingVector.X);
+            var angle = Math.Atan2(headingVector.Y, headingVector.X);
 
             if (index > 0)
             {
@@ -453,7 +459,7 @@ internal sealed class PathEditor
                 angle = previousAngle + Angles.DeltaAngle(angle, previousAngle);
             }
 
-            previousAngle = angle;
+            previousAngle = (Rotation)angle;
 
             builder.Add(parameter, angle);
         }
@@ -506,15 +512,15 @@ internal sealed class PathEditor
         var markers = rotationPoint.Get<RotationPointComponent>();
 
         heading = markers.HeadingMarker.Get<PositionComponent>().Position - position;
-        parameter = markers.Parameter;
+        parameter = (float)markers.Parameter;
     }
 
-    public void DrawTranslationPath(QuadBatch batch, Func<Vector2, Vector2>? mapping = null)
+    public void SubmitPath(QuadBatch batch)
     {
-        TranslationSpline.Render(batch, mapping);
+        _pathRenderer.Submit(batch);
     }
 
-    public void DrawIndicator(QuadBatch batch, Vector2 position)
+    public void SubmitIndicator(QuadBatch batch, Vector2 position)
     {
         if (TranslationSpline.Segments.Count == 0)
         {
@@ -522,7 +528,7 @@ internal sealed class PathEditor
         }
 
         batch.TexturedQuad(
-            TranslationSpline.Evaluate(TranslationSpline.Project(position.ToReal2<Displacement>())),
+            TranslationSpline.Evaluate(TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position))),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);
     }

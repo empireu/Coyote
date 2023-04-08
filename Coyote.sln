@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33103.201
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coyote.App", "Coyote.App\Coyote.App.csproj", "{5A110387-42C6-4374-829F-694CB776E0E8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coyote.App", "Coyote.App\Coyote.App.csproj", "{5A110387-42C6-4374-829F-694CB776E0E8}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{07DB8349-D00B-4F99-9BC2-FAE33FA606F4}"
 EndProject
@@ -16,6 +16,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameFramework.PostProcessing.Effects", "GraphicsFramework\GameFramework.PostProcessing.Effects\GameFramework.PostProcessing.Effects.csproj", "{450F21BF-C433-4AF2-A151-3F29A32F8FF3}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameFramework.Utilities", "GraphicsFramework\GameFramework.Utilities\GameFramework.Utilities.csproj", "{2DD3C5A5-BE77-4164-A578-1AD65C167CF6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coyote.Mathematics", "Coyote.Mathematics\Coyote.Mathematics.csproj", "{3DB1497A-0100-4F51-87B6-D417AC91C980}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coyote.Data", "Coyote.Data\Coyote.Data.csproj", "{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -73,6 +77,22 @@ Global
 		{2DD3C5A5-BE77-4164-A578-1AD65C167CF6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2DD3C5A5-BE77-4164-A578-1AD65C167CF6}.Release|x64.ActiveCfg = Release|x64
 		{2DD3C5A5-BE77-4164-A578-1AD65C167CF6}.Release|x64.Build.0 = Release|x64
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Debug|x64.Build.0 = Debug|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Release|x64.ActiveCfg = Release|Any CPU
+		{3DB1497A-0100-4F51-87B6-D417AC91C980}.Release|x64.Build.0 = Release|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Debug|x64.Build.0 = Debug|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|x64.ActiveCfg = Release|Any CPU
+		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

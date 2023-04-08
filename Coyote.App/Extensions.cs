@@ -2,7 +2,8 @@
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
-using Coyote.App.Mathematics;
+using Coyote.Mathematics;
+using Vortice.Mathematics;
 
 namespace Coyote.App;
 
@@ -72,30 +73,5 @@ internal static class Extensions
     public static Vector2 Xy(this Vector3 v)
     {
         return new Vector2(v.X, v.Y);
-    }
-
-    public static bool ApproxEquals(this float f, float other, float threshold = 10e-6f)
-    {
-        return Math.Abs(f - other) < threshold;
-    }
-
-    public static bool ApproxEquals(this double d, double other, double threshold = 10e-6)
-    {
-        return Math.Abs(d - other) < threshold;
-    }
-
-    public static Real<TUnit> ToReal<TUnit>(this float f) where TUnit : IUnit
-    {
-        return (Real<TUnit>)f;
-    }
-
-    public static Real<TUnit> ToReal<TUnit>(this double d) where TUnit : IUnit
-    {
-        return (Real<TUnit>)d;
-    }
-
-    public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v) where TUnit : IUnit
-    {
-        return (Real2<TUnit>)v;
     }
 }

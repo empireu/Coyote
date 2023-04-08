@@ -1,22 +1,29 @@
 ﻿using System.Text.Json.Serialization;
-using Coyote.App.Mathematics;
+using Coyote.Mathematics;
 
 namespace Coyote.App.Movement;
 
 internal struct MotionConstraints
 {
-    public static readonly MotionConstraints Default = new MotionConstraints(1.5f, 1f);
+    public static readonly MotionConstraints Default = new(1.5f, 1f);
 
     [JsonInclude] 
-    public float MaxVelocity { get; set; }
+    public Real<Velocity> MaxVelocity { get; set; }
 
     [JsonInclude] 
-    public float MaxAcceleration { get; set; }
+    public Real<Acceleration> MaxAcceleration { get; set; }
 
-    public MotionConstraints(float maxVelocity, float maxAcceleration)
+    [JsonConstructor]
+    public MotionConstraints(Real<Velocity> maxVelocity, Real<Acceleration> maxAcceleration)
     {
         MaxVelocity = maxVelocity;
         MaxAcceleration = maxAcceleration;
+    }
+
+    public MotionConstraints(double maxVelocity, double maxAcceleration)
+    {
+        MaxVelocity = maxVelocity.ToReal<Velocity>();
+        MaxAcceleration = maxAcceleration.ToReal<Acceleration>();
     }
 }
 
@@ -36,22 +43,22 @@ internal readonly struct MotionState
 
 static class TrapezoidalProfile
 {
-    public static bool Evaluate(MotionConstraints constraints, float distance, float time, out MotionState state)
+    public static bool Evaluate(MotionConstraints constraints, double distance, double time, out MotionState state)
     {
-        var maxVelocity = constraints.MaxVelocity;
-        var maxAcceleration = constraints.MaxAcceleration;
+        var maxVelocity = constraints.MaxVelocity.Value;
+        var maxAcceleration = constraints.MaxAcceleration.Value;
 
         var accelerationDuration = maxVelocity / maxAcceleration;
 
-        var midpoint = distance / 2f;
-        var accelerationDistance = 0.5f * maxAcceleration * accelerationDuration * accelerationDuration;
+        var midpoint = distance / 2;
+        var accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
 
         if (accelerationDistance > midpoint)
         {
-            accelerationDuration = MathF.Sqrt(midpoint / (0.5f * maxAcceleration));
+            accelerationDuration = Math.Sqrt(midpoint / (0.5 * maxAcceleration));
         }
 
-        accelerationDistance = 0.5f * maxAcceleration * accelerationDuration * accelerationDuration;
+        accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
 
         maxVelocity = maxAcceleration * accelerationDuration;
 
@@ -71,25 +78,25 @@ static class TrapezoidalProfile
 
         if (time < accelerationDuration)
         {
-            state = new MotionState((0.5f * maxAcceleration * time * time).ToReal<Displacement>(), (maxAcceleration * time).ToReal<Velocity>(), maxAcceleration.ToReal<Acceleration>());
+            state = new MotionState((0.5 * maxAcceleration * time * time).ToReal<Displacement>(), (maxAcceleration * time).ToReal<Velocity>(), maxAcceleration.ToReal<Acceleration>());
             return true;
         }
 
         if (time < deAccelerationTime)
         {
-            accelerationDistance = 0.5f * maxAcceleration * accelerationDuration * accelerationDuration;
+            accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
             var cruiseCurrentDt = time - accelerationDuration;
 
             state = new MotionState((accelerationDistance + maxVelocity * cruiseCurrentDt).ToReal<Displacement>(), maxVelocity.ToReal<Velocity>(), Real<Acceleration>.Zero);
             return true;
         }
 
-        accelerationDistance = 0.5f * maxAcceleration * accelerationDuration * accelerationDuration;
+        accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
         cruiseDistance = maxVelocity * cruiseDuration;
         deAccelerationTime = time - deAccelerationTime;
 
         state = new MotionState(
-            (accelerationDistance + cruiseDistance + maxVelocity * deAccelerationTime - 0.5f * maxAcceleration * deAccelerationTime * deAccelerationTime).ToReal<Displacement>(),
+            (accelerationDistance + cruiseDistance + maxVelocity * deAccelerationTime - 0.5 * maxAcceleration * deAccelerationTime * deAccelerationTime).ToReal<Displacement>(),
             (maxVelocity - deAccelerationTime * maxAcceleration).ToReal<Velocity>(), 
             maxAcceleration.ToReal<Acceleration>());
 

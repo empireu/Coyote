@@ -171,8 +171,8 @@ internal class App : GameApplication
             {
                 if (ImGui.Begin("Project Settings", ref _showProjectSettings))
                 {
-                    var maxVelocity = _project.Constraints.MaxVelocity;
-                    var maxAcceleration = _project.Constraints.MaxAcceleration;
+                    var maxVelocity = (float)(_project.Constraints.MaxVelocity).Value;
+                    var maxAcceleration = (float)(_project.Constraints.MaxAcceleration).Value;
 
                     var changed = false;
 

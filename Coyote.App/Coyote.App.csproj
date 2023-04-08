@@ -39,6 +39,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Coyote.Mathematics\Coyote.Mathematics.csproj" />
     <ProjectReference Include="..\GraphicsFramework\GameFramework.ImGui\GameFramework.ImGui.csproj" />
     <ProjectReference Include="..\GraphicsFramework\GameFramework.PostProcessing.Effects\GameFramework.PostProcessing.Effects.csproj" />
     <ProjectReference Include="..\GraphicsFramework\GameFramework.PostProcessing\GameFramework.PostProcessing.csproj" />

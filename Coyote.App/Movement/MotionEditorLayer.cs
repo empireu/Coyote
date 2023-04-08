@@ -431,7 +431,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
         _playerBatch.Submit(framebuffer: framebuffer); _playerBatch.Submit(framebuffer: framebuffer);
 
         _playerBatch.Clear();
-        _path.DrawTranslationPath(_playerBatch);
+        _path.SubmitPath(_playerBatch);
         _playerBatch.Submit(framebuffer: framebuffer);
 
         if (_simulator.Update(_dt, out var pose))
@@ -505,9 +505,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         Systems.RenderSprites(_world, _editorBatch);
         Draw();
-        _path.DrawTranslationPath(_editorBatch);
+        _path.SubmitPath(_editorBatch);
         Draw();
-        _path.DrawIndicator(_editorBatch, MouseWorld);
+        _path.SubmitIndicator(_editorBatch, MouseWorld);
         Draw();
         Systems.RenderConnections(_world, _editorBatch);
         Draw();

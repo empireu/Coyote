@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 using Arch.Core.Extensions;
-using Coyote.App.Mathematics;
+using Coyote.Mathematics;
 
 namespace Coyote.App.Movement;
 
@@ -95,7 +95,7 @@ internal class MotionProject
             {
                 Position = entity.Get<PositionComponent>().Position,
                 Heading = entity.Get<RotationPointComponent>().HeadingMarker.Get<PositionComponent>().Position,
-                Parameter = entity.Get<RotationPointComponent>().Parameter
+                Parameter = (float)entity.Get<RotationPointComponent>().Parameter.Value
             };
         }
 

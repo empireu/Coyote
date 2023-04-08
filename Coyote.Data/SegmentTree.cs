@@ -1,11 +1,11 @@
-﻿namespace Coyote.App.Movement;
+﻿namespace Coyote.Data;
 
-readonly struct SegmentRange
+public readonly struct SegmentRange
 {
-    public float Start { get; }
-    public float End { get; }
+    public double Start { get; }
+    public double End { get; }
 
-    public SegmentRange(float start, float end)
+    public SegmentRange(double start, double end)
     {
         Start = start;
         End = end;
@@ -16,18 +16,16 @@ readonly struct SegmentRange
         }
     }
 
-    public bool Contains(float point)
+    public bool Contains(double point)
     {
         return point >= Start && point <= End;
     }
 }
 
-class SegmentTreeNode<T>
+public sealed class SegmentTreeNode<T>
 {
     private readonly SegmentTreeNode<T>? _left;
     private readonly SegmentTreeNode<T>? _right;
-    public SegmentRange Range { get; }
-    public T? Data { get; }
 
     public SegmentTreeNode(SegmentRange range, T? data, SegmentTreeNode<T>? left, SegmentTreeNode<T>? right)
     {
@@ -37,12 +35,16 @@ class SegmentTreeNode<T>
         Data = data;
     }
 
-    public bool Contains(float point)
+    public SegmentRange Range { get; }
+
+    public T? Data { get; }
+
+    public bool Contains(double point)
     {
         return Range.Contains(point);
     }
 
-    public T Query(float point)
+    public T Query(double point)
     {
         if (!Contains(point))
         {
@@ -63,7 +65,7 @@ class SegmentTreeNode<T>
     }
 }
 
-class SegmentTreeBuilder<T>
+public sealed class SegmentTreeBuilder<T>
 {
     private struct PendingSegment
     {
@@ -93,7 +95,7 @@ class SegmentTreeBuilder<T>
 
         if (_pending.Count > 1)
         {
-            for (int i = 1; i < _pending.Count; i++)
+            for (var i = 1; i < _pending.Count; i++)
             {
                 var previous = _pending[i - 1];
                 var current = _pending[i];
@@ -127,7 +129,7 @@ class SegmentTreeBuilder<T>
     }
 }
 
-class SegmentTree<T>
+public sealed class SegmentTree<T>
 {
     private readonly SegmentTreeNode<T> _root;
 
@@ -138,7 +140,7 @@ class SegmentTree<T>
         _root = root;
     }
 
-    public T Query(float point)
+    public T Query(double point)
     {
         return _root.Query(point);
     }

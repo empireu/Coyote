@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 using Arch.Core;
-using Coyote.App.Mathematics;
+using Coyote.Mathematics;
 using GameFramework.Renderer;
 
 namespace Coyote.App;

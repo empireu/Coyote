@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Coyote.Data\Coyote.Data.csproj" />
+    <ProjectReference Include="..\GraphicsFramework\GameFramework.Utilities\GameFramework.Utilities.csproj" />
+  </ItemGroup>
+
+</Project>

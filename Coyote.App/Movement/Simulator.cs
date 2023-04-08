@@ -1,4 +1,4 @@
-﻿using Coyote.App.Mathematics;
+﻿using Coyote.Mathematics;
 using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
@@ -40,7 +40,8 @@ internal class Simulator
 
         _parameterizedQuinticSpline ??= new ArcParameterizedQuinticSpline(_editor.TranslationSpline.Segments);
 
-        if (!TrapezoidalProfile.Evaluate(_app.Project.Constraints, _parameterizedQuinticSpline.ArcLength, _playTime, out var motionState))
+        if (!TrapezoidalProfile.Evaluate(_app.Project.Constraints, 
+                _parameterizedQuinticSpline.ArcLength, _playTime, out var motionState))
         {
             _playTime = 0;
             
@@ -51,13 +52,13 @@ internal class Simulator
 
         var parameter = _parameterizedQuinticSpline.EvaluateParameter(motionState.Distance);
 
-        var translation = _parameterizedQuinticSpline.EvaluateUnderlying(parameter);
+        var translation = new Translation(_parameterizedQuinticSpline.EvaluateUnderlying(parameter));
 
         pose = _editor.RotationSpline.IsEmpty
-            ? new Pose(translation, _parameterizedQuinticSpline.EvaluateUnderlyingVelocity(parameter)) // Spline Tangent Heading
+            ? new Pose(translation, _parameterizedQuinticSpline.EvaluateUnderlyingVelocity(parameter).ToRotation()) // Spline Tangent Heading
             : new Pose(translation, (float)_editor.RotationSpline.Evaluate(parameter)); // Spline Spline Heading
 
-        pose -= MathF.PI / 2f;
+        pose -= new Rotation(Math.PI / 2);
 
         _playTime += dt;
 
