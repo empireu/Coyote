@@ -2,49 +2,51 @@
 using GameFramework.Renderer.Batch;
 using System.Numerics;
 using GameFramework.Extensions;
+using GameFramework.Renderer;
 using Veldrid;
 
 namespace Coyote.App;
 
 public sealed class SplineRenderer
 {
-    private const int SamplesPerSegment = 64;
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
+    private static readonly Twist AdmissibleTwist = new(0.1, 0.1, Math.PI / 32);
+    private const int MaxIterations = 8192;
 
-    private readonly List<Vector2> _renderPoints = new();
+    private readonly List<CurvePose> _points = new();
 
     public void Clear()
     {
-        _renderPoints.Clear();
+        _points.Clear();
     }
 
-    public void Update(IPositionSpline spline, int segments)
+    public void Update<TSpline>(TSpline spline) where TSpline : IPositionSpline, ICurvePoseSpline
     {
-        _renderPoints.Clear();
+        _points.Clear();
 
-        var samples = segments * SamplesPerSegment;
-        for (var subSampleIndex = 0; subSampleIndex < samples; subSampleIndex++)
-        {
-            var t0 = subSampleIndex / (samples - 1f);
-
-            _renderPoints.Add(spline.EvaluateTranslation(t0.ToReal<Percentage>()));
-        }
+        Splines.GetPoints(
+            _points, 
+            spline, 
+            Real<Percentage>.Zero, 
+            Real<Percentage>.One, 
+            AdmissibleTwist,
+            MaxIterations);
     }
 
     public void Submit(QuadBatch batch)
     {
-        if (_renderPoints.Count < 2)
+        if (_points.Count < 2)
         {
             return;
         }
 
-        for (var i = 1; i < _renderPoints.Count; i++)
+        for (var i = 1; i < _points.Count; i++)
         {
-            var start = _renderPoints[i - 1];
-            var end = _renderPoints[i];
+            var start = _points[i - 1];
+            var end = _points[i];
 
-            batch.Line(start, end, LineColor, LineThickness);
+            batch.Line(start.Pose.Translation, end.Pose.Translation, LineColor, LineThickness);
         }
     }
 }

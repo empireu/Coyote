@@ -360,7 +360,7 @@ internal sealed class PathEditor
 
         if (TranslationSpline.Segments.Count > 0)
         {
-            _pathRenderer.Update(TranslationSpline, TranslationSpline.Segments.Count);
+            _pathRenderer.Update(TranslationSpline);
         }
 
         ArcLength = TranslationSpline.ComputeArcLength();

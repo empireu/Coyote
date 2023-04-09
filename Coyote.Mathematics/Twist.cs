@@ -21,6 +21,11 @@ public readonly struct Twist
         DTheta = dTheta;
     }
 
+    public Twist(double dx, double dy, double dTheta) : this(dx.ToReal<Displacement>(), dy.ToReal<Displacement>(), dTheta.ToReal<Radians>())
+    {
+
+    }
+
     public override string ToString()
     {
         return $"Twist [Dx={Dx}, Dy={Dy}, DTheta={DTheta}]";
