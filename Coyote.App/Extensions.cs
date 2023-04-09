@@ -3,6 +3,11 @@ using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
+using GameFramework.Extensions;
+using GameFramework.Renderer;
+using GameFramework.Renderer.Batch;
+using GameFramework.Renderer.VertexFormats;
+using GameFramework.Utilities.Extensions;
 using Vortice.Mathematics;
 
 namespace Coyote.App;

@@ -10,6 +10,7 @@
   <ItemGroup>
     <None Remove="Assets\Fonts\Roboto.font" />
     <None Remove="Assets\Images\AccelerationMarker.png" />
+    <None Remove="Assets\Images\Arrow.png" />
     <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
@@ -21,6 +22,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\Fonts\Roboto.font" />
     <EmbeddedResource Include="Assets\Images\AccelerationMarker.png" />
+    <EmbeddedResource Include="Assets\Images\Arrow.png" />
     <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
     <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />
