@@ -607,20 +607,20 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 new RgbaFloat4(0, 1, 0, 0.5f));
         }
 
-        Systems.RenderSprites(_world, _editorBatch);
-        Draw();
         _path.SubmitPath(_editorBatch);
+        Draw();
+        Systems.RenderConnections(
+            _world,
+            _editorBatch,
+            _renderPositionPoints,
+            _renderRotationPoints,
+            _renderTranslationVelocityPoints,
+            _renderTranslationAccelerationPoints,
+            _renderRotationTangents);
         Draw();
         _path.SubmitIndicator(_editorBatch, MouseWorld);
         Draw();
-        Systems.RenderConnections(
-            _world, 
-            _editorBatch, 
-            _renderPositionPoints,
-            _renderRotationPoints,
-            _renderTranslationVelocityPoints, 
-            _renderTranslationAccelerationPoints, 
-            _renderRotationTangents);
+        Systems.RenderSprites(_world, _editorBatch);
         Draw();
     }
 
