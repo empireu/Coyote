@@ -47,10 +47,17 @@ internal static class Extensions
         {
             foreach (var entity in chunk.Entities)
             {
-                if (entity.IsAlive() && entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
+                if (!entity.IsAlive() || !entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
                 {
-                    results.Add(entity);
+                    continue;
                 }
+
+                if (entity.Has<SpriteComponent>() && entity.Get<SpriteComponent>().Disabled)
+                {
+                    continue;
+                }
+
+                results.Add(entity);
             }
         }
 

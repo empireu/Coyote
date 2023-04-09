@@ -81,11 +81,16 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private Entity? _selectedEntity;
 
-
     private int _pickIndex;
 
     private string _motionProjectName = "My Project";
     private int _selectedProject;
+
+    private bool _renderPositionPoints = true;
+    private bool _renderTranslationVelocityPoints = true;
+    private bool _renderTranslationAccelerationPoints = true;
+    private bool _renderRotationPoints = true;
+    private bool _renderRotationTangents = true;
 
     private readonly Simulator _simulator;
 
@@ -275,6 +280,61 @@ internal class MotionEditorLayer : Layer, ITabStyle
             }
 
             ImGui.EndGroup();
+        }
+
+        ImGui.End();
+
+        if (ImGui.Begin("Render"))
+        {
+            if (ImGui.Checkbox("Show Translation Points", ref _renderPositionPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderPositionPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Rotation Points", ref _renderRotationPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.RotationPoints)
+                {
+                    pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderRotationPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Translation Velocities", ref _renderTranslationVelocityPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<TranslationPointComponent>().VelocityMarker.Get<SpriteComponent>().Disabled = !_renderTranslationVelocityPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Translation Accelerations", ref _renderTranslationAccelerationPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<TranslationPointComponent>().AccelerationMarker.Get<SpriteComponent>().Disabled = !_renderTranslationAccelerationPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Rotation Tangents", ref _renderRotationTangents))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.RotationPoints)
+                {
+                    pathTranslationPoint.Get<RotationPointComponent>().HeadingMarker.Get<SpriteComponent>().Disabled = !_renderRotationTangents;
+                }
+            }
         }
 
         ImGui.End();
@@ -553,7 +613,14 @@ internal class MotionEditorLayer : Layer, ITabStyle
         Draw();
         _path.SubmitIndicator(_editorBatch, MouseWorld);
         Draw();
-        Systems.RenderConnections(_world, _editorBatch);
+        Systems.RenderConnections(
+            _world, 
+            _editorBatch, 
+            _renderPositionPoints,
+            _renderRotationPoints,
+            _renderTranslationVelocityPoints, 
+            _renderTranslationAccelerationPoints, 
+            _renderRotationTangents);
         Draw();
     }
 

@@ -30,6 +30,7 @@ internal struct RotationComponent
 internal struct SpriteComponent
 {
     public Sprite Sprite;
+    public bool Disabled;
 }
 
 internal struct TranslationPointComponent

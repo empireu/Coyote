@@ -11,39 +11,60 @@ internal static class Systems
     {
         world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, SpriteComponent>(), (ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref SpriteComponent spriteComponent) =>
         {
-            batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, spriteComponent.Sprite.Texture);
+            if (!spriteComponent.Disabled)
+            {
+                batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, spriteComponent.Sprite.Texture);
+            }
         });
 
         world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, RotationComponent, SpriteComponent>(), (ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref RotationComponent rotationComponent, ref SpriteComponent spriteComponent) =>
         {
-            batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, rotationComponent.Angle, spriteComponent.Sprite.Texture);
+            if (!spriteComponent.Disabled)
+            {
+                batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, rotationComponent.Angle, spriteComponent.Sprite.Texture);
+            }
         });
     }
 
-    public static void RenderConnections(World world, QuadBatch batch)
+    public static void RenderConnections(World world, QuadBatch batch, bool translationPoints, bool rotationPoints, bool translationVelocity, bool translationAcceleration, bool rotationTangents)
     {
-        world.Query(new QueryDescription().WithAll<PositionComponent, TranslationPointComponent>(), (ref PositionComponent positionComponent, ref TranslationPointComponent translationPointComponent) =>
+        if (translationPoints)
         {
-            batch.Line(
-                positionComponent.Position, 
-                translationPointComponent.VelocityMarker.Get<PositionComponent>().Position,
-                TranslationPointComponent.VelocityLineColor,
-                TranslationPointComponent.VelocityLineThickness);
+            world.Query(new QueryDescription().WithAll<PositionComponent, TranslationPointComponent>(), (ref PositionComponent positionComponent, ref TranslationPointComponent translationPointComponent) =>
+            {
+                if (translationVelocity)
+                {
+                    batch.Line(
+                        positionComponent.Position,
+                        translationPointComponent.VelocityMarker.Get<PositionComponent>().Position,
+                        TranslationPointComponent.VelocityLineColor,
+                        TranslationPointComponent.VelocityLineThickness);
+                }
 
-            batch.Line(
-                positionComponent.Position,
-                translationPointComponent.AccelerationMarker.Get<PositionComponent>().Position,
-                TranslationPointComponent.AccelerationLineColor,
-                TranslationPointComponent.AccelerationLineThickness);
-        });
+                if (translationAcceleration)
+                {
+                    batch.Line(
+                        positionComponent.Position,
+                        translationPointComponent.AccelerationMarker.Get<PositionComponent>().Position,
+                        TranslationPointComponent.AccelerationLineColor,
+                        TranslationPointComponent.AccelerationLineThickness);
+                }
+            });
+        }
 
-        world.Query(new QueryDescription().WithAll<PositionComponent, RotationPointComponent>(), (ref PositionComponent positionComponent, ref RotationPointComponent rotationPointComponent) =>
+        if (rotationPoints)
         {
-            batch.Line(
-                positionComponent.Position,
-                rotationPointComponent.HeadingMarker.Get<PositionComponent>().Position,
-                RotationPointComponent.HeadingLineColor,
-                RotationPointComponent.HeadingLineThickness);
-        });
+            world.Query(new QueryDescription().WithAll<PositionComponent, RotationPointComponent>(), (ref PositionComponent positionComponent, ref RotationPointComponent rotationPointComponent) =>
+            {
+                if (rotationTangents)
+                {
+                    batch.Line(
+                        positionComponent.Position,
+                        rotationPointComponent.HeadingMarker.Get<PositionComponent>().Position,
+                        RotationPointComponent.HeadingLineColor,
+                        RotationPointComponent.HeadingLineThickness);
+                }
+            });
+        }
     }
 }
