@@ -112,6 +112,9 @@ public struct TrajectoryPoint
     public Real<Velocity> Velocity;
     public Real<Acceleration> Acceleration;
     public Real<Displacement> Displacement;
+
+    public Real2<Velocity> CartesianVelocity;
+    public Real2<Acceleration> CartesianAcceleration;
 }
 
 public readonly struct BaseTrajectoryConstraints
@@ -289,6 +292,36 @@ public class TrajectoryGenerator
         }
     }
 
+    private static void ComputeVelocityAcceleration(TrajectoryPoint[] points)
+    {
+        points[0].CartesianVelocity = Real2<Velocity>.Zero;
+        points[0].CartesianAcceleration = Real2<Acceleration>.Zero;
+
+        // Cartesian velocities:
+        for (var i = 1; i < points.Length; i++)
+        {
+            var previous = points[i - 1];
+            ref var current = ref points[i];
+
+            var dPos = current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation;
+            var dt = current.Time - previous.Time;
+
+            current.CartesianVelocity = new Real2<Velocity>(dPos / dt);
+        }
+
+        // Cartesian accelerations:
+        for (var i = 1; i < points.Length; i++)
+        {
+            var previous = points[i - 1];
+            ref var current = ref points[i];
+
+            var dVel = current.CartesianVelocity - previous.CartesianVelocity;
+            var dt = current.Time - previous.Time;
+
+            current.CartesianAcceleration = new Real2<Acceleration>(dVel / dt);
+        }
+    }
+
     public static TrajectoryPoint[] GeneratePoints(CurvePose[] poses, BaseTrajectoryConstraints constraints)
     {
         var points = new TrajectoryPoint[poses.Length];
@@ -313,6 +346,9 @@ public class TrajectoryGenerator
 
         // Compute times:
         ComputeTime(points);
+
+        // Compute velocities and accelerations:
+        ComputeVelocityAcceleration(points);
 
         return points;
     }
@@ -353,13 +389,19 @@ public class Trajectory
             var curvature = Real<Curvature>.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress);
             var displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress);
 
+            var cartesianVelocity = Real2<Velocity>.Lerp(A.CartesianVelocity, B.CartesianVelocity, progress);
+            var cartesianAcceleration = Real2<Acceleration>.Lerp(A.CartesianAcceleration, B.CartesianAcceleration, progress);
+
             return new TrajectoryPoint
             {
                 CurvePose = new CurvePose(pose, curvature),
                 Time = time,
                 Velocity = velocity,
                 Acceleration = acceleration,
-                Displacement = displacement
+                Displacement = displacement,
+                
+                CartesianVelocity = cartesianVelocity,
+                CartesianAcceleration = cartesianAcceleration
             };
         }
     }

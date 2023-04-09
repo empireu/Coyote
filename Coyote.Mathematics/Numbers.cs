@@ -600,4 +600,20 @@ public readonly struct Real2<TUnit> where TUnit : IUnit
     {
         return v / v.Length();
     }
+
+    public static Real2<TUnit> Lerp(Real2<TUnit> a, Real2<TUnit> b, double t)
+    {
+        return new Real2<TUnit>(
+            Real<TUnit>.Lerp(a.X, b.X, t),
+            Real<TUnit>.Lerp(a.Y, b.Y, t)
+        );
+    }
+
+    public static Real2<TUnit> Lerp(Real2<TUnit> a, Real2<TUnit> b, Real<Percentage> t)
+    {
+        return new Real2<TUnit>(
+            Real<TUnit>.Lerp(a.X, b.X, t),
+            Real<TUnit>.Lerp(a.Y, b.Y, t)
+        );
+    }
 }

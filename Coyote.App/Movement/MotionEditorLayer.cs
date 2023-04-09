@@ -2,6 +2,7 @@
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Extensions;
 using GameFramework.ImGui;
@@ -42,6 +43,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private const float ZoomSpeed = 25;
     private const float MinZoom = 1f;
     private const float MaxZoom = 5f;
+    private static readonly Vector4 VelocityColor = new(1, 0.1f, 0.1f, 1f);
+    private static readonly Vector4 AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
+    private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
+    private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
 
     private readonly App _app;
     private readonly ImGuiLayer _imGuiLayer;
@@ -349,6 +354,23 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                 // Fixes inverted Y coordinate by inverting Y in the texture coordinate.
                 ImGui.Image(_playerBinding, imageSize.ToVector2(), Vector2.Zero, new Vector2(1f, -1f));
+
+                var lastPoint = _simulator.Last;
+
+                ImGui.TextColored(VelocityColor, $"{lastPoint.Velocity} m/s");
+                ImGui.TextColored(AccelerationColor, $"{lastPoint.Acceleration} m/s²");
+                ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement} m ({_simulator.TotalLength:F4} m total)");
+                ImGui.Separator();
+                ImGui.TextColored(TimeColor, $"{lastPoint.Time} s ({_simulator.TotalTime:F4} s total)");
+
+                ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
+                
+                if (ImGui.Button("Normal"))
+                {
+                    _simulator.Speed = 1;
+                }
+
+                ImGui.Text($"V: {lastPoint.CartesianVelocity.Length().Value:F2}, A: {lastPoint.CartesianAcceleration.Length().Value:F2}");
             }
 
             ImGui.End();
@@ -438,6 +460,11 @@ internal class MotionEditorLayer : Layer, ITabStyle
         {
             _playerBatch.Clear();
             _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
+            _playerBatch.Submit(framebuffer: framebuffer);
+
+            _playerBatch.Clear();
+            _playerBatch.Line(pose.Translation, pose.Translation + _simulator.Last.CartesianVelocity / 10, VelocityColor, 0.025f);
+            _playerBatch.Line(pose.Translation, pose.Translation + _simulator.Last.CartesianAcceleration / 10, AccelerationColor, 0.025f);
             _playerBatch.Submit(framebuffer: framebuffer);
         }
     }
