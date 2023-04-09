@@ -1,15 +1,20 @@
-﻿using Coyote.Mathematics;
+﻿using System.Diagnostics;
+using Coyote.Data;
+using Coyote.Mathematics;
 using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
 
 internal class Simulator
 {
+    private const double EditTimeRefreshThreshold = 0.5;
+
     private readonly App _app;
     private readonly PathEditor _editor;
 
-    private ArcParameterizedQuinticSpline? _parameterizedQuinticSpline;
-    private float _playTime;
+    private Trajectory? _trajectory;
+
+    private readonly Stopwatch _editTime = Stopwatch.StartNew();
 
     public Simulator(App app, PathEditor editor)
     {
@@ -26,8 +31,12 @@ internal class Simulator
 
     public void InvalidateTrajectory()
     {
-        _parameterizedQuinticSpline = null;
+        _trajectory = null;
+        _editTime.Restart();
     }
+
+    public float PlayTime { get; private set; }
+    public TrajectoryPoint Last { get; private set; }
 
     public bool Update(float dt, out Pose pose)
     {
@@ -38,29 +47,42 @@ internal class Simulator
            return false;
         }
 
-        _parameterizedQuinticSpline ??= new ArcParameterizedQuinticSpline(_editor.TranslationSpline.Segments);
-
-        if (!TrapezoidalProfile.Evaluate(_app.Project.Constraints, 
-                _parameterizedQuinticSpline.ArcLength, _playTime, out var motionState))
+        if (_trajectory == null)
         {
-            _playTime = 0;
-            
-            pose = Pose.Zero;
+            if (_editTime.Elapsed.TotalSeconds < EditTimeRefreshThreshold)
+            {
+                pose = Pose.Zero;
 
+                return false;
+            }
+
+            PlayTime = 0;
+
+            var points = new List<CurvePose>();
+
+            Splines.GetPoints(points, _editor.TranslationSpline, Real<Percentage>.Zero, Real<Percentage>.One,
+                new Twist(0.001, 0.001, Math.PI / 16), 32000);
+
+
+            _trajectory = TrajectoryGenerator.Generate(points.ToArray(), new BaseTrajectoryConstraints(
+                new Real<Velocity>(2.5),
+                new Real<Acceleration>(-1.7),
+                new Real<Acceleration>(1.7),
+                new Real<CentripetalAcceleration>(Math.PI / 4f)));
+        }
+
+        if (PlayTime > _trajectory.TimeRange.End)
+        {
+            PlayTime = 0;
+            pose = Pose.Zero;
             return false;
         }
 
-        var parameter = _parameterizedQuinticSpline.EvaluateParameter(motionState.Distance);
-
-        var translation = new Translation(_parameterizedQuinticSpline.EvaluateUnderlying(parameter));
-
-        pose = _editor.RotationSpline.IsEmpty
-            ? new Pose(translation, _parameterizedQuinticSpline.EvaluateUnderlyingVelocity(parameter).ToRotation()) // Spline Tangent Heading
-            : new Pose(translation, (float)_editor.RotationSpline.Evaluate(parameter)); // Spline Spline Heading
-
+        Last = _trajectory.Evaluate(PlayTime.ToReal<Time>());
+        pose = Last.CurvePose.Pose;
         pose -= new Rotation(Math.PI / 2);
 
-        _playTime += dt;
+        PlayTime += dt;
 
         return true;
     }

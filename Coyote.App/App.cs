@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
+using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;

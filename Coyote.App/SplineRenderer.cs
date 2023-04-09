@@ -1,8 +1,6 @@
 ﻿using Coyote.Mathematics;
 using GameFramework.Renderer.Batch;
-using System.Numerics;
 using GameFramework.Extensions;
-using GameFramework.Renderer;
 using Veldrid;
 
 namespace Coyote.App;
@@ -11,7 +9,7 @@ public sealed class SplineRenderer
 {
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
-    private static readonly Twist AdmissibleTwist = new(0.1, 0.1, Math.PI / 32);
+    private static readonly Twist AdmissibleTwist = new(0.1, 0.1, Math.PI / 16);
     private const int MaxIterations = 8192;
 
     private readonly List<CurvePose> _points = new();
@@ -26,10 +24,10 @@ public sealed class SplineRenderer
         _points.Clear();
 
         Splines.GetPoints(
-            _points, 
-            spline, 
-            Real<Percentage>.Zero, 
-            Real<Percentage>.One, 
+            _points,
+            spline,
+            Real<Percentage>.Zero,
+            Real<Percentage>.One,
             AdmissibleTwist,
             MaxIterations);
     }

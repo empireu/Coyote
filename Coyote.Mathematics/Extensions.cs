@@ -81,4 +81,24 @@ public static class Extensions
     {
         return direction.Convert<Acceleration, Displacement>().ToRotation();
     }
+
+    public static Real<Displacement> Integrate(this Real<Velocity> velocity, Real<Time> time)
+    {
+        return new Real<Displacement>(velocity.Value * time.Value);
+    }
+
+    public static Real<Velocity> Integrate(this Real<Acceleration> acceleration, Real<Time> time)
+    {
+        return new Real<Velocity>(acceleration.Value * time.Value);
+    }
+
+    public static Real<T> Squared<T>(this Real<T> real) where T : IUnit
+    {
+        return new Real<T>(real.Value * real.Value);
+    }
+
+    public static Real<T> SquareRoot<T>(this Real<T> real) where T : IUnit
+    {
+        return new Real<T>(Math.Sqrt(real.Value));
+    }
 }

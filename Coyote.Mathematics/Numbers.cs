@@ -17,9 +17,24 @@ public interface Displacement : IUnit { }
 public interface Velocity : IUnit { }
 
 /// <summary>
+///     Identifies an Angular Velocity (<see cref="Radians"/>') unit.
+/// </summary>
+public interface AngularVelocity : IUnit { }
+
+/// <summary>
+///     Identifies a Centripetal Acceleration (<see cref="Velocity"/>²/<see cref="Curvature"/>) unit.
+/// </summary>
+public interface CentripetalAcceleration : IUnit { }
+
+/// <summary>
 ///     Identifies an Acceleration (<see cref="Displacement"/>'', <see cref="Velocity"/>') unit.
 /// </summary>
 public interface Acceleration : IUnit { }
+
+/// <summary>
+///     Identifies an Angular Acceleration (<see cref="Radians"/>'', <see cref="AngularVelocity"/>') unit.
+/// </summary>
+public interface AngularAcceleration : IUnit { }
 
 /// <summary>
 ///     Identifies a Curvature (<see cref="Radians"/>/<see cref="Displacement"/>) unit.
@@ -40,6 +55,11 @@ public interface Degrees : IUnit { }
 ///     Identifies a percentage unit, expressed in a value ranging from 0-1.
 /// </summary>
 public interface Percentage : IUnit { }
+
+/// <summary>
+///     Identifies a time unit, expressed in seconds.
+/// </summary>
+public interface Time : IUnit { }
 
 /// <summary>
 ///     Represents a real number with a symbolic unit.
@@ -233,6 +253,11 @@ public readonly struct Real<TUnit> :
         return Clamp(this, min, max);
     }
 
+    public Real<TUnit> Abs()
+    {
+        return new Real<TUnit>(Math.Abs(Value));
+    }
+
     /// <summary>
     ///     Maps the <see cref="Value"/> from the source range <see cref="srcMin"/>-<seealso cref="srcMax"/> to the destination range <see cref="dstMin"/>-<see cref="dstMax"/>
     ///     Internally, this calls <see cref="Map(Coyote.Mathematics.Real{TUnit},Coyote.Mathematics.Real{TUnit},Coyote.Mathematics.Real{TUnit},Coyote.Mathematics.Real{TUnit},Coyote.Mathematics.Real{TUnit})"/>
@@ -329,6 +354,16 @@ public readonly struct Real<TUnit> :
         Real<TUnit> dstMax)
     {
         return new Real<TUnit>(MathUtilities.MapRange(r.Value, srcMin.Value, srcMax.Value, dstMin.Value, dstMax.Value));
+    }
+
+    public static Real<TUnit> Lerp(Real<TUnit> a, Real<TUnit> b, Real<TUnit> t)
+    {
+        return new Real<TUnit>(MathExt.Lerp(a, b, t));
+    }
+
+    public static Real<TUnit> Lerp(Real<TUnit> a, Real<TUnit> b, double t)
+    {
+        return new Real<TUnit>(MathExt.Lerp(a, b, t));
     }
 
     public static Real<TUnit> Map(Real<TUnit> r, double srcMin, double srcMax, double dstMin, double dstMax)

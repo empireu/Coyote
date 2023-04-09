@@ -720,15 +720,14 @@ public static class Splines
 
         results.Add(spline.EvaluateCurvePose(t0));
 
-        var stack = new List<GetPointsFrame> { new(t0, t1) };
+        var stack = new Stack<GetPointsFrame>();
+        stack.Push(new GetPointsFrame(t0, t1));
 
         var iterations = 0;
 
         while (stack.Count > 0)
         {
-            var current = stack[0];
-
-            stack.RemoveAt(0);
+            var current = stack.Pop();
 
             var start = spline.EvaluateCurvePose(current.T0);
             var end = spline.EvaluateCurvePose(current.T1);
@@ -737,8 +736,8 @@ public static class Splines
 
             if (Math.Abs(twist.Dx) > admissible.Dx || Math.Abs(twist.Dy) > admissible.Dy || Math.Abs(twist.DTheta) > admissible.DTheta)
             {
-                stack.Insert(0, new GetPointsFrame((current.T0 + current.T1) / 2, current.T1));
-                stack.Insert(0, new GetPointsFrame(current.T0, (current.T0 + current.T1) / 2));
+                stack.Push(new GetPointsFrame((current.T0 + current.T1) / 2, current.T1));
+                stack.Push(new GetPointsFrame(current.T0, (current.T0 + current.T1) / 2));
             }
             else
             {

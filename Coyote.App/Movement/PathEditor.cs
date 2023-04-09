@@ -398,7 +398,7 @@ internal sealed class PathEditor
             ref var component = ref rotationPoint.Get<RotationPointComponent>();
 
             // Refit rotation point on arc (assuming the arc was edited):
-            component.Parameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
+            component.Parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
 
             // Remove projection errors by updating the position again:
             position = TranslationSpline.Evaluate(component.Parameter);
@@ -415,7 +415,7 @@ internal sealed class PathEditor
     private void ReProjectRotationPoint(Entity point)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
+        var parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
 
         point.Get<RotationPointComponent>().Parameter = parameter;
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter);
