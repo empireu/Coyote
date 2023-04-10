@@ -133,7 +133,8 @@ internal sealed class PathEditor
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
+        var translationParameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+        
         var projectedPosition = TranslationSpline.Evaluate(translationParameter);
 
         var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
@@ -465,6 +466,8 @@ internal sealed class PathEditor
         }
 
         builder.Build(RotationSpline);
+
+        OnRotationChanged?.Invoke();
     }
 
     public static float Closest(float a, float b)
@@ -534,4 +537,5 @@ internal sealed class PathEditor
     }
 
     public event Action? OnTranslationChanged;
+    public event Action? OnRotationChanged;
 }

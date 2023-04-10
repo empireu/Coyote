@@ -113,6 +113,8 @@ public struct TrajectoryPoint
     public Real<Acceleration> Acceleration;
     public Real<Displacement> Displacement;
 
+    public Real<Radians> AngularDisplacement;
+   
     public Real2<Velocity> CartesianVelocity;
     public Real2<Acceleration> CartesianAcceleration;
 }
@@ -139,14 +141,27 @@ public readonly struct BaseTrajectoryConstraints
 
 public class TrajectoryGenerator
 {
+    private static Real<TVelocity> SolveAchievableVelocity<TVelocity, TAcceleration, TDisplacement>(
+        Real<TVelocity> previousVelocity,
+        Real<TAcceleration> maxA,
+        Real<TDisplacement> displacement) 
+        where TVelocity : IUnit 
+        where TAcceleration : IUnit 
+        where TDisplacement : IUnit
+    {
+        return Math.Sqrt(previousVelocity.Squared() + 2 * maxA * displacement).ToReal<TVelocity>();
+    }
+
     /// <summary>
     ///     Computes the displacement at each point, relative to the start point.
     /// </summary>
     private static void ComputeDisplacements(TrajectoryPoint[] points)
     {
         points[0].Displacement = Real<Displacement>.Zero;
+        points[0].AngularDisplacement = Real<Radians>.Zero;
 
         var totalDisplacement = Real<Displacement>.Zero;
+        var totalAngularDisplacement = Rotation.Zero;
 
         for (var i = 1; i < points.Length; i++)
         {
@@ -154,15 +169,17 @@ public class TrajectoryGenerator
             ref var current = ref points[i];
 
             totalDisplacement += (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length();
+            totalAngularDisplacement += new Rotation((current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation).Angle);
 
             current.Displacement = totalDisplacement;
+            current.AngularDisplacement = totalAngularDisplacement;
         }
     }
 
     /// <summary>
     ///     Computes a desired velocity at each point, taking into account some special constraints (e.g. angular constraints, user defined constraints, ...)
     /// </summary>
-    private static void DesiredVelocityPass(TrajectoryPoint[] points, BaseTrajectoryConstraints constraints)
+    private static void DesiredTranslationVelocityPass(TrajectoryPoint[] points, BaseTrajectoryConstraints constraints)
     {
         // Apply initial velocity:
         for (var i = 0; i < points.Length; i++)
@@ -175,16 +192,19 @@ public class TrajectoryGenerator
         {
             ref var current = ref points[i];
 
+            var maxCurvature = Math.Abs(current.CurvePose.Curvature);
+
+            if (i > 0)
+            {
+                var previous = points[i - 1];
+                var displacement = current.Displacement - previous.Displacement;
+                maxCurvature = Math.Max(maxCurvature, (current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation).Angle.Abs() / displacement);
+            }
+
             // Centripetal acceleration constraint:
             current.Velocity = (Real<Velocity>)Math.Min(
                 current.Velocity, 
-                Math.Sqrt(constraints.MaxCentripetalAcceleration / Math.Abs(current.CurvePose.Curvature)));
-        }
-
-        // Apply max velocity constraint:
-        for (var i = 0; i < points.Length; i++)
-        {
-            points[i].Velocity = points[i].Velocity.Clamped(0, constraints.MaxTranslationalVelocity);
+                Math.Sqrt(constraints.MaxCentripetalAcceleration / maxCurvature));
         }
     }
 
@@ -205,7 +225,7 @@ public class TrajectoryGenerator
 
             var displacement = current.Displacement - previous.Displacement;
 
-            var achievableVelocity = Math.Sqrt(previous.Velocity.Squared() + 2 * maxA * displacement);
+            var achievableVelocity = SolveAchievableVelocity(previous.Velocity, maxA, displacement);
 
             var oldVelocity = current.Velocity;
 
@@ -236,7 +256,7 @@ public class TrajectoryGenerator
 
             var displacement = current.Displacement - previous.Displacement;
 
-            var achievableVelocity = Math.Sqrt(previous.Velocity.Squared() + 2 * minA * displacement);
+            var achievableVelocity = SolveAchievableVelocity(previous.Velocity, minA, displacement);
 
             var oldVelocity = current.Velocity;
 
@@ -247,6 +267,35 @@ public class TrajectoryGenerator
                 ? current.Acceleration
                 : minA;
         }
+    }
+
+    private static Real<Time> ComputeTranslationTime(TrajectoryPoint previous, TrajectoryPoint current)
+    {
+        var displacement = current.Displacement - previous.Displacement;
+
+        Real<Time> translationTime;
+
+        if (current.Acceleration > 0)
+        {
+            translationTime = (Real<Time>)(-previous.Velocity / current.Acceleration + Math.Sqrt(previous.Velocity.Squared() / current.Acceleration.Squared() + 2 * displacement / current.Acceleration));
+        }
+        else if (current.Acceleration == Real<Acceleration>.Zero)
+        {
+            translationTime = new Real<Time>(displacement / previous.Velocity);
+        }
+        else if (current.Acceleration < 0 && previous.Velocity >= Math.Sqrt(-2 * displacement * current.Acceleration))
+        {
+            translationTime = (Real<Time>)(-previous.Velocity / current.Acceleration - Math.Sqrt(previous.Velocity.Squared() / current.Acceleration.Squared() + 2 * displacement / current.Acceleration));
+        }
+        else
+        {
+            Assert.Fail("No translation time solution found");
+            translationTime = Real<Time>.Zero;
+        }
+
+        Assert.IsTrue(!double.IsInfinity(translationTime) && !double.IsNaN(translationTime));
+
+        return translationTime;
     }
 
     /// <summary>
@@ -263,31 +312,7 @@ public class TrajectoryGenerator
             var previous = points[i - 1];
             ref var current = ref points[i];
 
-            var displacement = current.Displacement - previous.Displacement;
-
-            Real<Time> time;
-
-            if (current.Acceleration > 0)
-            {
-                time = (Real<Time>)(-previous.Velocity / current.Acceleration + Math.Sqrt(((previous.Velocity.Squared()) / current.Acceleration.Squared()) + ((2 * displacement) / current.Acceleration)));
-            }
-            else if (current.Acceleration == Real<Acceleration>.Zero)
-            {
-                time = new Real<Time>(displacement / previous.Velocity);
-            }
-            else if(current.Acceleration < 0 && previous.Velocity >= Math.Sqrt(-2 * displacement * current.Acceleration))
-            {
-                time = (Real<Time>)((-previous.Velocity / current.Acceleration) - Math.Sqrt(((previous.Velocity.Squared()) / current.Acceleration.Squared()) + ((2 * displacement) / current.Acceleration)));
-            }
-            else
-            {
-                Assert.Fail("No time solution found");
-                time = Real<Time>.Zero;
-            }
-
-            Assert.IsTrue(!double.IsInfinity(time) && !double.IsNaN(time));
-           
-            totalTime += time;
+            totalTime += ComputeTranslationTime(previous, current);
             current.Time = totalTime;
         }
     }
@@ -336,7 +361,7 @@ public class TrajectoryGenerator
         ComputeDisplacements(points);
 
         // Get basic velocities we want to achieve:
-        DesiredVelocityPass(points, constraints);
+        DesiredTranslationVelocityPass(points, constraints);
 
         // Apply acceleration constraints:
         ForwardAccelerationPass(points, constraints);
@@ -353,9 +378,9 @@ public class TrajectoryGenerator
         return points;
     }
 
-    public static Trajectory Generate(CurvePose[] poses, BaseTrajectoryConstraints constraints)
+    public static Trajectory Generate(CurvePose[] poses, BaseTrajectoryConstraints constraints, out TrajectoryPoint[] points)
     {
-        var points = GeneratePoints(poses, constraints);
+        points = GeneratePoints(poses, constraints);
 
         return new Trajectory(points);
     }
@@ -388,20 +413,24 @@ public class Trajectory
             var acceleration = Real<Acceleration>.Lerp(A.Acceleration, B.Acceleration, progress);
             var curvature = Real<Curvature>.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress);
             var displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress);
+            var parameter = Real<Percentage>.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress);
 
             var cartesianVelocity = Real2<Velocity>.Lerp(A.CartesianVelocity, B.CartesianVelocity, progress);
             var cartesianAcceleration = Real2<Acceleration>.Lerp(A.CartesianAcceleration, B.CartesianAcceleration, progress);
 
+            var angularDisplacement = Real<Radians>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress);
+
             return new TrajectoryPoint
             {
-                CurvePose = new CurvePose(pose, curvature),
+                CurvePose = new CurvePose(pose, curvature, parameter),
                 Time = time,
                 Velocity = velocity,
                 Acceleration = acceleration,
                 Displacement = displacement,
                 
                 CartesianVelocity = cartesianVelocity,
-                CartesianAcceleration = cartesianAcceleration
+                CartesianAcceleration = cartesianAcceleration,
+                AngularDisplacement = angularDisplacement
             };
         }
     }

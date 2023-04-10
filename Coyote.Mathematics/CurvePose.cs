@@ -13,10 +13,14 @@ public readonly struct CurvePose
     [JsonInclude]
     public Real<Curvature> Curvature { get; }
 
+    [JsonInclude]
+    public Real<Percentage> Parameter { get; }
+
     [JsonConstructor]
-    public CurvePose(Pose pose, Real<Curvature> curvature)
+    public CurvePose(Pose pose, Real<Curvature> curvature, Real<Percentage> parameter)
     {
         Pose = pose;
         Curvature = curvature;
+        Parameter = parameter;
     }
 }

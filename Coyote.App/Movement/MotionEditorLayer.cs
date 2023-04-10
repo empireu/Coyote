@@ -92,6 +92,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private bool _renderRotationPoints = true;
     private bool _renderRotationTangents = true;
 
+    private bool _renderPlayerVelocity = false;
+    private bool _renderPlayerAcceleration = false;
+
     private readonly Simulator _simulator;
 
     private float _dt;
@@ -420,17 +423,25 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 var lastPoint = _simulator.Last;
 
                 ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.CartesianVelocity.Length().Value:F4} m/s");
+                ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
+                ImGui.Separator();
+
                 ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.CartesianAcceleration.Length().Value:F4} m/s²");
+                ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
+                ImGui.Separator();
+
                 ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement} m ({_simulator.TotalLength:F4} m total)");
                 ImGui.Separator();
+                
                 ImGui.TextColored(TimeColor, $"{lastPoint.Time} s ({_simulator.TotalTime:F4} s total)");
-
                 ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
                 
                 if (ImGui.Button("Normal"))
                 {
                     _simulator.Speed = 1;
                 }
+
+                ImGui.Separator();
             }
 
             ImGui.End();
@@ -541,8 +552,15 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 _playerBatch.Effects = effect;
             }
 
-            Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianVelocity / 10, VelocityColor);
-            Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianAcceleration / 10, AccelerationColor);
+            if (_renderPlayerVelocity)
+            {
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianVelocity / 10, VelocityColor);
+            }
+
+            if (_renderPlayerAcceleration)
+            {
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianAcceleration / 10, AccelerationColor);
+            }
         }
     }
 

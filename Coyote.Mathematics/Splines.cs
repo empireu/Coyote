@@ -263,35 +263,39 @@ public sealed class QuinticSpline : IPositionSpline, IVelocitySpline, IAccelerat
         }
 
         var optimizedClosest = closest;
-        var descentRate = (1d / ProjectionSamples).ToReal<Percentage>();
 
-        for (var i = 0; i < DescentSteps; i++)
+        if (closest > 0 && closest < 1)
         {
-            var errorLeft = ProjectError(optimizedClosest - descentRate);
-            var errorRight = ProjectError(optimizedClosest + descentRate);
+            var descentRate = (1d / ProjectionSamples).ToReal<Percentage>();
 
-            var step = -descentRate;
-            var adjustedError = errorLeft;
-
-            if (errorRight < errorLeft)
+            for (var i = 0; i < DescentSteps; i++)
             {
-                step = descentRate;
-                adjustedError = errorRight;
+                var errorLeft = ProjectError(optimizedClosest - descentRate);
+                var errorRight = ProjectError(optimizedClosest + descentRate);
+
+                var step = -descentRate;
+                var adjustedError = errorLeft;
+
+                if (errorRight < errorLeft)
+                {
+                    step = descentRate;
+                    adjustedError = errorRight;
+                }
+
+                var currentError = ProjectError(optimizedClosest);
+
+                if (adjustedError > currentError)
+                {
+                    descentRate = descentRate.Pow(DescentFalloff);
+
+                    continue;
+                }
+
+                optimizedClosest += step;
             }
-
-            var currentError = ProjectError(optimizedClosest);
-
-            if (adjustedError > currentError)
-            {
-                descentRate = descentRate.Pow(DescentFalloff);
-
-                continue;
-            }
-
-            optimizedClosest += step;
         }
 
-        return optimizedClosest;
+        return optimizedClosest.Clamped(0, 1);
     }
 
     public Pose EvaluatePose(Real<Percentage> progress)
@@ -326,7 +330,7 @@ public sealed class QuinticSpline : IPositionSpline, IVelocitySpline, IAccelerat
 
     public CurvePose EvaluateCurvePose(Real<Percentage> progress)
     {
-        return new CurvePose(EvaluatePose(progress), EvaluateCurvature(progress));
+        return new CurvePose(EvaluatePose(progress), EvaluateCurvature(progress), progress);
     }
 
     #endregion

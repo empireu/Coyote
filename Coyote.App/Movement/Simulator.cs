@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Coyote.Mathematics;
 
 namespace Coyote.App.Movement;
@@ -13,16 +14,22 @@ internal class Simulator
     private readonly Stopwatch _editTime = Stopwatch.StartNew();
 
     public Trajectory? Trajectory { get; private set; }
-    
+
     public Simulator(App app, PathEditor editor)
     {
         _app = app;
         _editor = editor;
 
         _editor.OnTranslationChanged += OnTranslationChanged;
+        _editor.OnRotationChanged += OnRotationChanged;
     }
 
     private void OnTranslationChanged()
+    {
+        InvalidateTrajectory();
+    }
+
+    private void OnRotationChanged()
     {
         InvalidateTrajectory();
     }
@@ -35,7 +42,6 @@ internal class Simulator
 
     public float PlayTime { get; private set; }
     public TrajectoryPoint Last { get; private set; }
-
     public float TotalTime { get; private set; }
     public float TotalLength { get; private set; }
 
@@ -64,13 +70,32 @@ internal class Simulator
             var points = new List<CurvePose>();
 
             Splines.GetPoints(points, _editor.TranslationSpline, Real<Percentage>.Zero, Real<Percentage>.One,
-                new Twist(0.001, 0.001, Math.PI / 16), 32000);
+                new Twist(0.001, 0.001, Math.PI / 16), 16000 * _editor.TranslationPoints.Count);
+
+            if (!_editor.RotationSpline.IsEmpty)
+            {
+                Console.WriteLine($"Using spline rotation. {_editor.RotationSpline.Evaluate(0)}");
+
+                var span = CollectionsMarshal.AsSpan(points);
+
+                // Assign spline-spline rotations
+
+                for (var i = 0; i < points.Count; i++)
+                {
+                    var point = span[i];
+
+                    span[i] = new CurvePose(
+                        new Pose(point.Pose.Translation, _editor.RotationSpline.Evaluate(point.Parameter)),
+                        point.Curvature, 
+                        point.Parameter);
+                }
+            }
 
             Trajectory = TrajectoryGenerator.Generate(points.ToArray(), new BaseTrajectoryConstraints(
                 new Real<Velocity>(2.5),
                 new Real<Acceleration>(-1.7),
                 new Real<Acceleration>(1.7),
-                new Real<CentripetalAcceleration>(Math.PI / 4f)));
+                new Real<CentripetalAcceleration>(Math.PI / 4f)), out _);
 
             TotalTime = (float)Trajectory.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;
