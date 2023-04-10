@@ -42,12 +42,12 @@ internal class MotionProject
 
         foreach (var point in TranslationPoints)
         {
-            var entity = editor.CreateTranslationPoint(point.Position, false);
+            var entity = editor.CreateTranslationPoint(point.Position, false, true);
 
             ref var component = ref entity.Get<TranslationPointComponent>();
 
-            component.VelocityMarker.Move(point.Velocity);
-            component.AccelerationMarker.Move(point.Acceleration);
+            component.VelocityMarker.Get<PositionComponent>().Position = point.Velocity;
+            component.AccelerationMarker.Get<PositionComponent>().Position = point.Acceleration;
         }
 
         foreach (var point in RotationPoints)
