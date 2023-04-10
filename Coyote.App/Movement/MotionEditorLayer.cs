@@ -2,8 +2,8 @@
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
-using Coyote.Mathematics;
 using GameFramework;
+using GameFramework.Assets;
 using GameFramework.Extensions;
 using GameFramework.ImGui;
 using GameFramework.Layers;
@@ -31,10 +31,18 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
     {
-        { ToolType.TranslateAdd , "Add Translation Points" },
+        { ToolType.TranslateAdd, "Add Translation Points" },
         { ToolType.TranslateDelete, "Delete Translation Points" },
         { ToolType.RotateAdd, "Add Rotation Points" },
-        { ToolType.RotateRemove, "Delete Rotation Points"}
+        { ToolType.RotateRemove, "Delete Rotation Points" }
+    };
+
+    private static readonly Dictionary<ToolType, IResourceKey> ToolTextures = new()
+    {
+        { ToolType.TranslateAdd, App.Asset("Images.AddTranslationPoint.png") },
+        { ToolType.TranslateDelete, App.Asset("Images.DeleteTranslationPoint.png") },
+        { ToolType.RotateAdd, App.Asset("Images.AddRotationPoint.png") },
+        { ToolType.RotateRemove, App.Asset("Images.DeleteRotationPoint.png") }
     };
 
     public const float FieldSize = 3.66f;
@@ -254,13 +262,22 @@ internal class MotionEditorLayer : Layer, ITabStyle
             ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
             ImGui.BeginGroup();
 
-            foreach (var value in Enum.GetValues<ToolType>())
+            var types = Enum.GetValues<ToolType>();
+            for (var index = 0; index < types.Length; index++)
             {
-                ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(1, 0, 0, 0.5f) : new Vector4(0, 1, 0, 0.3f));
-
-                if (ImGui.Button(ToolDescriptions[value]))
+                var value = types[index];
+                ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(0.3f, 0, 0, 0.8f) : new Vector4(0, 0, 0, 0f));
+             
+                if (ImGui.ImageButton(
+                        ToolDescriptions[value],
+                        _imGuiLayer.Renderer.GetOrCreateImGuiBinding(
+                            _app.Resources.Factory,
+                            _app.Resources.AssetManager.GetView(ToolTextures[value])),
+                        new Vector2(32, 32), Vector2.Zero, new Vector2(1f, -1f)))
                 {
                     _selectedTool = value;
+
+                    _app.ToastInfo($"Now using {ToolDescriptions[_selectedTool]}");
 
                     ImGui.PopStyleColor();
 
@@ -269,16 +286,27 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                 ImGui.PopStyleColor();
 
-                ImGui.Separator();
+                if (index != types.Length - 1)
+                {
+                    ImGui.SameLine();
+                }
             }
 
+            ImGui.Text(ToolDescriptions[_selectedTool]);
+
             ImGui.EndGroup();
+            ImGui.Separator();
 
             ImGui.TextColored(new Vector4(1, 1, 1, 1), "Review");
             ImGui.BeginGroup();
 
             if (ImGui.Button("Player"))
             {
+                if (!_showPlayer)
+                {
+                    _app.ToastInfo("Opening simulation!");
+                }
+
                 _showPlayer = true;
             }
 
@@ -439,6 +467,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 if (ImGui.Button("Normal"))
                 {
                     _simulator.Speed = 1;
+                    _app.ToastInfo("Normal Speed");
                 }
 
                 ImGui.Separator();

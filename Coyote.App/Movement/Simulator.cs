@@ -95,7 +95,7 @@ internal class Simulator
                 new Real<Velocity>(2.5),
                 new Real<Acceleration>(-1.7),
                 new Real<Acceleration>(1.7),
-                new Real<CentripetalAcceleration>(Math.PI / 4f)), out _);
+                new Real<CentripetalAcceleration>(Math.PI)), out _);
 
             TotalTime = (float)Trajectory.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;
