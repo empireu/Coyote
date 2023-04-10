@@ -202,9 +202,7 @@ public class TrajectoryGenerator
             }
 
             // Centripetal acceleration constraint:
-            current.Velocity = (Real<Velocity>)Math.Min(
-                current.Velocity, 
-                Math.Sqrt(constraints.MaxCentripetalAcceleration / maxCurvature));
+            current.Velocity = (Real<Velocity>)Math.Min(current.Velocity, Math.Sqrt(constraints.MaxCentripetalAcceleration / maxCurvature));
         }
     }
 
@@ -271,31 +269,7 @@ public class TrajectoryGenerator
 
     private static Real<Time> ComputeTranslationTime(TrajectoryPoint previous, TrajectoryPoint current)
     {
-        var displacement = current.Displacement - previous.Displacement;
-
-        Real<Time> translationTime;
-
-        if (current.Acceleration > 0)
-        {
-            translationTime = (Real<Time>)(-previous.Velocity / current.Acceleration + Math.Sqrt(previous.Velocity.Squared() / current.Acceleration.Squared() + 2 * displacement / current.Acceleration));
-        }
-        else if (current.Acceleration == Real<Acceleration>.Zero)
-        {
-            translationTime = new Real<Time>(displacement / previous.Velocity);
-        }
-        else if (current.Acceleration < 0 && previous.Velocity >= Math.Sqrt(-2 * displacement * current.Acceleration))
-        {
-            translationTime = (Real<Time>)(-previous.Velocity / current.Acceleration - Math.Sqrt(previous.Velocity.Squared() / current.Acceleration.Squared() + 2 * displacement / current.Acceleration));
-        }
-        else
-        {
-            Assert.Fail("No translation time solution found");
-            translationTime = Real<Time>.Zero;
-        }
-
-        Assert.IsTrue(!double.IsInfinity(translationTime) && !double.IsNaN(translationTime));
-
-        return translationTime;
+        return (2 * (current.Displacement - previous.Displacement) / (current.Velocity + previous.Velocity)).ToReal<Time>();
     }
 
     /// <summary>
@@ -311,8 +285,9 @@ public class TrajectoryGenerator
         {
             var previous = points[i - 1];
             ref var current = ref points[i];
-
+            
             totalTime += ComputeTranslationTime(previous, current);
+            
             current.Time = totalTime;
         }
     }
