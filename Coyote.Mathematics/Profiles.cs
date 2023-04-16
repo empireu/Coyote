@@ -45,70 +45,52 @@ public struct TrajectoryPoint
     public Real<AngularAcceleration> AngularAcceleration;
 }
 
-public class BaseTrajectoryConstraints
+public sealed class BaseTrajectoryConstraints
 {
     public BaseTrajectoryConstraints(
-        Real<Velocity> maxTranslationalVelocity,
-        Real<Acceleration> minTranslationalAcceleration,
-        Real<Acceleration> maxTranslationalAcceleration,
-        Real<AngularVelocity> maxAngularVelocity,
-        Real<AngularAcceleration> minAngularAcceleration,
-        Real<AngularAcceleration> maxAngularAcceleration,
-        Real<CentripetalAcceleration> maxCentripetalAcceleration)
+        Real<Velocity> linearVelocity,
+        Real<Acceleration> linearAcceleration,
+        Real<AngularVelocity> angularVelocity,
+        Real<AngularAcceleration> angularAcceleration,
+        Real<CentripetalAcceleration> centripetalAcceleration)
     {
-        if (maxTranslationalVelocity <= 0)
+        if (linearVelocity <= 0)
         {
-            throw new ArgumentException("Max translational velocity must be positive", nameof(maxTranslationalVelocity));
+            throw new ArgumentException("Max translational velocity must be positive", nameof(linearVelocity));
         }
 
-        if (minTranslationalAcceleration >= 0)
+        if (linearAcceleration <= 0)
         {
-            throw new ArgumentException("Min translational acceleration must be negative", nameof(minTranslationalAcceleration));
+            throw new ArgumentException("Max translational acceleration must be positive", nameof(linearAcceleration));
         }
 
-        if (maxTranslationalAcceleration <= 0)
+        if (angularVelocity <= 0)
         {
-            throw new ArgumentException("Max translational acceleration must be positive", nameof(maxTranslationalAcceleration));
+            throw new ArgumentException("Max angular velocity must be positive", nameof(angularVelocity));
         }
 
-        if (maxAngularVelocity <= 0)
+        if (angularAcceleration <= 0)
         {
-            throw new ArgumentException("Max angular velocity must be positive", nameof(maxAngularVelocity));
+            throw new ArgumentException("Max angular acceleration must be positive", nameof(angularAcceleration));
         }
 
-        if (minAngularAcceleration >= 0)
+        if (centripetalAcceleration <= 0)
         {
-            throw new ArgumentException("Min angular acceleration must be negative", nameof(minAngularAcceleration));
+            throw new ArgumentException("Max centripetal acceleration must be positive", nameof(centripetalAcceleration));
         }
 
-        if (maxAngularAcceleration <= 0)
-        {
-            throw new ArgumentException("Max angular acceleration must be positive", nameof(maxAngularAcceleration));
-        }
-
-        if (maxCentripetalAcceleration <= 0)
-        {
-            throw new ArgumentException("Max centripetal acceleration must be positive", nameof(maxCentripetalAcceleration));
-        }
-
-        MaxTranslationalVelocity = maxTranslationalVelocity;
-        MinTranslationalAcceleration = minTranslationalAcceleration;
-        MaxTranslationalAcceleration = maxTranslationalAcceleration;
-        MaxAngularVelocity = maxAngularVelocity;
-        MinAngularAcceleration = minAngularAcceleration;
-        MaxAngularAcceleration = maxAngularAcceleration;
-        MaxCentripetalAcceleration = maxCentripetalAcceleration;
+        LinearVelocity = linearVelocity;
+        LinearAcceleration = linearAcceleration;
+        AngularVelocity = angularVelocity;
+        AngularAcceleration = angularAcceleration;
+        CentripetalAcceleration = centripetalAcceleration;
     }
 
-    public Real<Velocity> MaxTranslationalVelocity { get; }
-    public Real<Acceleration> MinTranslationalAcceleration { get; }
-    public Real<Acceleration> MaxTranslationalAcceleration { get; }
-
-    public Real<AngularVelocity> MaxAngularVelocity { get; }
-    public Real<AngularAcceleration> MinAngularAcceleration { get; }
-    public Real<AngularAcceleration> MaxAngularAcceleration { get; }
-
-    public Real<CentripetalAcceleration> MaxCentripetalAcceleration { get; }
+    public Real<Velocity> LinearVelocity { get; }
+    public Real<Acceleration> LinearAcceleration { get; }
+    public Real<AngularVelocity> AngularVelocity { get; }
+    public Real<AngularAcceleration> AngularAcceleration { get; }
+    public Real<CentripetalAcceleration> CentripetalAcceleration { get; }
 }
 
 public static class TrajectoryGenerator
@@ -224,8 +206,8 @@ public static class TrajectoryGenerator
 
     private static void ComputeUpperVelocities(TrajectoryPoint[] poses, Intermediary[] profile, BaseTrajectoryConstraints constraints)
     {
-        var awMax = constraints.MaxAngularAcceleration;
-        var atMax = constraints.MaxTranslationalAcceleration;
+        var awMax = constraints.AngularAcceleration;
+        var atMax = constraints.LinearAcceleration;
 
         #region Angular Acceleration Bounds
 
@@ -242,7 +224,7 @@ public static class TrajectoryGenerator
 
             var ds = (poses[iB].Displacement - poses[iA].Displacement).Abs();
 
-            double thresh = constraints.MaxTranslationalVelocity;
+            double thresh = constraints.LinearVelocity;
 
             void UnexpectedSet()
             {
@@ -437,14 +419,14 @@ public static class TrajectoryGenerator
         for (var i = 0; i < poses.Length; i++)
         {
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                (constraints.MaxAngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
+                (constraints.AngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
         }
 
         // Centripetal Acceleration:
         for (var i = 0; i < poses.Length; i++)
         { 
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                Math.Sqrt(constraints.MaxCentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
+                Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
         }
     }
 
@@ -503,7 +485,7 @@ public static class TrajectoryGenerator
             profile[i] = new Intermediary
             {
                 LinearDisplacement = points[i].Displacement,
-                LinearVelocity = constraints.MaxTranslationalVelocity,
+                LinearVelocity = constraints.LinearVelocity,
                 RotationCurvature = points[i].RotationCurvature
             };
         }
@@ -525,8 +507,8 @@ public static class TrajectoryGenerator
 
             var translationalDisplacement = pi.LinearDisplacement - pi1.LinearDisplacement;
             
-            var atMax = constraints.MaxTranslationalAcceleration;
-            var awMax = constraints.MaxAngularAcceleration;
+            var atMax = constraints.LinearAcceleration;
+            var awMax = constraints.AngularAcceleration;
 
             var ci1 = profile[previousIndex].RotationCurvature;
             var ci = profile[currentIndex].RotationCurvature;
@@ -704,15 +686,14 @@ public static class TrajectoryGenerator
                 current.LinearDisplacement - previous.LinearDisplacement,
                 previous.LinearVelocity, 
                 current.LinearVelocity, 
-                constraints.MinTranslationalAcceleration,
-                constraints.MaxTranslationalAcceleration);
+                -constraints.LinearAcceleration,
+                constraints.LinearAcceleration);
         }
 
         // Compute actual velocities and accelerations:
         ComputeVelocityAcceleration(points);
 
 #if WRITE_TO_FILE
-
         for (var i = 0; i < points.Length; i++)
         {
             csv.Add(csvProfileTime, points[i].Time);
@@ -726,7 +707,6 @@ public static class TrajectoryGenerator
 
             csv.Flush();
         }
-
 #endif
         
         return points;
