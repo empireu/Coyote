@@ -4,7 +4,7 @@ using Coyote.Mathematics;
 
 namespace Coyote.App.Movement;
 
-internal class Simulator
+internal sealed class Simulator
 {
     private const double EditTimeRefreshThreshold = 0.5;
 
@@ -77,21 +77,27 @@ internal class Simulator
 
             var poses = new List<CurvePose>();
 
-            Splines.GetPoints(poses, _editor.TranslationSpline, Real<Percentage>.Zero, Real<Percentage>.One,
-                new Twist(0.001, 0.001, Math.PI / 16), 16000 * _editor.TranslationPoints.Count, _editor.RotationSpline.IsEmpty ? null : (t0, t1) =>
-                {
-                    if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+            Splines.GetPoints(poses, 
+                _editor.TranslationSpline, 
+                Real<Percentage>.Zero, 
+                Real<Percentage>.One,
+                new Twist(0.001, 0.001, Math.PI / 16),
+                16000 * _editor.TranslationPoints.Count, 
+                _editor.RotationSpline.IsEmpty 
+                    ? null 
+                    : (t0, t1) =>
                     {
-                        return true;
+                        if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+                        {
+                            return true;
+                        }
+
+                        var r0 = _editor.RotationSpline.Evaluate(t0);
+                        var r1 = _editor.RotationSpline.Evaluate(t1);
+
+                        return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
                     }
-
-                    var r0 = _editor.RotationSpline.Evaluate(t0);
-                    var r1 = _editor.RotationSpline.Evaluate(t1);
-
-                    return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
-                });
-
-            var required = new List<int>();
+                );
 
             if (!_editor.RotationSpline.IsEmpty)
             {

@@ -31,13 +31,13 @@ public readonly struct Pose
         Rotation = rotation;
     }
 
-    public Pose(Translation translation, Real<Angle> rotation)
+    public Pose(Translation translation, Real<AngularDisplacement> rotation)
     {
         Translation = translation;
         Rotation = rotation;
     }
 
-    public Pose(Real2<Displacement> translation, Real<Angle> rotation)
+    public Pose(Real2<Displacement> translation, Real<AngularDisplacement> rotation)
     {
         Translation = translation;
         Rotation = rotation;
@@ -245,6 +245,6 @@ public readonly struct Pose
 
         return new Pose(
             Real2<Displacement>.Lerp(a.Translation, b.Translation, t),
-            Real<Angle>.Lerp(a.Rotation, b.Rotation, t));
+            Real<AngularDisplacement>.Lerp(a.Rotation, b.Rotation, t));
     }
 }

@@ -43,12 +43,12 @@ public static class Extensions
         return (Real2<TUnit>)v;
     }
 
-    public static Real<Angle> ToRadians(this Real<AngleDegrees> r)
+    public static Real<AngularDisplacement> ToRadians(this Real<AngleDegrees> r)
     {
-        return new Real<Angle>(Angles.ToRadians(r));
+        return new Real<AngularDisplacement>(Angles.ToRadians(r));
     }
 
-    public static Real<AngleDegrees> ToDegrees(this Real<Angle> r)
+    public static Real<AngleDegrees> ToDegrees(this Real<AngularDisplacement> r)
     {
         return new Real<AngleDegrees>(Angles.ToDegrees(r));
     }

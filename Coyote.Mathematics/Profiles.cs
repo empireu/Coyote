@@ -1,4 +1,6 @@
-﻿using Coyote.Data;
+﻿#define WRITE_TO_FILE
+
+using Coyote.Data;
 using GameFramework.Utilities;
 using System.Text.Json.Serialization;
 using static System.Double;
@@ -34,7 +36,7 @@ public struct TrajectoryPoint
     public CurvePose CurvePose;
     public Real<Curvature> RotationCurvature;
     public Real<Displacement> Displacement;
-    public Real<Angle> AngularDisplacement;
+    public Real<AngularDisplacement> AngularDisplacement;
     public Real<Time> Time;
 
     public Real2<Velocity> Velocity;
@@ -124,7 +126,7 @@ public static class TrajectoryGenerator
     private static void AssignPathPoints(TrajectoryPoint[] points)
     {
         points[0].Displacement = Real<Displacement>.Zero;
-        points[0].AngularDisplacement = Real<Angle>.Zero;
+        points[0].AngularDisplacement = Real<AngularDisplacement>.Zero;
 
         for (var i = 1; i < points.Length; i++)
         {
@@ -454,26 +456,27 @@ public static class TrajectoryGenerator
     /// <returns></returns>
     public static TrajectoryPoint[] ComputeProfile(CurvePose[] poses, BaseTrajectoryConstraints constraints)
     {
-        CsvHeader PROFILE_TIME = "profile_time";
-        CsvHeader PROFILE_ANG = "angle";
-        CsvHeader PROFILE_ANG_VEL = "profile_angular_velocity";
-        CsvHeader PROFILE_ANG_ACC = "profile_angular_acceleration";
-        CsvHeader PROFILE_K = "path_curvature";
-        CsvHeader PROFILE_COMP_K = "rotation_curvature";
-        CsvHeader PROFILE_VEL_UPPER = "velocity_upper_bounds";
-        CsvHeader PROFILE_LIN_DISP = "linear_displacement";
+#if WRITE_TO_FILE
+        
+        CsvHeader csvProfileTime = "profile_time";
+        CsvHeader csvAngle = "angle";
+        CsvHeader csvAngularVelocity = "profile_angular_velocity";
+        CsvHeader csvAngularAcceleration = "profile_angular_acceleration";
+        CsvHeader csvPathCurvature = "path_curvature";
+        CsvHeader csvRotationCurvature = "rotation_curvature";
+        CsvHeader csvVelocityUpperBounds = "velocity_upper_bounds";
+        CsvHeader csvLinearDisplacement = "linear_displacement";
 
-        //todo delete
         using var csv = new CsvWriter(File.CreateText("PROFILE.csv"),
-            PROFILE_TIME,
-            PROFILE_ANG,
-            PROFILE_ANG_VEL,
-            PROFILE_ANG_ACC,
-            PROFILE_K,
-            PROFILE_COMP_K,
-            PROFILE_VEL_UPPER,
-            PROFILE_LIN_DISP);
-
+            csvProfileTime,
+            csvAngle,
+            csvAngularVelocity,
+            csvAngularAcceleration,
+            csvPathCurvature,
+            csvRotationCurvature,
+            csvVelocityUpperBounds,
+            csvLinearDisplacement);
+#endif
         // Validation:
 
         // Path not really possible with less than two points.
@@ -508,9 +511,9 @@ public static class TrajectoryGenerator
         // Compute isolated velocities:
         ComputeUpperVelocities(points, profile, constraints);
 
-        // For logging
+#if WRITE_TO_FILE
         var upperBounds = profile.Select(x => x.LinearVelocity).ToArray();
-
+#endif
         // Passes over two points and adjusts velocities so that acceleration constrains are respected.
         void CombinedPass(int previousIndex, int currentIndex)
         {
@@ -708,20 +711,24 @@ public static class TrajectoryGenerator
         // Compute actual velocities and accelerations:
         ComputeVelocityAcceleration(points);
 
+#if WRITE_TO_FILE
+
         for (var i = 0; i < points.Length; i++)
         {
-            csv.Add(PROFILE_TIME, points[i].Time);
-            csv.Add(PROFILE_ANG, points[i].CurvePose.Pose.Rotation.Angle);
-            csv.Add(PROFILE_ANG_VEL, points[i].AngularVelocity);
-            csv.Add(PROFILE_ANG_ACC, points[i].AngularAcceleration);
-            csv.Add(PROFILE_K, points[i].CurvePose.Curvature);
-            csv.Add(PROFILE_COMP_K, profile[i].RotationCurvature);
-            csv.Add(PROFILE_VEL_UPPER, upperBounds[i]);
-            csv.Add(PROFILE_LIN_DISP, profile[i].LinearDisplacement);
+            csv.Add(csvProfileTime, points[i].Time);
+            csv.Add(csvAngle, points[i].CurvePose.Pose.Rotation.Angle);
+            csv.Add(csvAngularVelocity, points[i].AngularVelocity);
+            csv.Add(csvAngularAcceleration, points[i].AngularAcceleration);
+            csv.Add(csvPathCurvature, points[i].CurvePose.Curvature);
+            csv.Add(csvRotationCurvature, profile[i].RotationCurvature);
+            csv.Add(csvVelocityUpperBounds, upperBounds[i]);
+            csv.Add(csvLinearDisplacement, profile[i].LinearDisplacement);
 
             csv.Flush();
         }
 
+#endif
+        
         return points;
     }
 
@@ -774,7 +781,7 @@ public class Trajectory
                     Real<Percentage>.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress)),
                 RotationCurvature = Real<Curvature>.Lerp(A.RotationCurvature, B.RotationCurvature, progress),
                 Displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress),
-                AngularDisplacement = Real<Angle>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
+                AngularDisplacement = Real<AngularDisplacement>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
                 Time = Real<Time>.Lerp(A.Time, B.Time, progress),
 
                 Velocity = Real2<Velocity>.Lerp(A.Velocity, B.Velocity, progress),

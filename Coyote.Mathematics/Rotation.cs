@@ -7,10 +7,10 @@ namespace Coyote.Mathematics;
 /// </summary>
 public readonly struct Rotation
 {
-    public static readonly Rotation Zero = new(Real<Angle>.Zero);
+    public static readonly Rotation Zero = new(Real<AngularDisplacement>.Zero);
 
     [JsonInclude]
-    public Real<Angle> Angle { get; }
+    public Real<AngularDisplacement> Angle { get; }
 
     [JsonIgnore]
     public Real<Displacement> Cos { get; }
@@ -22,7 +22,7 @@ public readonly struct Rotation
     public double Tangent => Sin.Value / Cos.Value;
 
     [JsonConstructor]
-    public Rotation(Real<Angle> angle)
+    public Rotation(Real<AngularDisplacement> angle)
     {
         Angle = angle;
 
@@ -30,24 +30,24 @@ public readonly struct Rotation
         Sin = Math.Sin(angle).ToReal<Displacement>();
     }
 
-    public Rotation(double angle) : this(angle.ToReal<Angle>())
+    public Rotation(double angle) : this(angle.ToReal<AngularDisplacement>())
     {
 
     }
 
     public static Rotation FromDirection(Real2<Displacement> direction)
     {
-        return new Rotation(Math.Atan2(direction.Y, direction.X).ToReal<Angle>());
+        return new Rotation(Math.Atan2(direction.Y, direction.X).ToReal<AngularDisplacement>());
     }
 
     public static Rotation FromDirection(Real<Displacement> x, Real<Displacement> y)
     {
-        return new Rotation(Math.Atan2(y, x).ToReal<Angle>());
+        return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
     }
 
     public static Rotation FromDirection(double x, double y)
     {
-        return new Rotation(Math.Atan2(y, x).ToReal<Angle>());
+        return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
     }
 
     public Rotation Rotated(Rotation other)
@@ -79,12 +79,12 @@ public readonly struct Rotation
 
     public static Rotation operator *(Rotation a, double scalar)
     {
-        return new Rotation(new Real<Angle>(a.Angle.Value * scalar));
+        return new Rotation(new Real<AngularDisplacement>(a.Angle.Value * scalar));
     }
 
     public static Rotation operator /(Rotation a, double scalar)
     {
-        return new Rotation(new Real<Angle>(a.Angle.Value / scalar));
+        return new Rotation(new Real<AngularDisplacement>(a.Angle.Value / scalar));
     }
 
     public static implicit operator double(Rotation r)
@@ -97,24 +97,24 @@ public readonly struct Rotation
         return (float)r.Angle.Value;
     }
 
-    public static implicit operator Real<Angle>(Rotation a)
+    public static implicit operator Real<AngularDisplacement>(Rotation a)
     {
         return a.Angle;
     }
 
-    public static implicit operator Rotation(Real<Angle> a)
+    public static implicit operator Rotation(Real<AngularDisplacement> a)
     {
         return new Rotation(a);
     }
 
     public static explicit operator Rotation(double a)
     {
-        return new Rotation(a.ToReal<Angle>());
+        return new Rotation(a.ToReal<AngularDisplacement>());
     }
 
     public static explicit operator Rotation(float a)
     {
-        return new Rotation(a.ToReal<Angle>());
+        return new Rotation(a.ToReal<AngularDisplacement>());
     }
 
     public static bool operator ==(Rotation a, Rotation b)

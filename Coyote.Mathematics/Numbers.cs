@@ -4,17 +4,21 @@ using GameFramework.Utilities;
 
 namespace Coyote.Mathematics;
 
+#region Units
+
 public interface Displacement { }
 public interface Velocity { }
-public interface AngularVelocity { }
-public interface CentripetalAcceleration { }
 public interface Acceleration { }
-public interface Angle { }
-public interface AngleDegrees { }
+public interface AngularDisplacement { }
+public interface AngularVelocity { }
 public interface AngularAcceleration { }
+public interface AngleDegrees { }
+public interface CentripetalAcceleration { }
 public interface Curvature { }
 public interface Percentage { }
 public interface Time { }
+
+#endregion
 
 /// <summary>
 ///     Represents a real number with a symbolic unit.
@@ -361,6 +365,9 @@ public readonly struct Real<TUnit> :
     }
 }
 
+/// <summary>
+///     Represents a vector with two <see cref="Real{TUnit}"/> components.
+/// </summary>
 public readonly struct Real2<TUnit>
 {
     public static readonly Real2<TUnit> Zero = new(Real<TUnit>.Zero);
@@ -597,6 +604,9 @@ public readonly struct Real2<TUnit>
     }
 }
 
+/// <summary>
+///     Represents a number interval.
+/// </summary>
 public readonly struct Range
 {
     public static readonly Range Invalid = new(1, 0);
