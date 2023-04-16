@@ -28,6 +28,7 @@ public sealed class SplineRenderer
             spline,
             Real<Percentage>.Zero,
             Real<Percentage>.One,
+            new Real<Percentage>(0.01),
             AdmissibleTwist,
             MaxIterations);
     }

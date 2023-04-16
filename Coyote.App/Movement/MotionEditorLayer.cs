@@ -481,13 +481,69 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
                 ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
                 
+                
                 if (ImGui.Button("Normal"))
                 {
                     _simulator.Speed = 1;
-                    _app.ToastInfo("Normal Speed");
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("0.75"))
+                {
+                    _simulator.Speed = 0.75f;
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("0.5"))
+                {
+                    _simulator.Speed = 0.5f;
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("0.25"))
+                {
+                    _simulator.Speed = 0.25f;
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("0.1"))
+                {
+                    _simulator.Speed = 0.1f;
                 }
 
                 ImGui.Separator();
+
+                const int factor = 1000;
+
+                var dx = _simulator.Dx * factor;
+                var dy = _simulator.Dy * factor;
+                var dTheta = _simulator.DTheta * factor;
+                var dParameter = _simulator.DParameter * factor;
+
+                if(ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
+                {
+                    _simulator.Dx = dx / factor;
+                }
+                
+                if(ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
+                {
+                    _simulator.Dy = dy / factor; 
+                }
+
+                if(ImGui.SliderFloat($"DTheta {factor}", ref dTheta, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                {
+                    _simulator.DTheta = dTheta / factor;
+                }
+
+                if(ImGui.SliderFloat($"DParam {factor}", ref dParameter, 0.001f, 10))
+                {
+                    _simulator.DParameter = dParameter / factor;
+                }
+
+                if (ImGui.Button("Re-generate"))
+                {
+                    _simulator.InvalidateTrajectory();
+                }
             }
 
             ImGui.End();

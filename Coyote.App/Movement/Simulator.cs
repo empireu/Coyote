@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Coyote.Mathematics;
+using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
 
@@ -55,6 +56,11 @@ internal sealed class Simulator
     public double MaxAngularVelocity { get; private set; }
     public double MaxAngularAcceleration { get; private set; }
 
+    public float Dx = 0.0025f;
+    public float Dy = 0.0025f;
+    public float DTheta = MathF.PI / 32;
+    public float DParameter = 0.001f;
+
     public bool Update(float dt, out Pose pose)
     {
         if (_editor.ArcLength == 0)
@@ -77,27 +83,31 @@ internal sealed class Simulator
 
             var poses = new List<CurvePose>();
 
-            Splines.GetPoints(poses, 
-                _editor.TranslationSpline, 
-                Real<Percentage>.Zero, 
-                Real<Percentage>.One,
-                new Twist(0.001, 0.001, Math.PI / 16),
-                16000 * _editor.TranslationPoints.Count, 
-                _editor.RotationSpline.IsEmpty 
-                    ? null 
-                    : (t0, t1) =>
-                    {
-                        if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+            var getPointsTime = Measurements.MeasureTimeSpan(() =>
+            {
+                Splines.GetPoints(poses,
+                    _editor.TranslationSpline,
+                    Real<Percentage>.Zero,
+                    Real<Percentage>.One,
+                    new Real<Percentage>(DParameter),
+                    new Twist(Dx, Dy, DTheta),
+                    int.MaxValue,
+                    _editor.RotationSpline.IsEmpty
+                        ? null
+                        : (t0, t1) =>
                         {
-                            return true;
+                            if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+                            {
+                                return true;
+                            }
+
+                            var r0 = _editor.RotationSpline.Evaluate(t0);
+                            var r1 = _editor.RotationSpline.Evaluate(t1);
+
+                            return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
                         }
-
-                        var r0 = _editor.RotationSpline.Evaluate(t0);
-                        var r1 = _editor.RotationSpline.Evaluate(t1);
-
-                        return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
-                    }
                 );
+            });
 
             if (!_editor.RotationSpline.IsEmpty)
             {
@@ -115,20 +125,28 @@ internal sealed class Simulator
                 }
             }
 
-            Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
-                new Real<Velocity>(2.5),
-                new Real<Acceleration>(1.7),
-                new Real<AngularVelocity>(Angles.ToRadians(220)),
-                new Real<AngularAcceleration>(Angles.ToRadians(200)),
-                new Real<CentripetalAcceleration>(1)), out var trajectoryPoints);
+            TrajectoryPoint[]? trajectoryPoints = null;
+            var generateTime = Measurements.MeasureTimeSpan(() =>
+            {
+                Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
+                    new Real<Velocity>(2.5),
+                    new Real<Acceleration>(1.7),
+                    new Real<AngularVelocity>(Angles.ToRadians(220)),
+                    new Real<AngularAcceleration>(Angles.ToRadians(200)),
+                    new Real<CentripetalAcceleration>(1)), out trajectoryPoints);
+            });
+
+            Assert.NotNull(ref trajectoryPoints);
 
             MaxVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
             MaxAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
             MaxAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
             MaxAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
 
-            TotalTime = (float)Trajectory.TimeRange.End;
+            TotalTime = (float)Trajectory!.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;
+
+            _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
         }
 
         if (PlayTime > Trajectory.TimeRange.End)

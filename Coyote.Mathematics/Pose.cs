@@ -197,7 +197,7 @@ public readonly struct Pose
     {
         var transform = end.RelativeTo(this);
         var dTheta = transform.Rotation;
-        var halfDTheta = dTheta / 2;
+        var halfDTheta = dTheta / 2d;
 
         var cosMinusOne = transform.Rotation.Cos - 1;
 
