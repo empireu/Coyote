@@ -77,7 +77,7 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private nint _playerBinding;
     private Point _playerSize = new(-1, -1);
     private bool _showPlayer;
-
+  
     private readonly CommandList _commandList;
 
     private readonly Sprite _fieldSprite;
@@ -461,88 +461,95 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                 var lastPoint = _simulator.Last;
 
-                ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxVelocity:F4} m/s");
-                ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
-                ImGui.Separator();
-
-                ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxAcceleration:F4} m/s²");
-                ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
-                ImGui.Separator();
-
-                ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxAngularVelocity:F4} rad/s");
-                ImGui.Separator();
-
-                ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxAngularAcceleration:F4} rad/s²");
-                ImGui.Separator();
-
-                ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
-                ImGui.Separator();
-                
-                ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
-                ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
-                
-                
-                if (ImGui.Button("Normal"))
+                if (ImGui.CollapsingHeader("Kinematics"))
                 {
-                    _simulator.Speed = 1;
+                    ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
+
+                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxVelocity:F4} m/s");
+                    ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxAcceleration:F4} m/s²");
+                    ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxAngularVelocity:F4} rad/s");
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxAngularAcceleration:F4} rad/s²");
+                    ImGui.Separator();
+
+                    ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
+                    ImGui.Separator();
                 }
 
-                ImGui.SameLine();
-                if (ImGui.Button("0.75"))
+                if (ImGui.CollapsingHeader("Playback"))
                 {
-                    _simulator.Speed = 0.75f;
+                    ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
+
+                    if (ImGui.Button("Normal"))
+                    {
+                        _simulator.Speed = 1;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.75"))
+                    {
+                        _simulator.Speed = 0.75f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.5"))
+                    {
+                        _simulator.Speed = 0.5f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.25"))
+                    {
+                        _simulator.Speed = 0.25f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.1"))
+                    {
+                        _simulator.Speed = 0.1f;
+                    }
                 }
 
-                ImGui.SameLine();
-                if (ImGui.Button("0.5"))
+                if (ImGui.CollapsingHeader("Point Density"))
                 {
-                    _simulator.Speed = 0.5f;
-                }
+                    const int factor = 1000;
 
-                ImGui.SameLine();
-                if (ImGui.Button("0.25"))
-                {
-                    _simulator.Speed = 0.25f;
-                }
+                    var dx = _simulator.Dx * factor;
+                    var dy = _simulator.Dy * factor;
+                    var dTheta = _simulator.DTheta * factor;
+                    var dParameter = _simulator.DParameter * factor;
 
-                ImGui.SameLine();
-                if (ImGui.Button("0.1"))
-                {
-                    _simulator.Speed = 0.1f;
-                }
+                    if (ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
+                    {
+                        _simulator.Dx = dx / factor;
+                    }
 
-                ImGui.Separator();
+                    if (ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
+                    {
+                        _simulator.Dy = dy / factor;
+                    }
 
-                const int factor = 1000;
+                    if (ImGui.SliderFloat($"DTheta {factor}", ref dTheta, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    {
+                        _simulator.DTheta = dTheta / factor;
+                    }
 
-                var dx = _simulator.Dx * factor;
-                var dy = _simulator.Dy * factor;
-                var dTheta = _simulator.DTheta * factor;
-                var dParameter = _simulator.DParameter * factor;
+                    if (ImGui.SliderFloat($"DParam {factor}", ref dParameter, 0.001f, 10))
+                    {
+                        _simulator.DParameter = dParameter / factor;
+                    }
 
-                if(ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
-                {
-                    _simulator.Dx = dx / factor;
-                }
-                
-                if(ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
-                {
-                    _simulator.Dy = dy / factor; 
-                }
-
-                if(ImGui.SliderFloat($"DTheta {factor}", ref dTheta, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
-                {
-                    _simulator.DTheta = dTheta / factor;
-                }
-
-                if(ImGui.SliderFloat($"DParam {factor}", ref dParameter, 0.001f, 10))
-                {
-                    _simulator.DParameter = dParameter / factor;
-                }
-
-                if (ImGui.Button("Re-generate"))
-                {
-                    _simulator.InvalidateTrajectory();
+                    if (ImGui.Button("Re-generate"))
+                    {
+                        _simulator.InvalidateTrajectory();
+                    }
                 }
             }
 
