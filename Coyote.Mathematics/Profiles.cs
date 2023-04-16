@@ -204,6 +204,10 @@ public static class TrajectoryGenerator
         }
     }
 
+    /// <summary>
+    ///     Computes upper isolated velocities.
+    ///     This also includes upper bounds that ensure rotational acceleration constraints can be approximately respected.
+    /// </summary>
     private static void ComputeUpperVelocities(TrajectoryPoint[] poses, Intermediary[] profile, BaseTrajectoryConstraints constraints)
     {
         var awMax = constraints.AngularAcceleration;
@@ -212,17 +216,17 @@ public static class TrajectoryGenerator
         #region Angular Acceleration Bounds
 
         // Find the derivation of this work in http://www2.informatik.uni-freiburg.de/~lau/students/Sprunk2008.pdf
-        double Bounds(int iA, int iB)
+        double Bounds(int index1, int index)
         {
             double Sqr(double a)
             {
                 return a * a;
             }
 
-            var ci = profile[iB].RotationCurvature;
-            var ci1 = profile[iA].RotationCurvature;
+            var ci = profile[index].RotationCurvature;
+            var ci1 = profile[index1].RotationCurvature;
 
-            var ds = (poses[iB].Displacement - poses[iA].Displacement).Abs();
+            var ds = (poses[index].Displacement - poses[index1].Displacement).Abs();
 
             double thresh = constraints.LinearVelocity;
 
@@ -436,7 +440,7 @@ public static class TrajectoryGenerator
     /// <param name="poses">The basic shape of the path.</param>
     /// <param name="constraints">The base constraints to use.</param>
     /// <returns></returns>
-    public static TrajectoryPoint[] ComputeProfile(CurvePose[] poses, BaseTrajectoryConstraints constraints)
+    public static TrajectoryPoint[] GenerateProfile(CurvePose[] poses, BaseTrajectoryConstraints constraints)
     {
 #if WRITE_TO_FILE
         
@@ -636,7 +640,7 @@ public static class TrajectoryGenerator
                                 range.Min, 
                                 range.Max
                             })
-                            .Where(av => av >= 0)
+                            .Where(av => av >= -10e-4)
                             .SelectMany(av => new[]
                             {
                                 (angVel: av, linVel: vtAt.Min), 
@@ -644,9 +648,9 @@ public static class TrajectoryGenerator
                             })
                             .MinBy(pair => Math.Abs(pair.angVel - pair.linVel));
 
-                        velocity = (linVel + angVel) / 2;
+                        velocity = Math.Max((linVel + angVel) / 2d, 0);
 
-                        Console.WriteLine($"Constraint approximation {currentIndex}: {Math.Abs(linVel - angVel) * 100000:F4}");
+                        //Console.WriteLine($"Constraint approximation {currentIndex}: {Math.Abs(linVel - angVel) * 100000:F4}");
                     }
                     continue;
                 }
@@ -714,7 +718,7 @@ public static class TrajectoryGenerator
 
     public static Trajectory GenerateTrajectory(CurvePose[] poses, BaseTrajectoryConstraints constraints, out TrajectoryPoint[] points)
     {
-        points = ComputeProfile(poses, constraints);
+        points = GenerateProfile(poses, constraints);
 
         return new Trajectory(points);
     }
