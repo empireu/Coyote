@@ -118,8 +118,8 @@ internal sealed class Simulator
             Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
                 new Real<Velocity>(2.5),
                 new Real<Acceleration>(1.7),
-                new Real<AngularVelocity>(Angles.ToRadians(180)),
-                new Real<AngularAcceleration>(Angles.ToRadians(45)),
+                new Real<AngularVelocity>(Angles.ToRadians(220)),
+                new Real<AngularAcceleration>(Angles.ToRadians(200)),
                 new Real<CentripetalAcceleration>(1)), out var trajectoryPoints);
 
             MaxVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();

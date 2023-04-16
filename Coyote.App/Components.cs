@@ -9,12 +9,11 @@ internal struct PositionComponent
 {
     public delegate void UpdateDelegate(Entity entity, Vector2 oldPosition);
 
+    [FloatEditor(-3.66f, 3.66f)]
     public Vector2 Position;
 
     // old position
     public UpdateDelegate? UpdateCallback;
-
-    public bool NonMovable;
 }
 
 internal struct ScaleComponent

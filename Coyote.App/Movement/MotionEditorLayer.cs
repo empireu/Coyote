@@ -426,7 +426,14 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         if (ImGui.Begin("Inspector"))
         {
-
+            if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
+            {
+                ImGui.Text("Nothing to show");
+            }
+            else
+            {
+                Inspector.SubmitEditor(_selectedEntity.Value);
+            }
         }
 
         ImGui.End();

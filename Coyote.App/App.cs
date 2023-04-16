@@ -17,6 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Veldrid;
 
 namespace Coyote.App;
+
 internal class App : GameApplication
 {
     private const string ProjectDirectory = "./projects/";
@@ -28,7 +29,7 @@ internal class App : GameApplication
     public ToastManager ToastManager { get; }
 
     private readonly QuadBatch _toastBatch;
-    private readonly QuadBatch _slideshowBatch;
+    private readonly QuadBatch _slideShowBatch;
 
     private LayerController? _layerController;
 
@@ -67,7 +68,7 @@ internal class App : GameApplication
 
         ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
-        _slideshowBatch = new QuadBatch(this);
+        _slideShowBatch = new QuadBatch(this);
 
         _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
 
@@ -93,7 +94,7 @@ internal class App : GameApplication
 
     protected override void Initialize()
     {
-        Window.Title = "DashViu";
+        Window.Title = "Coyote";
 
         Layers.ConstructLayer<ImGuiLayer>(imGui =>
         {
@@ -281,10 +282,10 @@ internal class App : GameApplication
 
     protected override void Render(FrameInfo frameInfo)
     {
-        _slideshowBatch.Clear();
-        _slideshowBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
-        _slideshowBatch.TexturedQuad(Vector2.Zero, Vector2.Normalize(new Vector2(3840, 1920)) * 3, _wallpaper.Texture);
-        _slideshowBatch.Submit();
+        _slideShowBatch.Clear();
+        _slideShowBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
+        _slideShowBatch.TexturedQuad(Vector2.Zero, Vector2.Normalize(new Vector2(3840, 1920)) * 3, _wallpaper.Texture);
+        _slideShowBatch.Submit();
 
         base.Render(frameInfo);
     }
