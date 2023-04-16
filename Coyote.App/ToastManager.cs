@@ -3,16 +3,18 @@ using System.Numerics;
 using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
+using GameFramework.Renderer.Text;
+using GameFramework.Utilities;
 
 namespace Coyote.App;
 
-internal enum ToastNotificationType
+public enum ToastNotificationType
 {
     Information,
     Error
 }
 
-internal class ToastNotification
+public sealed class ToastNotification
 {
     public ToastNotificationType Type { get; }
     public string Message { get; }
@@ -32,17 +34,59 @@ internal class ToastNotification
     public string DisplayedString { get; }
 }
 
-internal class ToastManager
+public sealed class ToastManagerOptions
 {
-    private const float DrawMargin = 0.01f;
-    private const float BorderThickness = 0.005f;
-    private const float YOffset = 0.01f;
-    
-    private static readonly Vector4 BorderColor = new(0.1f, 0.3f, 0.5f, 0.2f);
-    private static readonly Vector4 InitialColor = new(1, 0.2f, 0.4f, 0.95f);
-    private static readonly Vector4 FinalColor = new(0.1f, 1f, 0f, 0.1f);
+    public float DrawMargin = 0.01f;
+    public float BorderThickness = 0.005f;
+    public float YOffset = 0.01f;
+    public Vector4 BorderColor = new(0.1f, 0.3f, 0.5f, 0.2f);
+    public Vector4 InitialColor = new(1, 0.2f, 0.4f, 0.95f);
+    public Vector4 FinalColor = new(0.1f, 1f, 0f, 0.1f);
 
-    private readonly App _app;
+    public ToastManager.AnimationDelegate? Animation = (notification, elapsed, position, size) =>
+    {
+        double EaseOutElastic(double t)
+        {
+            var t2 = (t - 1) * (t - 1);
+            return 1 - t2 * t2 * Math.Cos(t * Math.PI * 4.5);
+        }
+
+        double EaseInQuad(double t)
+        {
+            return t * t;
+        }
+
+        const double easeIn = 1;
+        const double easeOut = 0.5;
+
+        if (elapsed < easeIn)
+        {
+            return new Vector2((float)(size.X - EaseOutElastic(
+                MathUtilities.MapRange(elapsed, 0, easeIn, 0, 1)) * size.X), 0);
+        }
+
+        if (elapsed > notification.Duration - easeOut)
+        {
+            var t = MathUtilities.MapRange(
+                elapsed, 
+                notification.Duration - easeOut, 
+                notification.Duration, 
+                0, 
+                1);
+
+            return new Vector2((float)(size.X * EaseInQuad(t)), 0);
+        }
+
+        return Vector2.Zero;
+    };
+}
+
+public sealed class ToastManager
+{
+    public delegate Vector2 AnimationDelegate(ToastNotification notification, double elapsed, Vector2 position, Vector2 size);
+
+    private readonly SdfFont _font;
+    private readonly ToastManagerOptions _options;
     private readonly List<ToastNotification> _notifications = new();
     private readonly Queue<ToastNotification> _removeQueue = new();
     private readonly Stopwatch _stopWatch = Stopwatch.StartNew();
@@ -57,9 +101,12 @@ internal class ToastManager
         notification.AddedTimestamp = _stopWatch.Elapsed.TotalSeconds;
     }
 
-    public ToastManager(App app)
+    public ToastManager(SdfFont font, ToastManagerOptions? options = null)
     {
-        _app = app;
+        options ??= new ToastManagerOptions();
+
+        _font = font;
+        _options = options;
     }
 
     public void Add(ToastNotification notification)
@@ -71,8 +118,6 @@ internal class ToastManager
 
     public void Render(QuadBatch batch, float fontSize, Vector2 startPos, float edgeX)
     {
-        var font = _app.Font;
-
         var y = startPos.Y;
 
         foreach (var toastNotification in _notifications)
@@ -87,39 +132,44 @@ internal class ToastManager
 
             var progress = (float)(elapsed / toastNotification.Duration);
 
-            var size = font.MeasureText(toastNotification.DisplayedString, fontSize) * 1.1f;
-            var position = new Vector2(edgeX - size.X - DrawMargin, y);
+            var size = _font.MeasureText(toastNotification.DisplayedString, fontSize) * 1.1f;
+            var position = new Vector2(edgeX - size.X - _options.DrawMargin, y);
 
-            batch.Quad(position, size, Vector4.Lerp(InitialColor, FinalColor, progress), align: AlignMode.TopLeft);
+            if (_options.Animation != null)
+            {
+                position += _options.Animation(toastNotification, elapsed, position, size);
+            }
 
-            font.Render(batch, position + new Vector2(DrawMargin, DrawMargin), toastNotification.DisplayedString, size: fontSize);
+            batch.Quad(position, size, Vector4.Lerp(_options.InitialColor, _options.FinalColor, progress), align: AlignMode.TopLeft);
+
+            _font.Render(batch, position + new Vector2(_options.DrawMargin, _options.DrawMargin), toastNotification.DisplayedString, size: fontSize);
 
             // upper border
             batch.Quad(
                 new Vector2(position.X, position.Y),
-                new Vector2(size.X + BorderThickness, BorderThickness),
-                BorderColor, align: AlignMode.TopLeft);
+                new Vector2(size.X + _options.BorderThickness, _options.BorderThickness),
+                _options.BorderColor, align: AlignMode.TopLeft);
 
             // lower border
             batch.Quad(
                 new Vector2(position.X, position.Y - size.Y),
-                new Vector2(size.X + BorderThickness, BorderThickness),
-                BorderColor, align: AlignMode.TopLeft);
+                new Vector2(size.X + _options.BorderThickness, _options.BorderThickness),
+                _options.BorderColor, align: AlignMode.TopLeft);
 
             // left border
             batch.Quad(
                 new Vector2(position.X, position.Y),
-                new Vector2(BorderThickness, size.Y + BorderThickness),
-                BorderColor, align: AlignMode.TopLeft);
+                new Vector2(_options.BorderThickness, size.Y + _options.BorderThickness),
+                _options.BorderColor, align: AlignMode.TopLeft);
 
             // right border
             batch.Quad(
                 new Vector2(position.X + size.X, position.Y),
-                new Vector2(BorderThickness, size.Y + BorderThickness),
-                BorderColor, align: AlignMode.TopLeft);
+                new Vector2(_options.BorderThickness, size.Y + _options.BorderThickness),
+                _options.BorderColor, align: AlignMode.TopLeft);
 
 
-            y += size.Y + YOffset;
+            y += size.Y + _options.YOffset;
         }
 
         while (_removeQueue.TryDequeue(out var removed))

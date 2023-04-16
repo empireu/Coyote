@@ -64,7 +64,7 @@ internal class App : GameApplication
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
         Font.Options.SetWeight(0.46f);
 
-        ToastManager = new ToastManager(this);
+        ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
         _slideshowBatch = new QuadBatch(this);
 
@@ -293,7 +293,7 @@ internal class App : GameApplication
         _toastBatch.Clear();
         _toastBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
 
-        ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.90f);
+        ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.925f);
 
         _toastBatch.Submit();
 
