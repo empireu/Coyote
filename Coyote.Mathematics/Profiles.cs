@@ -1,6 +1,7 @@
-﻿using System.Text.Json.Serialization;
-using Coyote.Data;
+﻿using Coyote.Data;
 using GameFramework.Utilities;
+using System.Text.Json.Serialization;
+using static System.Double;
 
 namespace Coyote.Mathematics;
 
@@ -28,302 +29,459 @@ public readonly struct MotionConstraints
     }
 }
 
-public readonly struct MotionState
-{
-    public Real<Displacement> Distance { get; }
-    public Real<Velocity> Velocity { get; }
-    public Real<Acceleration> Acceleration { get; }
-
-    public MotionState(Real<Displacement> distance, Real<Velocity> velocity, Real<Acceleration> acceleration)
-    {
-        Distance = distance;
-        Velocity = velocity;
-        Acceleration = acceleration;
-    }
-}
-
-public static class TrapezoidalProfile
-{
-    public static bool Evaluate(MotionConstraints constraints, double distance, double time, out MotionState state)
-    {
-        var maxVelocity = constraints.MaxVelocity.Value;
-        var maxAcceleration = constraints.MaxAcceleration.Value;
-
-        var accelerationDuration = maxVelocity / maxAcceleration;
-
-        var midpoint = distance / 2;
-        var accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
-
-        if (accelerationDistance > midpoint)
-        {
-            accelerationDuration = Math.Sqrt(midpoint / (0.5 * maxAcceleration));
-        }
-
-        accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
-
-        maxVelocity = maxAcceleration * accelerationDuration;
-
-        var deAccelerationInterval = accelerationDuration;
-
-        var cruiseDistance = distance - 2 * accelerationDistance;
-        var cruiseDuration = cruiseDistance / maxVelocity;
-        var deAccelerationTime = accelerationDuration + cruiseDuration;
-
-        var entireDuration = accelerationDuration + cruiseDuration + deAccelerationInterval;
-
-        if (time > entireDuration)
-        {
-            state = default;
-            return false;
-        }
-
-        if (time < accelerationDuration)
-        {
-            state = new MotionState((0.5 * maxAcceleration * time * time).ToReal<Displacement>(), (maxAcceleration * time).ToReal<Velocity>(), maxAcceleration.ToReal<Acceleration>());
-            return true;
-        }
-
-        if (time < deAccelerationTime)
-        {
-            accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
-            var cruiseCurrentDt = time - accelerationDuration;
-
-            state = new MotionState((accelerationDistance + maxVelocity * cruiseCurrentDt).ToReal<Displacement>(), maxVelocity.ToReal<Velocity>(), Real<Acceleration>.Zero);
-            return true;
-        }
-
-        accelerationDistance = 0.5 * maxAcceleration * accelerationDuration * accelerationDuration;
-        cruiseDistance = maxVelocity * cruiseDuration;
-        deAccelerationTime = time - deAccelerationTime;
-
-        state = new MotionState(
-            (accelerationDistance + cruiseDistance + maxVelocity * deAccelerationTime - 0.5 * maxAcceleration * deAccelerationTime * deAccelerationTime).ToReal<Displacement>(),
-            (maxVelocity - deAccelerationTime * maxAcceleration).ToReal<Velocity>(),
-            maxAcceleration.ToReal<Acceleration>());
-
-        return true;
-    }
-}
-
 public struct TrajectoryPoint
 {
     public CurvePose CurvePose;
-    public Real<Time> Time;
-    public Real<Velocity> Velocity;
-    public Real<Acceleration> Acceleration;
+    public Real<Curvature> RotationCurvature;
     public Real<Displacement> Displacement;
+    public Real<Angle> AngularDisplacement;
+    public Real<Time> Time;
 
-    public Real<Radians> AngularDisplacement;
-   
-    public Real2<Velocity> CartesianVelocity;
-    public Real2<Acceleration> CartesianAcceleration;
+    public Real2<Velocity> Velocity;
+    public Real2<Acceleration> Acceleration;
+    public Real<AngularVelocity> AngularVelocity;
+    public Real<AngularAcceleration> AngularAcceleration;
 }
 
-public readonly struct BaseTrajectoryConstraints
+public class BaseTrajectoryConstraints
 {
     public BaseTrajectoryConstraints(
-        Real<Velocity> maxTranslationalVelocity, 
-        Real<Acceleration> minTranslationalAcceleration, 
-        Real<Acceleration> maxTranslationalAcceleration, 
+        Real<Velocity> maxTranslationalVelocity,
+        Real<Acceleration> minTranslationalAcceleration,
+        Real<Acceleration> maxTranslationalAcceleration,
+        Real<AngularVelocity> maxAngularVelocity,
+        Real<AngularAcceleration> minAngularAcceleration,
+        Real<AngularAcceleration> maxAngularAcceleration,
         Real<CentripetalAcceleration> maxCentripetalAcceleration)
     {
+        if (maxTranslationalVelocity <= 0)
+        {
+            throw new ArgumentException("Max translational velocity must be positive", nameof(maxTranslationalVelocity));
+        }
+
+        if (minTranslationalAcceleration >= 0)
+        {
+            throw new ArgumentException("Min translational acceleration must be negative", nameof(minTranslationalAcceleration));
+        }
+
+        if (maxTranslationalAcceleration <= 0)
+        {
+            throw new ArgumentException("Max translational acceleration must be positive", nameof(maxTranslationalAcceleration));
+        }
+
+        if (maxAngularVelocity <= 0)
+        {
+            throw new ArgumentException("Max angular velocity must be positive", nameof(maxAngularVelocity));
+        }
+
+        if (minAngularAcceleration >= 0)
+        {
+            throw new ArgumentException("Min angular acceleration must be negative", nameof(minAngularAcceleration));
+        }
+
+        if (maxAngularAcceleration <= 0)
+        {
+            throw new ArgumentException("Max angular acceleration must be positive", nameof(maxAngularAcceleration));
+        }
+
+        if (maxCentripetalAcceleration <= 0)
+        {
+            throw new ArgumentException("Max centripetal acceleration must be positive", nameof(maxCentripetalAcceleration));
+        }
+
         MaxTranslationalVelocity = maxTranslationalVelocity;
         MinTranslationalAcceleration = minTranslationalAcceleration;
         MaxTranslationalAcceleration = maxTranslationalAcceleration;
+        MaxAngularVelocity = maxAngularVelocity;
+        MinAngularAcceleration = minAngularAcceleration;
+        MaxAngularAcceleration = maxAngularAcceleration;
         MaxCentripetalAcceleration = maxCentripetalAcceleration;
     }
 
     public Real<Velocity> MaxTranslationalVelocity { get; }
     public Real<Acceleration> MinTranslationalAcceleration { get; }
     public Real<Acceleration> MaxTranslationalAcceleration { get; }
+
+    public Real<AngularVelocity> MaxAngularVelocity { get; }
+    public Real<AngularAcceleration> MinAngularAcceleration { get; }
+    public Real<AngularAcceleration> MaxAngularAcceleration { get; }
+
     public Real<CentripetalAcceleration> MaxCentripetalAcceleration { get; }
 }
 
-public class TrajectoryGenerator
+public static class TrajectoryGenerator
 {
-    private static Real<TVelocity> SolveAchievableVelocity<TVelocity, TAcceleration, TDisplacement>(
-        Real<TVelocity> previousVelocity,
-        Real<TAcceleration> maxA,
-        Real<TDisplacement> displacement) 
-        where TVelocity : IUnit 
-        where TAcceleration : IUnit 
-        where TDisplacement : IUnit
+    private struct Intermediary
     {
-        return Math.Sqrt(previousVelocity.Squared() + 2 * maxA * displacement).ToReal<TVelocity>();
+        public Real<Displacement> LinearDisplacement;
+        public Real<Velocity> LinearVelocity;
+        public Real<Curvature> RotationCurvature;
     }
 
     /// <summary>
     ///     Computes the displacement at each point, relative to the start point.
     /// </summary>
-    private static void ComputeDisplacements(TrajectoryPoint[] points)
+    private static void AssignPathPoints(TrajectoryPoint[] points)
     {
         points[0].Displacement = Real<Displacement>.Zero;
-        points[0].AngularDisplacement = Real<Radians>.Zero;
-
-        var totalDisplacement = Real<Displacement>.Zero;
-        var totalAngularDisplacement = Rotation.Zero;
+        points[0].AngularDisplacement = Real<Angle>.Zero;
 
         for (var i = 1; i < points.Length; i++)
         {
             var previous = points[i - 1];
             ref var current = ref points[i];
 
-            totalDisplacement += (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length();
-            totalAngularDisplacement += new Rotation((current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation).Angle);
+            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length();
+            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Angle, previous.CurvePose.Pose.Rotation.Angle).Angle.Abs();
 
-            current.Displacement = totalDisplacement;
-            current.AngularDisplacement = totalAngularDisplacement;
-        }
-    }
-
-    /// <summary>
-    ///     Computes a desired velocity at each point, taking into account some special constraints (e.g. angular constraints, user defined constraints, ...)
-    /// </summary>
-    private static void DesiredTranslationVelocityPass(TrajectoryPoint[] points, BaseTrajectoryConstraints constraints)
-    {
-        // Apply initial velocity:
-        for (var i = 0; i < points.Length; i++)
-        {
-            points[i].Velocity = constraints.MaxTranslationalVelocity;
-        }
-
-        // Apply extra constraints:
-        for (var i = 0; i < points.Length; i++)
-        {
-            ref var current = ref points[i];
-
-            var maxCurvature = Math.Abs(current.CurvePose.Curvature);
-
-            if (i > 0)
+            if (current.Displacement == previous.Displacement)
             {
-                var previous = points[i - 1];
-                var displacement = current.Displacement - previous.Displacement;
-                maxCurvature = Math.Max(maxCurvature, (current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation).Angle.Abs() / displacement);
+                throw new Exception("Path points with zero displacement are not allowed");
             }
 
-            // Centripetal acceleration constraint:
-            current.Velocity = (Real<Velocity>)Math.Min(current.Velocity, Math.Sqrt(constraints.MaxCentripetalAcceleration / maxCurvature));
+            // Numerically evaluate curvature (will be different to path curvature if the rotation directions are not tangent to the path)
+            // We need this to compute the rotation constraints for holonomic paths.
+            current.RotationCurvature = MathExt.ComputeCurvature(
+                current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation,
+                current.Displacement - previous.Displacement);
         }
     }
 
     /// <summary>
-    ///     Compute new velocity based on previous point and max acceleration.
+    ///     Computes the time required to move from point A a specified <see cref="displacement"/>.
     /// </summary>
-    private static void ForwardAccelerationPass(TrajectoryPoint[] points, BaseTrajectoryConstraints constraints)
+    /// <typeparam name="TDisplacement">The displacement unit to use.</typeparam>
+    /// <typeparam name="TVelocity">The velocity unit to use.</typeparam>
+    /// <typeparam name="TAcceleration">The acceleration unit to use.</typeparam>
+    /// <param name="displacement">The distance between the two points.</param>
+    /// <param name="initialVelocity">The velocity at the first point.</param>
+    /// <param name="finalVelocity">the velocity at the destination.</param>
+    /// <param name="minAcceleration">The de-acceleration.</param>
+    /// <param name="maxAcceleration">The acceleration.</param>
+    /// <returns>The time needed to perform this movement.</returns>
+    private static Real<Time> ComputeMovementTime<TDisplacement, TVelocity, TAcceleration>(
+        Real<TDisplacement> displacement,
+        Real<TVelocity> initialVelocity,
+        Real<TVelocity> finalVelocity,
+        Real<TAcceleration> minAcceleration,
+        Real<TAcceleration> maxAcceleration)
     {
-        points[0].Velocity = Real<Velocity>.Zero;
-        points[0].Acceleration = Real<Acceleration>.Zero;
+        Assert.IsTrue(minAcceleration < 0);
+        Assert.IsTrue(maxAcceleration > 0);
 
-        var maxA = constraints.MaxTranslationalAcceleration;
-
-        for (var i = 1; i < points.Length; i++)
+        if (displacement == Real<TDisplacement>.Zero)
         {
-            var previous = points[i - 1];
-            ref var current = ref points[i];
+            if (initialVelocity == finalVelocity)
+            {
+                // It is probably fine, since time 0 is acceptable.
 
-            var displacement = current.Displacement - previous.Displacement;
+                return Real<Time>.Zero;
+            }
 
-            var achievableVelocity = SolveAchievableVelocity(previous.Velocity, maxA, displacement);
-
-            var oldVelocity = current.Velocity;
-
-            current.Velocity = Math.Min(achievableVelocity, current.Velocity).ToReal<Velocity>();
-
-            // Compute used acceleration:
-            current.Acceleration = current.Velocity.Equals(oldVelocity)
-                ? Real<Acceleration>.Zero   // No acceleration
-                : maxA;                     // Max acceleration
+            Assert.Fail("Generation failed");
         }
-    }
 
-    /// <summary>
-    ///     Compute new velocity based on next point and minimum acceleration.
-    /// </summary>
-    private static void BackwardAccelerationPass(TrajectoryPoint[] points, BaseTrajectoryConstraints constraints)
-    {
-        // They should be these anyways, but just to be sure, we set them here:
-        points[^1].Velocity = Real<Velocity>.Zero;
-        points[^1].Acceleration = Real<Acceleration>.Zero;
+        var acceleration = (finalVelocity.Squared() - initialVelocity.Squared()) / (2 * displacement);
 
-        var minA = constraints.MinTranslationalAcceleration;
-
-        for (var i = points.Length - 2; i >= 0; i--)
+        if (acceleration.Abs() > 0)
         {
-            var previous = points[i + 1];
-            ref var current = ref points[i];
-
-            var displacement = current.Displacement - previous.Displacement;
-
-            var achievableVelocity = SolveAchievableVelocity(previous.Velocity, minA, displacement);
-
-            var oldVelocity = current.Velocity;
-
-            current.Velocity = Math.Min(achievableVelocity, current.Velocity).ToReal<Velocity>();
-
-            // Compute used acceleration:
-            current.Acceleration = current.Velocity.Equals(oldVelocity)
-                ? current.Acceleration
-                : minA;
+            return ((finalVelocity - initialVelocity) / acceleration).Value.ToReal<Time>();
         }
-    }
 
-    private static Real<Time> ComputeTranslationTime(TrajectoryPoint previous, TrajectoryPoint current)
-    {
-        return (2 * (current.Displacement - previous.Displacement) / (current.Velocity + previous.Velocity)).ToReal<Time>();
-    }
+        var sum = initialVelocity + finalVelocity;
 
-    /// <summary>
-    ///     Computes time at every point.
-    /// </summary>
-    private static void ComputeTime(TrajectoryPoint[] points)
-    {
-        points[0].Time = Real<Time>.Zero;
-
-        var totalTime = Real<Time>.Zero;
-
-        for (var i = 1; i < points.Length; i++)
+        if (sum == Real<TVelocity>.Zero)
         {
-            var previous = points[i - 1];
-            ref var current = ref points[i];
-            
-            totalTime += ComputeTranslationTime(previous, current);
-            
-            current.Time = totalTime;
+            Assert.Fail("Velocity sum zero");
         }
+
+        return (2 * displacement / sum).ToReal<Time>();
     }
 
     private static void ComputeVelocityAcceleration(TrajectoryPoint[] points)
     {
-        points[0].CartesianVelocity = Real2<Velocity>.Zero;
-        points[0].CartesianAcceleration = Real2<Acceleration>.Zero;
+        points[0].Velocity = Real2<Velocity>.Zero;
+        points[0].AngularVelocity = Real<AngularVelocity>.Zero;
 
-        // Cartesian velocities:
         for (var i = 1; i < points.Length; i++)
         {
             var previous = points[i - 1];
             ref var current = ref points[i];
 
             var dPos = current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation;
+            var dTheta = current.AngularDisplacement - previous.AngularDisplacement;
             var dt = current.Time - previous.Time;
 
-            current.CartesianVelocity = new Real2<Velocity>(dPos / dt);
-        }
+            current.Velocity = new Real2<Velocity>(dPos / dt);
+            current.AngularVelocity = new Real<AngularVelocity>(dTheta / dt);
 
-        // Cartesian accelerations:
-        for (var i = 1; i < points.Length; i++)
-        {
-            var previous = points[i - 1];
-            ref var current = ref points[i];
-
-            var dVel = current.CartesianVelocity - previous.CartesianVelocity;
-            var dt = current.Time - previous.Time;
-
-            current.CartesianAcceleration = new Real2<Acceleration>(dVel / dt);
+            current.Acceleration = new Real2<Acceleration>((current.Velocity - previous.Velocity) / dt);
+            current.AngularAcceleration = new Real<AngularAcceleration>((current.AngularVelocity - previous.AngularVelocity) / dt);
         }
     }
 
-    public static TrajectoryPoint[] GeneratePoints(CurvePose[] poses, BaseTrajectoryConstraints constraints)
+    private static void ComputeUpperVelocities(TrajectoryPoint[] poses, Intermediary[] profile, BaseTrajectoryConstraints constraints)
     {
+        var awMax = constraints.MaxAngularAcceleration;
+        var atMax = constraints.MaxTranslationalAcceleration;
+
+        #region Angular Acceleration Bounds
+
+        // Find the derivation of this work in http://www2.informatik.uni-freiburg.de/~lau/students/Sprunk2008.pdf
+        double Bounds(int iA, int iB)
+        {
+            double Sqr(double a)
+            {
+                return a * a;
+            }
+
+            var ci = profile[iB].RotationCurvature;
+            var ci1 = profile[iA].RotationCurvature;
+
+            var ds = (poses[iB].Displacement - poses[iA].Displacement).Abs();
+
+            double thresh = constraints.MaxTranslationalVelocity;
+
+            void UnexpectedSet()
+            {
+                throw new Exception($"Unexpected CI {ci} and CI1 {ci1}");
+            }
+
+            if (ci > 0 && ci1 >= 0)
+            {
+                if (ci > ci1)
+                {
+                    thresh = Math.Sqrt(2 * ds * Sqr((awMax + ci * atMax)) /
+                                       ((atMax * (ci + ci1) + 2 * awMax) * (ci - ci1)));
+                }
+                else if (ci < ci1)
+                {
+                    var thresh1 = Math.Sqrt((8 * ci * awMax * ds) / Sqr(ci1 + ci));
+                    var tmp1 = Math.Sqrt((4 * ci * ds * (ci * atMax + awMax)) / (Sqr(ci1 - ci)));
+                    var tmp2 = Math.Sqrt((2 * ds * Sqr(ci * atMax + awMax)) /
+                                         ((ci1 - ci) * (2 * awMax + (ci1 + ci) * atMax)));
+                    var thresh_tmp1 = Math.Min(tmp1, tmp2);
+                    var thresh_tmp2 = Math.Min(Math.Sqrt((2 * awMax * ds) / (ci1)), Math.Sqrt(2 * atMax * ds));
+
+                    var thresh_tmp3 = NegativeInfinity;
+
+                    var tmp = Math.Min(((2 * awMax * ds) / (ci1)),
+                        ((2 * ds * Sqr(ci * atMax - awMax)) / ((ci1 - ci) * (2 * awMax - (ci1 + ci) * atMax))));
+
+                    if (tmp > ((-4 * ci * ds * (ci * atMax - awMax)) / ((ci1 - ci) * (ci1 + ci))) &&
+                        tmp > 2 * atMax * ds)
+                    {
+                        thresh_tmp3 = Math.Sqrt(tmp);
+                    }
+
+                    thresh = Math.Max(Math.Max(thresh1, thresh_tmp1), Math.Max(thresh_tmp2, thresh_tmp3));
+
+                }
+                else if (ci == ci1)
+                {
+                    thresh = PositiveInfinity;
+                }
+                else
+                {
+                    UnexpectedSet();
+                }
+            }
+            else if (ci < 0 && ci1 <= 0)
+            {
+                if (ci > ci1)
+                {
+                    var thresh1 = Math.Sqrt((-8 * ci * awMax * ds) / Sqr(ci1 + ci));
+                    var tmp1 = Math.Sqrt((-4 * ci * ds * (awMax - ci * atMax)) / ((ci1 + ci) * (ci1 - ci)));
+                    var tmp2 = Math.Sqrt((-2 * ds * Sqr(awMax - ci * atMax)) /
+                                         ((ci1 - ci) * (2 * awMax - (ci1 + ci) * atMax)));
+                    var thresh_tmp1 = Math.Min(tmp1, tmp2);
+                    var thresh_tmp2 = Math.Min(Math.Sqrt((-2 * awMax * ds) / (ci1)), Math.Sqrt(2 * atMax * ds));
+
+                    var thresh_tmp3 = NegativeInfinity;
+
+
+                    var tmp = Math.Min(((-2 * awMax * ds) / (ci1)),
+                        ((-2 * ds * Sqr(ci * atMax - awMax)) / ((ci1 - ci) * (2 * awMax + (ci1 + ci) * atMax))));
+
+                    if (tmp > ((-4 * ci * ds * (awMax + ci * atMax)) / ((ci1 - ci) * (ci1 + ci))) &&
+                        tmp > 2 * atMax * ds)
+                    {
+                        thresh_tmp3 = Math.Sqrt(tmp);
+                    }
+
+                    thresh = Math.Max(Math.Max(thresh1, thresh_tmp1), Math.Max(thresh_tmp2, thresh_tmp3));
+
+
+                }
+                else if (ci < ci1)
+                {
+                    thresh = Math.Sqrt((-2 * ds * Sqr(awMax - ci * atMax)) /
+                                       ((ci1 - ci) * ((ci + ci1) * atMax - 2 * awMax)));
+                }
+                else if (ci == ci1)
+                {
+                    thresh = PositiveInfinity;
+                }
+                else
+                {
+                    UnexpectedSet();
+                }
+            }
+            else if (ci < 0 && ci1 > 0)
+            {
+                var vtwostarpos = Math.Sqrt((2 * ds * awMax) / (ci1));
+                var precond = PositiveInfinity;
+
+                if (ci1 + ci < 0)
+                {
+                    precond = Math.Sqrt((-4 * ci * ds * (ci * atMax - awMax)) / ((ci1 - ci) * (ci1 + ci)));
+                }
+
+                var thresh_tmp = Math.Min(precond,
+                    Math.Sqrt((-2 * ds * Sqr(ci * atMax - awMax)) / ((ci1 - ci) * ((ci1 + ci) * atMax - 2 * awMax))));
+                thresh_tmp = Math.Max(thresh_tmp, Math.Sqrt(2 * ds * atMax));
+                thresh = Math.Min(thresh_tmp, vtwostarpos);
+
+            }
+            else if (ci > 0 && ci1 < 0)
+            {
+                var vonestarpos = Math.Sqrt(-(((2 * ds * awMax) / (ci1))));
+                var precond = PositiveInfinity;
+
+                if (ci1 + ci > 0)
+                {
+                    precond = Math.Sqrt((-4 * ci * ds * (awMax + ci * atMax)) / ((ci1 - ci) * (ci1 + ci)));
+                }
+
+                var thresh_tmp = Math.Min(precond,
+                    Math.Sqrt((-2 * ds * Sqr(awMax + ci * atMax)) / ((ci1 - ci) * (((ci1 + ci) * atMax + 2 * awMax)))));
+                thresh_tmp = Math.Max(thresh_tmp, Math.Sqrt(2 * ds * atMax));
+                thresh = Math.Min(thresh_tmp, vonestarpos);
+
+            }
+            else if (ci == 0 && ci1 == 0)
+            {
+                thresh = PositiveInfinity;
+            }
+            else if (ci == 0)
+            {
+                if (ci1 > 0)
+                {
+                    var vtwohatpos = Math.Sqrt((2 * ds * awMax) / (ci1));
+                                       
+                    var thresh_tmp = MathExt.MaxNaN(
+                        Math.Sqrt(2 * ds * atMax),
+                        Math.Sqrt((-2 * ds * Sqr(awMax)) / (ci1 * (ci1 * atMax - 2 * awMax))));
+
+                    thresh = MathExt.MinNaN(vtwohatpos, thresh_tmp);
+
+                    if(thresh.IsNan())
+                    {
+                        Assert.Fail();
+                    }
+                }
+                else if (ci1 < 0)
+                {
+                    var vonehatpos = Math.Sqrt(-((2 * ds * awMax) / (ci1)));
+                  
+                    var thresh_tmp = MathExt.MaxNaN(
+                        Math.Sqrt(2 * ds * atMax), 
+                        Math.Sqrt((-2 * ds * Sqr(awMax)) / (ci1 * (ci1 * atMax + 2 * awMax))));
+                    
+                    thresh = MathExt.MinNaN(vonehatpos, thresh_tmp);
+
+                    if (thresh.IsNan())
+                    {
+                        Assert.Fail();
+                    }
+                }
+                else
+                {
+                    UnexpectedSet();
+                }
+            }
+            else
+            {
+                UnexpectedSet();
+            }
+
+            if (IsNaN(thresh))
+            {
+                Assert.Fail("Threshold is NaN");
+            }
+
+            return thresh;
+        }
+
+        profile[0].LinearVelocity = Real<Velocity>.Zero;
+        for (var i = 1; i < poses.Length; i++)
+        {
+            profile[i - 1].LinearVelocity = Math.Min(
+                profile[i - 1].LinearVelocity, 
+                Bounds(i - 1, i)).ToReal<Velocity>();
+        }
+
+        profile[^1].LinearVelocity = Real<Velocity>.Zero;
+        for (var i = poses.Length - 2; i >= 0; i--)
+        {
+            profile[i + 1].LinearVelocity = Math.Min(
+                profile[i + 1].LinearVelocity,
+                Bounds(i + 1, i)).ToReal<Velocity>();
+        }
+
+        #endregion
+
+        // Angular Velocity:
+        for (var i = 0; i < poses.Length; i++)
+        {
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
+                (constraints.MaxAngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
+        }
+
+        // Centripetal Acceleration:
+        for (var i = 0; i < poses.Length; i++)
+        { 
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
+                Math.Sqrt(constraints.MaxCentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
+        }
+    }
+
+    /// <summary>
+    ///     Computes a velocity profile for a holonomic robot using the specified kineto-dynamic constraints.
+    /// </summary>
+    /// <param name="poses">The basic shape of the path.</param>
+    /// <param name="constraints">The base constraints to use.</param>
+    /// <returns></returns>
+    public static TrajectoryPoint[] ComputeProfile(CurvePose[] poses, BaseTrajectoryConstraints constraints)
+    {
+        CsvHeader PROFILE_TIME = "profile_time";
+        CsvHeader PROFILE_ANG = "angle";
+        CsvHeader PROFILE_ANG_VEL = "profile_angular_velocity";
+        CsvHeader PROFILE_ANG_ACC = "profile_angular_acceleration";
+        CsvHeader PROFILE_K = "path_curvature";
+        CsvHeader PROFILE_COMP_K = "rotation_curvature";
+        CsvHeader PROFILE_VEL_UPPER = "velocity_upper_bounds";
+        CsvHeader PROFILE_LIN_DISP = "linear_displacement";
+
+        //todo delete
+        using var csv = new CsvWriter(File.CreateText("PROFILE.csv"),
+            PROFILE_TIME,
+            PROFILE_ANG,
+            PROFILE_ANG_VEL,
+            PROFILE_ANG_ACC,
+            PROFILE_K,
+            PROFILE_COMP_K,
+            PROFILE_VEL_UPPER,
+            PROFILE_LIN_DISP);
+
+        // Validation:
+
+        // Path not really possible with less than two points.
+        if (poses.Length < 2)
+        {
+            throw new ArgumentException("Path is too short", nameof(poses));
+        }
+
         var points = new TrajectoryPoint[poses.Length];
 
         // Copy the poses to our trajectory points:
@@ -332,30 +490,244 @@ public class TrajectoryGenerator
             points[i].CurvePose = poses[i];
         }
 
-        // Compute displacement at each point:
-        ComputeDisplacements(points);
+        AssignPathPoints(points);
 
-        // Get basic velocities we want to achieve:
-        DesiredTranslationVelocityPass(points, constraints);
+        var profile = new Intermediary[points.Length];
 
-        // Apply acceleration constraints:
-        ForwardAccelerationPass(points, constraints);
+        // Assign displacements, curvatures and initial upper velocity:
+        for (var i = 0; i < points.Length; i++)
+        {
+            profile[i] = new Intermediary
+            {
+                LinearDisplacement = points[i].Displacement,
+                LinearVelocity = constraints.MaxTranslationalVelocity,
+                RotationCurvature = points[i].RotationCurvature
+            };
+        }
 
-        // Apply de-acceleration constraints:
-        BackwardAccelerationPass(points, constraints);
+        // Compute isolated velocities:
+        ComputeUpperVelocities(points, profile, constraints);
 
-        // Compute times:
-        ComputeTime(points);
+        // For logging
+        var upperBounds = profile.Select(x => x.LinearVelocity).ToArray();
 
-        // Compute velocities and accelerations:
+        // Passes over two points and adjusts velocities so that acceleration constrains are respected.
+        void CombinedPass(int previousIndex, int currentIndex)
+        {
+            // Previous point:
+            var pi1 = profile[previousIndex];
+            
+            // Current point:
+            ref var pi = ref profile[currentIndex];
+
+            var translationalDisplacement = pi.LinearDisplacement - pi1.LinearDisplacement;
+            
+            var atMax = constraints.MaxTranslationalAcceleration;
+            var awMax = constraints.MaxAngularAcceleration;
+
+            var ci1 = profile[previousIndex].RotationCurvature;
+            var ci = profile[currentIndex].RotationCurvature;
+            var vi1 = pi1.LinearVelocity;
+
+            var ds = translationalDisplacement.Abs();
+
+            // Admissible velocities that respect translational acceleration constraint:
+            var vtAt = new Range(
+                vi1.Squared() > 2 * atMax * ds
+                    ? Math.Sqrt(vi1.Squared() - 2 * atMax * ds)
+                    : 0d, 
+                Math.Sqrt(vi1.Squared() + 2 * atMax * ds));
+
+            #region Analysis
+
+            double V1()
+            {
+                return (1d / (2d * ci)) * ((ci1 - ci) * vi1 + Math.Sqrt((ci + ci1).Squared() * vi1.Squared() + 8 * ci * ds * awMax));
+            }
+
+            double V2()
+            {
+                return (1d / (2d * ci)) * ((ci1 - ci) * vi1 - Math.Sqrt((ci + ci1).Squared() * vi1.Squared() + 8 * ci * ds * awMax));
+            }
+
+            double V1Star()
+            {
+                return (1d / (2d * ci)) * ((ci1 - ci) * vi1 + Math.Sqrt((ci + ci1).Squared() * vi1.Squared() - 8 * ci * ds * awMax));
+            }
+
+            double V2Star()
+            {
+                return (1d / (2d * ci)) * ((ci1 - ci) * vi1 - Math.Sqrt((ci + ci1).Squared() * vi1.Squared() - 8 * ci * ds * awMax));
+            }
+
+            double V1Hat()
+            {
+                return -(2 * ds * awMax) / (ci1 * vi1) - vi1;
+            }
+
+            double V2Hat()
+            {
+                return (2 * ds * awMax) / (ci1 * vi1) - vi1;
+            }
+
+            #endregion
+
+            // Admissible velocities that respect rotational acceleration constraint:
+            var vtAwRanges = Array.Empty<Range>();
+
+            if (ci > 0)
+            {
+                var condition = (ci + ci1).Squared() * vi1.Squared() - 8 * ci * awMax * ds;
+
+                if (condition < 0)
+                {
+                    vtAwRanges = new[]
+                    {
+                        new Range(V2(), V1())
+                    };
+                }
+                else
+                {
+                    Assert.IsTrue(condition >= 0);
+
+                    vtAwRanges = new[]
+                    {
+                        new Range(V2(), V2Star()),
+                        new Range(V1Star(), V1())
+                    };
+                }
+            }
+            else if (ci < 0)
+            {
+                var condition = (ci + ci1).Squared() * vi1.Squared() + 8 * ci * awMax * ds;
+
+                if (condition < 0)
+                {
+                    vtAwRanges = new[] { new Range(V1Star(), V2Star()) };
+                }
+                else
+                {
+                    Assert.IsTrue(condition >= 0);
+
+                    vtAwRanges = new[]
+                    {
+                        new Range(V1Star(), V1()),
+                        new Range(V2(), V2Star())
+                    };
+                }
+            }
+            else
+            {
+                Assert.IsTrue(ci == 0);
+
+                if (ci1 > 0)
+                {
+                    vtAwRanges = new[] { new Range(V1Hat(), V2Hat()) };
+                }
+                else if (ci1 < 0)
+                {
+                    vtAwRanges = new[] { new Range(V2Hat(), V1Hat()) };
+                }
+                else if (ci1 == 0)
+                {
+                    vtAwRanges = new[] { Range.R };
+                }
+            }
+
+            double velocity = 0;
+
+            for (var i = 0; i < vtAwRanges.Length; i++)
+            {
+                var vtAw = Range.Intersect(Range.R0Plus, vtAwRanges[i]);
+                var intersect = Range.Intersect(vtAw, vtAt);
+
+                if (!Range.CheckValidity(intersect))
+                {
+                    if (i == vtAwRanges.Length - 1)
+                    {
+                        var (angVel, linVel) = vtAwRanges
+                            .SelectMany(range => new[]
+                            {
+                                range.Min, 
+                                range.Max
+                            })
+                            .Where(av => av >= 0)
+                            .SelectMany(av => new[]
+                            {
+                                (angVel: av, linVel: vtAt.Min), 
+                                (angVel: av, linVel: vtAt.Max)
+                            })
+                            .MinBy(pair => Math.Abs(pair.angVel - pair.linVel));
+
+                        velocity = (linVel + angVel) / 2;
+
+                        Console.WriteLine($"Constraint approximation {currentIndex}: {Math.Abs(linVel - angVel) * 100000:F4}");
+                    }
+                    continue;
+                }
+
+                velocity = Math.Max(velocity, intersect.Max);
+            }
+
+            if (velocity is NaN || IsInfinity(velocity))
+            {
+                Assert.Fail();
+            }
+
+            pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity.ToReal<Velocity>());
+        }
+
+        // Forward pass:
+        profile[0].LinearVelocity = Real<Velocity>.Zero;
+        for (var i = 1; i < profile.Length; i++)
+        {
+            CombinedPass(i - 1, i);
+        }
+
+        // Backward pass:
+        profile[^1].LinearVelocity = Real<Velocity>.Zero;
+        for (var i = profile.Length - 2; i >= 0; i--)
+        {
+            CombinedPass(i + 1, i);
+        }
+
+        // Compute time:
+        for (var i = 1; i < profile.Length; i++)
+        {
+            var previous = profile[i - 1];
+            var current = profile[i];
+
+            points[i].Time = points[i - 1].Time + ComputeMovementTime(
+                current.LinearDisplacement - previous.LinearDisplacement,
+                previous.LinearVelocity, 
+                current.LinearVelocity, 
+                constraints.MinTranslationalAcceleration,
+                constraints.MaxTranslationalAcceleration);
+        }
+
+        // Compute actual velocities and accelerations:
         ComputeVelocityAcceleration(points);
+
+        for (var i = 0; i < points.Length; i++)
+        {
+            csv.Add(PROFILE_TIME, points[i].Time);
+            csv.Add(PROFILE_ANG, points[i].CurvePose.Pose.Rotation.Angle);
+            csv.Add(PROFILE_ANG_VEL, points[i].AngularVelocity);
+            csv.Add(PROFILE_ANG_ACC, points[i].AngularAcceleration);
+            csv.Add(PROFILE_K, points[i].CurvePose.Curvature);
+            csv.Add(PROFILE_COMP_K, profile[i].RotationCurvature);
+            csv.Add(PROFILE_VEL_UPPER, upperBounds[i]);
+            csv.Add(PROFILE_LIN_DISP, profile[i].LinearDisplacement);
+
+            csv.Flush();
+        }
 
         return points;
     }
 
-    public static Trajectory Generate(CurvePose[] poses, BaseTrajectoryConstraints constraints, out TrajectoryPoint[] points)
+    public static Trajectory GenerateTrajectory(CurvePose[] poses, BaseTrajectoryConstraints constraints, out TrajectoryPoint[] points)
     {
-        points = GeneratePoints(poses, constraints);
+        points = ComputeProfile(poses, constraints);
 
         return new Trajectory(points);
     }
@@ -363,6 +735,9 @@ public class TrajectoryGenerator
 
 public class Trajectory
 {
+    /// <summary>
+    ///     Represents a segment between two <see cref="TrajectoryPoint"/>s.
+    /// </summary>
     private readonly struct TrajectorySegment
     {
         public TrajectoryPoint A { get; }
@@ -374,38 +749,38 @@ public class Trajectory
             B = b;
         }
 
+        /// <summary>
+        ///     Evaluates the trajectory state using interpolation.
+        /// </summary>
+        /// <param name="t">The absolute time. It must be between the times specified in <see cref="A"/> and <see cref="B"/>.</param>
+        /// <returns>An interpolated trajectory state.</returns>
         public TrajectoryPoint Evaluate(Real<Time> t)
         {
             if (t < A.Time || t > B.Time)
             {
-                Assert.Fail();
+                throw new ArgumentOutOfRangeException(nameof(t), $"{t} is outside {A.Time} - {B.Time}");
             }
 
+            // Computes 0-1 progress in this segment:
             var progress = t.MappedTo<Percentage>(A.Time, B.Time, 0, 1);
-            var time = Real<Time>.Lerp(A.Time, B.Time, progress);
-            var pose = A.CurvePose.Pose.Interpolate(B.CurvePose.Pose, progress);
-            var velocity = Real<Velocity>.Lerp(A.Velocity, B.Velocity, progress);
-            var acceleration = Real<Acceleration>.Lerp(A.Acceleration, B.Acceleration, progress);
-            var curvature = Real<Curvature>.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress);
-            var displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress);
-            var parameter = Real<Percentage>.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress);
 
-            var cartesianVelocity = Real2<Velocity>.Lerp(A.CartesianVelocity, B.CartesianVelocity, progress);
-            var cartesianAcceleration = Real2<Acceleration>.Lerp(A.CartesianAcceleration, B.CartesianAcceleration, progress);
-
-            var angularDisplacement = Real<Radians>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress);
+            var pose = Pose.Lerp(A.CurvePose.Pose, B.CurvePose.Pose, progress);
 
             return new TrajectoryPoint
             {
-                CurvePose = new CurvePose(pose, curvature, parameter),
-                Time = time,
-                Velocity = velocity,
-                Acceleration = acceleration,
-                Displacement = displacement,
-                
-                CartesianVelocity = cartesianVelocity,
-                CartesianAcceleration = cartesianAcceleration,
-                AngularDisplacement = angularDisplacement
+                CurvePose = new CurvePose(
+                    pose,
+                    Real<Curvature>.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress),
+                    Real<Percentage>.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress)),
+                RotationCurvature = Real<Curvature>.Lerp(A.RotationCurvature, B.RotationCurvature, progress),
+                Displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress),
+                AngularDisplacement = Real<Angle>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
+                Time = Real<Time>.Lerp(A.Time, B.Time, progress),
+
+                Velocity = Real2<Velocity>.Lerp(A.Velocity, B.Velocity, progress),
+                Acceleration = Real2<Acceleration>.Lerp(A.Acceleration, B.Acceleration, progress),
+                AngularVelocity = Real<AngularVelocity>.Lerp(A.AngularVelocity, B.AngularVelocity, progress),
+                AngularAcceleration = Real<AngularAcceleration>.Lerp(A.AngularAcceleration, B.AngularAcceleration, progress),
             };
         }
     }

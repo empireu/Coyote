@@ -11,17 +11,17 @@ public readonly struct Twist
     public Real<Displacement> Dy { get; }
 
     [JsonInclude]
-    public Real<Radians> DTheta { get; }
+    public Real<Angle> DTheta { get; }
 
     [JsonConstructor]
-    public Twist(Real<Displacement> dx, Real<Displacement> dy, Real<Radians> dTheta)
+    public Twist(Real<Displacement> dx, Real<Displacement> dy, Real<Angle> dTheta)
     {
         Dx = dx;
         Dy = dy;
         DTheta = dTheta;
     }
 
-    public Twist(double dx, double dy, double dTheta) : this(dx.ToReal<Displacement>(), dy.ToReal<Displacement>(), dTheta.ToReal<Radians>())
+    public Twist(double dx, double dy, double dTheta) : this(dx.ToReal<Displacement>(), dy.ToReal<Displacement>(), dTheta.ToReal<Angle>())
     {
 
     }

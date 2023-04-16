@@ -1,5 +1,4 @@
 ﻿using System.Text.Json.Serialization;
-using Microsoft.VisualBasic.CompilerServices;
 
 namespace Coyote.Mathematics;
 
@@ -11,7 +10,7 @@ public readonly struct Transformation
     /// <summary>
     ///     Gets an identity <see cref="Transformation"/>. Applying this transformation will leave the <see cref="Pose"/> unaffected.
     /// </summary>
-    public static readonly Transformation Identity = new(Mathematics.Translation.Zero, Rotation.Zero);
+    public static readonly Transformation Identity = new(Translation.Zero, Rotation.Zero);
 
     [JsonInclude]
     public Translation Translation { get; }

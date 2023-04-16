@@ -28,41 +28,37 @@ public static class Extensions
         return Math.Abs(d - other) < threshold;
     }
 
-    public static Real<TUnit> ToReal<TUnit>(this float f) where TUnit : IUnit
+    public static Real<TUnit> ToReal<TUnit>(this float f)
     {
         return (Real<TUnit>)f;
     }
 
-    public static Real<TUnit> ToReal<TUnit>(this double d) where TUnit : IUnit
+    public static Real<TUnit> ToReal<TUnit>(this double d)
     {
         return (Real<TUnit>)d;
     }
 
-    public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v) where TUnit : IUnit
+    public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v)
     {
         return (Real2<TUnit>)v;
     }
 
-    public static Real<Radians> ToRadians(this Real<Degrees> r)
+    public static Real<Angle> ToRadians(this Real<AngleDegrees> r)
     {
-        return new Real<Radians>(Angles.ToRadians(r));
+        return new Real<Angle>(Angles.ToRadians(r));
     }
 
-    public static Real<Degrees> ToDegrees(this Real<Radians> r)
+    public static Real<AngleDegrees> ToDegrees(this Real<Angle> r)
     {
-        return new Real<Degrees>(Angles.ToDegrees(r));
+        return new Real<AngleDegrees>(Angles.ToDegrees(r));
     }
 
     public static Real<TResult> Convert<TSource, TResult>(this Real<TSource> source)
-        where TSource : IUnit
-        where TResult : IUnit
     {
         return new Real<TResult>(source.Value);
     }
 
     public static Real2<TResult> Convert<TSource, TResult>(this Real2<TSource> source)
-        where TResult : IUnit
-        where TSource : IUnit
     {
         return new Real2<TResult>(source.X.Convert<TSource, TResult>(), source.Y.Convert<TSource, TResult>());
     }
@@ -91,14 +87,19 @@ public static class Extensions
     {
         return new Real<Velocity>(acceleration.Value * time.Value);
     }
-
-    public static Real<T> Squared<T>(this Real<T> real) where T : IUnit
+    
+    public static Real<T> Squared<T>(this Real<T> real)
     {
         return new Real<T>(real.Value * real.Value);
     }
 
-    public static Real<T> SquareRoot<T>(this Real<T> real) where T : IUnit
+    public static Real<T> SquareRoot<T>(this Real<T> real)
     {
         return new Real<T>(Math.Sqrt(real.Value));
+    }
+
+    public static bool IsNan(this double d)
+    {
+        return double.IsNaN(d);
     }
 }

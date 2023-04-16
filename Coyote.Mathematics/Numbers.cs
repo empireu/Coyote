@@ -4,62 +4,17 @@ using GameFramework.Utilities;
 
 namespace Coyote.Mathematics;
 
-public interface IUnit { }
-
-/// <summary>
-///     Identifies a Displacement (Distance) unit.
-/// </summary>
-public interface Displacement : IUnit { }
-
-/// <summary>
-///     Identifies a Velocity (<see cref="Displacement"/>') unit.
-/// </summary>
-public interface Velocity : IUnit { }
-
-/// <summary>
-///     Identifies an Angular Velocity (<see cref="Radians"/>') unit.
-/// </summary>
-public interface AngularVelocity : IUnit { }
-
-/// <summary>
-///     Identifies a Centripetal Acceleration (<see cref="Velocity"/>²/<see cref="Curvature"/>) unit.
-/// </summary>
-public interface CentripetalAcceleration : IUnit { }
-
-/// <summary>
-///     Identifies an Acceleration (<see cref="Displacement"/>'', <see cref="Velocity"/>') unit.
-/// </summary>
-public interface Acceleration : IUnit { }
-
-/// <summary>
-///     Identifies an Angular Acceleration (<see cref="Radians"/>'', <see cref="AngularVelocity"/>') unit.
-/// </summary>
-public interface AngularAcceleration : IUnit { }
-
-/// <summary>
-///     Identifies a Curvature (<see cref="Radians"/>/<see cref="Displacement"/>) unit.
-/// </summary>
-public interface Curvature : IUnit { }
-
-/// <summary>
-///     Identifies a rotation unit, expressed in radians.
-/// </summary>
-public interface Radians : IUnit { }
-
-/// <summary>
-///     Identifies a rotation unit, expressed in degrees.
-/// </summary>
-public interface Degrees : IUnit { }
-
-/// <summary>
-///     Identifies a percentage unit, expressed in a value ranging from 0-1.
-/// </summary>
-public interface Percentage : IUnit { }
-
-/// <summary>
-///     Identifies a time unit, expressed in seconds.
-/// </summary>
-public interface Time : IUnit { }
+public interface Displacement { }
+public interface Velocity { }
+public interface AngularVelocity { }
+public interface CentripetalAcceleration { }
+public interface Acceleration { }
+public interface Angle { }
+public interface AngleDegrees { }
+public interface AngularAcceleration { }
+public interface Curvature { }
+public interface Percentage { }
+public interface Time { }
 
 /// <summary>
 ///     Represents a real number with a symbolic unit.
@@ -76,7 +31,6 @@ public readonly struct Real<TUnit> :
     IMultiplyOperators<Real<TUnit>, double, Real<TUnit>>,
     IDivisionOperators<Real<TUnit>, Real<TUnit>, Real<TUnit>>,
     IDivisionOperators<Real<TUnit>, double, Real<TUnit>>
-    where TUnit : IUnit
 {
     public static readonly Real<TUnit> Zero = new(0);
     public static readonly Real<TUnit> One = new(1);
@@ -85,6 +39,11 @@ public readonly struct Real<TUnit> :
 
     [JsonInclude]
     public double Value { get; }
+
+    [JsonIgnore] public bool IsNan => double.IsNaN(Value);
+    [JsonIgnore] public bool IsInf => double.IsInfinity(Value);
+    [JsonIgnore] public bool IsRealFinite => !IsNan && !IsInf;
+    [JsonIgnore] public int Sign => Math.Sign(Value);
 
     [JsonConstructor]
     public Real(double value)
@@ -226,9 +185,14 @@ public readonly struct Real<TUnit> :
         return a.Value.ApproxEquals(b.Value, tolerance);
     }
 
-    public override string ToString()
+    public string ToStringFormatted()
     {
         return $"{Value:F4} {typeof(TUnit).Name}";
+    }
+
+    public override string ToString()
+    {
+        return Value.ToString();
     }
 
     /// <summary>
@@ -299,7 +263,7 @@ public readonly struct Real<TUnit> :
     /// <param name="dstMin">The lower boundary of the destination range.</param>
     /// <param name="dstMax">The upper boundary of the destination range.</param>
     /// <returns>The <see cref="Value"/>, mapped using the specified ranges.</returns>
-    public Real<TOtherUnit> MappedTo<TOtherUnit>(double srcMin, double srcMax, double dstMin, double dstMax) where TOtherUnit : IUnit
+    public Real<TOtherUnit> MappedTo<TOtherUnit>(double srcMin, double srcMax, double dstMin, double dstMax)
     {
         return new Real<TOtherUnit>(Mapped(srcMin, srcMax, dstMin, dstMax).Value);
     }
@@ -317,9 +281,14 @@ public readonly struct Real<TUnit> :
         Real<TUnit> srcMin,
         Real<TUnit> srcMax,
         Real<TOtherUnit> dstMin,
-        Real<TOtherUnit> dstMax) where TOtherUnit : IUnit
+        Real<TOtherUnit> dstMax)
     {
         return new Real<TOtherUnit>(Mapped(srcMin.Value, srcMax.Value, dstMin.Value, dstMax.Value).Value);
+    }
+
+    public Real<TUnit> MinWith(Real<TUnit> other)
+    {
+        return Min(this, other);
     }
 
     /// <summary>
@@ -380,9 +349,19 @@ public readonly struct Real<TUnit> :
     {
         return Pow(exponent.Value);
     }
+
+    public static Real<TUnit> Min(Real<TUnit> a, Real<TUnit> b)
+    {
+        return Math.Min(a.Value, b.Value).ToReal<TUnit>();
+    }
+
+    public static Real<TUnit> Max(Real<TUnit> a, Real<TUnit> b)
+    {
+        return Math.Max(a.Value, b.Value).ToReal<TUnit>();
+    }
 }
 
-public readonly struct Real2<TUnit> where TUnit : IUnit
+public readonly struct Real2<TUnit>
 {
     public static readonly Real2<TUnit> Zero = new(Real<TUnit>.Zero);
     public static readonly Real2<TUnit> One = new(Real<TUnit>.One);
@@ -615,5 +594,42 @@ public readonly struct Real2<TUnit> where TUnit : IUnit
             Real<TUnit>.Lerp(a.X, b.X, t),
             Real<TUnit>.Lerp(a.Y, b.Y, t)
         );
+    }
+}
+
+public readonly struct Range
+{
+    public static readonly Range Invalid = new(1, 0);
+    public static readonly Range R = new(double.MinValue, double.MaxValue);
+    public static readonly Range R0Plus = new(0, double.MaxValue);
+    public static readonly Range RPlus = new(double.Epsilon, double.MaxValue);
+
+    public double Min { get; }
+    public double Max { get; }
+
+    public bool IsValid => CheckValidity(this);
+
+    public Range(double min, double max)
+    {
+        Min = min;
+        Max = max;
+    }
+
+    public override string ToString()
+    {
+        return $"{Min}:{Max}";
+    }
+
+    public static bool CheckValidity(Range r)
+    {
+        return !double.IsNaN(r.Min) && !double.IsNaN(r.Max) && r.Min < r.Max;
+    }
+
+    public static Range Intersect(Range r1, Range r2)
+    {
+        var start = Math.Max(r1.Min, r2.Min);
+        var end = Math.Min(r1.Max, r2.Max);
+
+        return new Range(start, end);
     }
 }

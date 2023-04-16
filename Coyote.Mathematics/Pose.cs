@@ -31,6 +31,18 @@ public readonly struct Pose
         Rotation = rotation;
     }
 
+    public Pose(Translation translation, Real<Angle> rotation)
+    {
+        Translation = translation;
+        Rotation = rotation;
+    }
+
+    public Pose(Real2<Displacement> translation, Real<Angle> rotation)
+    {
+        Translation = translation;
+        Rotation = rotation;
+    }
+
     public Pose(double x, double y, double rotation) : this(new Translation(x, y), new Rotation(rotation))
     {
 
@@ -207,23 +219,32 @@ public readonly struct Pose
         return new Twist(translationPart.X, translationPart.Y, dTheta);
     }
 
-    public Pose Interpolate(Pose endValue, Real<Percentage> t)
+    public static Pose Interpolate(Pose a, Pose b, Real<Percentage> t)
     {
         if (t < 0)
         {
-            return this;
+            return a;
         }
 
         if (t >= 1)
         {
-            return endValue;
+            return b;
         }
 
-        var twist = Log(endValue);
+        var twist = a.Log(b);
 
-        return Exp(new Twist(
+        return a.Exp(new Twist(
             twist.Dx * t.Value, 
             twist.Dy * t.Value, 
             twist.DTheta * t.Value));
+    }
+
+    public static Pose Lerp(Pose a, Pose b, Real<Percentage> t)
+    {
+        t = t.Clamped(0, 1);
+
+        return new Pose(
+            Real2<Displacement>.Lerp(a.Translation, b.Translation, t),
+            Real<Angle>.Lerp(a.Rotation, b.Rotation, t));
     }
 }

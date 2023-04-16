@@ -8,6 +8,9 @@ internal class Simulator
 {
     private const double EditTimeRefreshThreshold = 0.5;
 
+    private const double RotationSplineSplitThreshold = 0.1;
+    private const double RotationSplineAngleThreshold = 0.01;
+
     private readonly App _app;
     private readonly PathEditor _editor;
 
@@ -47,6 +50,11 @@ internal class Simulator
 
     public float Speed = 1;
 
+    public double MaxVelocity { get; private set; }
+    public double MaxAcceleration { get; private set; }
+    public double MaxAngularVelocity { get; private set; }
+    public double MaxAngularAcceleration { get; private set; }
+
     public bool Update(float dt, out Pose pose)
     {
         if (_editor.ArcLength == 0)
@@ -67,20 +75,30 @@ internal class Simulator
 
             PlayTime = 0;
 
-            var points = new List<CurvePose>();
+            var poses = new List<CurvePose>();
 
-            Splines.GetPoints(points, _editor.TranslationSpline, Real<Percentage>.Zero, Real<Percentage>.One,
-                new Twist(0.001, 0.001, Math.PI / 16), 16000 * _editor.TranslationPoints.Count);
+            Splines.GetPoints(poses, _editor.TranslationSpline, Real<Percentage>.Zero, Real<Percentage>.One,
+                new Twist(0.001, 0.001, Math.PI / 16), 16000 * _editor.TranslationPoints.Count, _editor.RotationSpline.IsEmpty ? null : (t0, t1) =>
+                {
+                    if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+                    {
+                        return true;
+                    }
+
+                    var r0 = _editor.RotationSpline.Evaluate(t0);
+                    var r1 = _editor.RotationSpline.Evaluate(t1);
+
+                    return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
+                });
+
+            var required = new List<int>();
 
             if (!_editor.RotationSpline.IsEmpty)
             {
-                Console.WriteLine($"Using spline rotation. {_editor.RotationSpline.Evaluate(0)}");
+                var span = CollectionsMarshal.AsSpan(poses);
 
-                var span = CollectionsMarshal.AsSpan(points);
-
-                // Assign spline-spline rotations
-
-                for (var i = 0; i < points.Count; i++)
+                // Assign spline-spline rotations:
+                for (var i = 0; i < poses.Count; i++)
                 {
                     var point = span[i];
 
@@ -91,11 +109,19 @@ internal class Simulator
                 }
             }
 
-            Trajectory = TrajectoryGenerator.Generate(points.ToArray(), new BaseTrajectoryConstraints(
+            Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
                 new Real<Velocity>(2.5),
                 new Real<Acceleration>(-1.7),
                 new Real<Acceleration>(1.7),
-                new Real<CentripetalAcceleration>(Math.PI)), out _);
+                new Real<AngularVelocity>(Angles.ToRadians(180)),
+                new Real<AngularAcceleration>(-Angles.ToRadians(45)),
+                new Real<AngularAcceleration>(Angles.ToRadians(45)),
+                new Real<CentripetalAcceleration>(1)), out var trajectoryPoints);
+
+            MaxVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
+            MaxAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
+            MaxAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
+            MaxAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
 
             TotalTime = (float)Trajectory.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;

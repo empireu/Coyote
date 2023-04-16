@@ -53,6 +53,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private const float MaxZoom = 5f;
     private static readonly RgbaFloat VelocityColor = new(1, 0.1f, 0.1f, 1f);
     private static readonly RgbaFloat AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
+    private static readonly RgbaFloat AngularVelocityColor = new(1, 0.1f, 0.5f, 1f);
+    private static readonly RgbaFloat AngularAccelerationColor = new(0.5f, 1f, 0.5f, 1f);
+
+
     private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
     private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
 
@@ -450,18 +454,24 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                 var lastPoint = _simulator.Last;
 
-                ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.CartesianVelocity.Length().Value:F4} m/s");
+                ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxVelocity:F4} m/s");
                 ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
                 ImGui.Separator();
 
-                ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.CartesianAcceleration.Length().Value:F4} m/s²");
+                ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxAcceleration:F4} m/s²");
                 ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
                 ImGui.Separator();
 
-                ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement} m ({_simulator.TotalLength:F4} m total)");
+                ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxAngularVelocity:F4} rad/s");
+                ImGui.Separator();
+
+                ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxAngularAcceleration:F4} rad/s²");
+                ImGui.Separator();
+
+                ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
                 ImGui.Separator();
                 
-                ImGui.TextColored(TimeColor, $"{lastPoint.Time} s ({_simulator.TotalTime:F4} s total)");
+                ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
                 ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
                 
                 if (ImGui.Button("Normal"))
@@ -583,12 +593,12 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
             if (_renderPlayerVelocity)
             {
-                Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianVelocity / 10, VelocityColor);
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.Velocity / 10, VelocityColor);
             }
 
             if (_renderPlayerAcceleration)
             {
-                Arrow(pose.Translation, pose.Translation + _simulator.Last.CartesianAcceleration / 10, AccelerationColor);
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.Acceleration / 10, AccelerationColor);
             }
         }
     }

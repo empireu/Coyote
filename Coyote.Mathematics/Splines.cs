@@ -715,7 +715,8 @@ public static class Splines
         Real<Percentage> t0, 
         Real<Percentage> t1,
         Twist admissible,
-        int maxIterations) where TSpline : ICurvePoseSpline
+        int maxIterations,
+        Func<Real<Percentage>, Real<Percentage>, bool>? splitCondition = null) where TSpline : ICurvePoseSpline
     {
         if (admissible.Dx <= 0 || admissible.Dy <= 0 || admissible.DTheta <= 0)
         {
@@ -738,7 +739,7 @@ public static class Splines
 
             var twist = start.Pose.Log(end.Pose);
 
-            if (Math.Abs(twist.Dx) > admissible.Dx || Math.Abs(twist.Dy) > admissible.Dy || Math.Abs(twist.DTheta) > admissible.DTheta)
+            if ((splitCondition != null && splitCondition(current.T0, current.T1)) || Math.Abs(twist.Dx) > admissible.Dx || Math.Abs(twist.Dy) > admissible.Dy || Math.Abs(twist.DTheta) > admissible.DTheta)
             {
                 stack.Push(new GetPointsFrame((current.T0 + current.T1) / 2, current.T1));
                 stack.Push(new GetPointsFrame(current.T0, (current.T0 + current.T1) / 2));
