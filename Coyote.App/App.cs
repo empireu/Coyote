@@ -5,6 +5,7 @@ using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
+using GameFramework.Gui;
 using GameFramework.ImGui;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
