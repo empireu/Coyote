@@ -1,9 +1,7 @@
 ﻿using Coyote.App;
 using Coyote.App.Movement;
-using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.ImGui;
-using GameFramework.Utilities;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

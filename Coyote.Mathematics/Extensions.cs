@@ -40,7 +40,7 @@ public static class Extensions
 
     public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v)
     {
-        return (Real2<TUnit>)v;
+        return new Real2<TUnit>(new Real<TUnit>(v.X), new Real<TUnit>(v.Y));
     }
 
     public static Real<AngularDisplacement> ToRadians(this Real<AngleDegrees> r)
@@ -101,5 +101,39 @@ public static class Extensions
     public static bool IsNan(this double d)
     {
         return double.IsNaN(d);
+    }
+
+    public static Real2<TUnit> ToReal2<TUnit>(this RealVector<TUnit> vector)
+    {
+        Vectors.Validate(vector, 2);
+
+        return new Real2<TUnit>(vector[0], vector[1]);
+    }
+
+    public static RealVector<TUnit> ToRealVector<TUnit>(this Real<TUnit> real)
+    {
+        return new RealVector<TUnit>(real);
+    }
+
+    public static RealVector<TUnit> ToRealVector<TUnit>(this Real2<TUnit> real)
+    {
+        return new RealVector<TUnit>(real.X, real.Y);
+    }
+
+    public static RealVector<TUnit> ToRealVector<TUnit>(this Vector2 v)
+    {
+        return new RealVector<TUnit>(new Real<TUnit>(v.X), new Real<TUnit>(v.Y));
+    }
+
+    public static Vector2 ToVector2<TUnit>(this RealVector<TUnit> vector)
+    {
+        Vectors.Validate(vector, 2);
+
+        return new Vector2((float)vector[0], (float)vector[1]);
+    }
+
+    public static RealVector<TUnit> ToRealVector<TUnit>(this double d)
+    {
+        return new RealVector<TUnit>(new Real<TUnit>(d));
     }
 }

@@ -643,3 +643,191 @@ public readonly struct Range
         return new Range(start, end);
     }
 }
+
+public interface IRealVector
+{
+    int Size { get; }
+}
+
+/// <summary>
+///     Represents a real vector with an arbitrary number of components.
+/// </summary>
+public readonly struct RealVector<TUnit> : IRealVector
+{
+    private readonly double[] _values;
+
+    public RealVector(ReadOnlySpan<double> values)
+    {
+        if (values.Length == 0)
+        {
+            throw new ArgumentException("Cannot initialize vector with 0 values", nameof(values));
+        }
+
+        _values = values.ToArray();
+    }
+
+    public int Size => _values.Length;
+
+    /// <summary>
+    ///     Creates a real vector from the specified values. This method will allocate a copy to retain ownership.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown if no values are specified.</exception>
+    public static RealVector<TUnit> Create(params double[] values)
+    {
+        if (values.Length == 0)
+        {
+            throw new ArgumentException("Cannot initialize vector with 0 values", nameof(values));
+        }
+
+        return new RealVector<TUnit>(values.ToArray());
+    }
+
+    /// <summary>
+    ///     Creates a real vector from the specified values. This method will allocate a copy to retain ownership.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown if no values are specified.</exception>
+    public RealVector(params Real<TUnit>[] values)
+    {
+        if (values.Length == 0)
+        {
+            throw new ArgumentException("Cannot initialize vector with 0 values", nameof(values));
+        }
+
+        _values = new double[values.Length];
+
+        for (var i = 0; i < values.Length; i++)
+        {
+            _values[i] = values[i];
+        }
+    }
+
+    private RealVector(double[] values)
+    {
+        _values = values;
+    }
+
+    /// <summary>
+    ///     Gets the number at the specified index.
+    /// </summary>
+    public Real<TUnit> this[int index] => new(_values[index]);
+
+    public static RealVector<TUnit> operator +(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        Vectors.Validate(a, b);
+
+        var values = new double[a.Size];
+
+        for (var i = 0; i < a.Size; i++)
+        {
+            values[i] = a._values[i] + b._values[i];
+        }
+
+        return new RealVector<TUnit>(values);
+    }
+
+    public static RealVector<TUnit> operator -(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        Vectors.Validate(a, b);
+
+        var values = new double[a.Size];
+
+        for (var i = 0; i < a.Size; i++)
+        {
+            values[i] = a._values[i] - b._values[i];
+        }
+
+        return new RealVector<TUnit>(values);
+    }
+
+    public static Real<TUnit> DistanceSquared(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        Vectors.Validate(a, b);
+
+        var result = 0d;
+
+        for (var i = 0; i < a.Size; i++)
+        {
+            var d = a[i] - b[i];
+
+            result += d * d;
+        }
+
+        return new Real<TUnit>(result);
+    }
+
+    public static Real<TUnit> Distance(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        return Math.Sqrt(DistanceSquared(a, b)).ToReal<TUnit>();
+    }
+
+    public RealVector<TOther> To<TOther>()
+    {
+        return new RealVector<TOther>(_values);
+    }
+
+    public static RealVector<TUnit> Create(Real<TUnit> value, int size)
+    {
+        var values = new double[size];
+
+        Array.Fill(values, value);
+
+        return new RealVector<TUnit>(values);
+    }
+
+    public static RealVector<TUnit> Zero(int size)
+    {
+        return new RealVector<TUnit>(new double[size]);
+    }
+}
+
+public static class Vectors
+{
+    /// <summary>
+    ///     Ensures that the <see cref="vector"/> has the specified size.
+    /// </summary>
+    /// <param name="vector">The vector to check.</param>
+    /// <param name="requiredSize">The required size of the vector.</param>
+    /// <exception cref="InvalidOperationException">Thrown if validation failed.</exception>
+    public static void Validate(IRealVector vector, int requiredSize)
+    {
+        if (vector.Size != requiredSize)
+        {
+            throw new InvalidOperationException($"A vector of size {requiredSize} is required.");
+        }
+    }
+
+    /// <summary>
+    ///     Ensures that the two vectors have the same size.
+    /// </summary>
+   
+    /// <exception cref="Exception">Thrown if validation failed.</exception>
+    public static void Validate(IRealVector a, IRealVector b)
+    {
+        if (a.Size != b.Size)
+        {
+            throw new Exception("Vectors are not compatible");
+        }
+    }
+
+    /// <summary>
+    ///     Ensures that all vectors have the same size.
+    /// </summary>
+    /// <exception cref="Exception">Thrown if validation failed.</exception>
+    public static void ValidateMany(params IRealVector[] vectors)
+    {
+        if (vectors.Length <= 1)
+        {
+            return;
+        }
+
+        var size = vectors[0].Size;
+
+        for (var i = 1; i < vectors.Length; i++)
+        {
+            if (vectors[i].Size != size)
+            {
+                throw new Exception("Invalid vector set");
+            }
+        }
+    }
+}

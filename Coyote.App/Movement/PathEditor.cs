@@ -40,12 +40,12 @@ internal sealed class PathEditor
     /// <summary>
     ///     Gets the translation spline.
     /// </summary>
-    public QuinticSpline TranslationSpline { get; } = new();
+    public QuinticSpline TranslationSpline { get; } = new(2);
 
     /// <summary>
     ///     Gets the rotation spline. This spline may be empty if no rotation points are specified.
     /// </summary>
-    public MappedCubicSpline RotationSpline { get; } = new();
+    public MappedQuinticSpline RotationSpline { get; } = new(1);
 
     private readonly SplineRenderer _pathRenderer = new();
 
@@ -84,7 +84,7 @@ internal sealed class PathEditor
         {
             // We find the best position on the spline to insert this.
 
-            var projection = TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position));
+            var projection = TranslationSpline.Project(position.ToRealVector<Displacement>());
 
             // It is close enough to the ends that we can add it there:
             if (projection < AddToEndThreshold)
@@ -133,9 +133,9 @@ internal sealed class PathEditor
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+        var translationParameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
         
-        var projectedPosition = TranslationSpline.Evaluate(translationParameter);
+        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
 
         var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
 
@@ -351,12 +351,12 @@ internal sealed class PathEditor
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
             TranslationSpline.Add(new QuinticSplineSegment(
-                p0.ToReal2<Displacement>(), 
-                v0.ToReal2<Velocity>(), 
-                a0.ToReal2<Acceleration>(), 
-                a1.ToReal2<Acceleration>(), 
-                v1.ToReal2<Velocity>(), 
-                p1.ToReal2<Displacement>()));
+                p0.ToRealVector<Displacement>(), 
+                v0.ToRealVector<Velocity>(), 
+                a0.ToRealVector<Acceleration>(), 
+                a1.ToRealVector<Acceleration>(), 
+                v1.ToRealVector<Velocity>(), 
+                p1.ToRealVector<Displacement>()));
         }
 
         if (TranslationSpline.Segments.Count > 0)
@@ -399,10 +399,10 @@ internal sealed class PathEditor
             ref var component = ref rotationPoint.Get<RotationPointComponent>();
 
             // Refit rotation point on arc (assuming the arc was edited):
-            component.Parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+            component.Parameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
 
             // Remove projection errors by updating the position again:
-            position = TranslationSpline.Evaluate(component.Parameter);
+            position = TranslationSpline.Evaluate(component.Parameter).ToVector2();
 
             // Move knob to new position:
             OnControlPointChanged(rotationPoint, oldPosition, () => { }, component.HeadingMarker);
@@ -416,10 +416,10 @@ internal sealed class PathEditor
     private void ReProjectRotationPoint(Entity point)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(position.ToReal2<Displacement>());
+        var parameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
 
         point.Get<RotationPointComponent>().Parameter = parameter;
-        point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter);
+        point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
     }
 
     /// <summary>
@@ -437,7 +437,7 @@ internal sealed class PathEditor
         _rotationPoints.Sort((entity1, entity2) =>
             entity1.Get<RotationPointComponent>().Parameter.CompareTo(entity2.Get<RotationPointComponent>().Parameter));
 
-        var builder = new MappedCubicSplineBuilder();
+        var builder = new MappedQuinticSplineBuilder(1);
 
         var previousAngle = Rotation.Zero;
 
@@ -462,7 +462,10 @@ internal sealed class PathEditor
 
             previousAngle = (Rotation)angle;
 
-            builder.Add(parameter, angle);
+            builder.Add(parameter, 
+                angle.ToRealVector<Displacement>(), 
+                RealVector<Velocity>.Zero(1),
+                RealVector<Acceleration>.Zero(1));
         }
 
         builder.Build(RotationSpline);
@@ -531,7 +534,7 @@ internal sealed class PathEditor
         }
 
         batch.TexturedQuad(
-            TranslationSpline.Evaluate(TranslationSpline.Project(Coyote.Mathematics.Extensions.ToReal2<Displacement>(position))),
+            TranslationSpline.Evaluate(TranslationSpline.Project(position.ToRealVector<Displacement>())).ToVector2(),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);
     }

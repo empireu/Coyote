@@ -56,10 +56,10 @@ internal sealed class Simulator
     public double MaxAngularVelocity { get; private set; }
     public double MaxAngularAcceleration { get; private set; }
 
-    public float Dx = 0.0025f;
-    public float Dy = 0.0025f;
-    public float DTheta = MathF.PI / 32;
-    public float DParameter = 0.001f;
+    public float Dx = 0.0015f;
+    public float Dy = 0.0015f;
+    public float DTheta = MathF.PI / 64;
+    public float DParameter = 0.0005f;
 
     public bool Update(float dt, out Pose pose)
     {
@@ -104,7 +104,7 @@ internal sealed class Simulator
                             var r0 = _editor.RotationSpline.Evaluate(t0);
                             var r1 = _editor.RotationSpline.Evaluate(t1);
 
-                            return Math.Abs(r0 - r1) > RotationSplineAngleThreshold;
+                            return Math.Abs(r0[0] - r1[0]) > RotationSplineAngleThreshold;
                         }
                 );
             });
@@ -119,7 +119,7 @@ internal sealed class Simulator
                     var point = span[i];
 
                     span[i] = new CurvePose(
-                        new Pose(point.Pose.Translation, _editor.RotationSpline.Evaluate(point.Parameter)),
+                        new Pose(point.Pose.Translation, _editor.RotationSpline.Evaluate(point.Parameter)[0]),
                         point.Curvature, 
                         point.Parameter);
                 }
