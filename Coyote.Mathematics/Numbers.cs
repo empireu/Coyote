@@ -828,7 +828,7 @@ public readonly struct RealVector<TUnit> : IRealVector
 
 public static class Vectors
 {
-    // Do not use 
+    // Do not use params
 
     /// <summary>
     ///     Ensures that the <see cref="vector"/> has the specified size.

@@ -292,11 +292,11 @@ public readonly struct QuinticSplineSegmentMapped
     }
 }
 
-public sealed class MappedQuinticSpline
+public sealed class QuinticSplineMapped
 {
     private readonly List<QuinticSplineSegmentMapped> _segments = new();
 
-    public MappedQuinticSpline(int dimensions)
+    public QuinticSplineMapped(int dimensions)
     {
         if (dimensions <= 0)
         {
@@ -397,7 +397,7 @@ public sealed class MappedQuinticSpline
     }
 }
 
-public sealed class MappedQuinticSplineBuilder
+public sealed class QuinticSplineMappedBuilder
 {
     private struct SplinePoint
     {
@@ -411,7 +411,7 @@ public sealed class MappedQuinticSplineBuilder
 
     private readonly List<SplinePoint> _points = new();
 
-    public MappedQuinticSplineBuilder(int size)
+    public QuinticSplineMappedBuilder(int size)
     {
         Size = size;
     }
@@ -448,7 +448,7 @@ public sealed class MappedQuinticSplineBuilder
         return _points.Count > 1;
     }
 
-    public void Build(MappedQuinticSpline spline)
+    public void Build(QuinticSplineMapped spline)
     {
         if (!CanBuild())
         {
