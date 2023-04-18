@@ -416,30 +416,44 @@ public sealed class QuinticSplineMappedBuilder
         Size = size;
     }
 
+    SplinePoint Get(int index)
+    {
+        if (index < 0)
+        {
+            return _points[0];
+        }
+
+        if (index >= _points.Count)
+        {
+            return _points.Last();
+        }
+
+        return _points[index];
+    }
+
     public void Add(
         double key,
         RealVector<Displacement> displacement, 
         RealVector<Velocity> velocity, 
         RealVector<Acceleration> acceleration)
     {
-        Vectors.Validate(displacement, Size);
-        Vectors.Validate(velocity, Size);
-        Vectors.Validate(acceleration, Size);
-
-        if (_points.Count > 0)
-        {
-            if (key <= _points.Last().Key)
-            {
-                throw new ArgumentException("Key precedes the key of the previous point.");
-            }
-        }
-
         _points.Add(new SplinePoint
         {
             Key = key,
             Displacement = displacement,
             Velocity = velocity,
             Acceleration = acceleration
+        });
+    }
+
+    public void Add(double key, RealVector<Displacement> displacement)
+    {
+        _points.Add(new SplinePoint
+        {
+            Key = key,
+            Displacement = displacement,
+            Velocity = RealVector<Velocity>.Zero(Size),
+            Acceleration = RealVector<Acceleration>.Zero(Size)
         });
     }
 
@@ -453,21 +467,6 @@ public sealed class QuinticSplineMappedBuilder
         if (!CanBuild())
         {
             throw new InvalidOperationException("Cannot build spline with specified point set");
-        }
-
-        SplinePoint Get(int index)
-        {
-            if (index < 0)
-            {
-                return _points[0];
-            }
-
-            if (index >= _points.Count)
-            {
-                return _points.Last();
-            }
-
-            return _points[index];
         }
 
         for (var i = 1; i < _points.Count; i++)

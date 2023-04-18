@@ -653,7 +653,7 @@ public interface IRealVector
 /// <summary>
 ///     Represents a real vector with an arbitrary number of components.
 /// </summary>
-public readonly struct RealVector<TUnit> : IRealVector
+public class RealVector<TUnit> : IRealVector
 {
     private readonly double[] _values;
 
@@ -735,6 +735,30 @@ public readonly struct RealVector<TUnit> : IRealVector
         for (var i = 0; i < a.Size; i++)
         {
             values[i] = a._values[i] - b._values[i];
+        }
+
+        return new RealVector<TUnit>(values);
+    }
+
+    public static RealVector<TUnit> operator *(RealVector<TUnit> a, double scalar)
+    {
+        var values = new double[a.Size];
+
+        for (var i = 0; i < a.Size; i++)
+        {
+            values[i] = a._values[i] * scalar;
+        }
+
+        return new RealVector<TUnit>(values);
+    }
+
+    public static RealVector<TUnit> operator /(RealVector<TUnit> a, double scalar)
+    {
+        var values = new double[a.Size];
+
+        for (var i = 0; i < a.Size; i++)
+        {
+            values[i] = a._values[i] / scalar;
         }
 
         return new RealVector<TUnit>(values);

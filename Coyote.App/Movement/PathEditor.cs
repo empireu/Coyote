@@ -462,10 +462,7 @@ internal sealed class PathEditor
 
             previousAngle = (Rotation)angle;
 
-            builder.Add(parameter, 
-                angle.ToRealVector<Displacement>(), 
-                RealVector<Velocity>.Zero(1),
-                RealVector<Acceleration>.Zero(1));
+            builder.Add(parameter, angle.ToRealVector<Displacement>());
         }
 
         builder.Build(RotationSpline);

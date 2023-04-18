@@ -210,6 +210,20 @@ public static class TrajectoryGenerator
     /// </summary>
     private static void ComputeUpperVelocities(TrajectoryPoint[] poses, Intermediary[] profile, BaseTrajectoryConstraints constraints)
     {
+        // Angular Velocity:
+        for (var i = 0; i < poses.Length; i++)
+        {
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
+                (constraints.AngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
+        }
+
+        // Centripetal Acceleration:
+        for (var i = 0; i < poses.Length; i++)
+        { 
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
+                Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
+        }
+
         var awMax = constraints.AngularAcceleration;
         var atMax = constraints.LinearAcceleration;
 
@@ -356,14 +370,14 @@ public static class TrajectoryGenerator
                 if (ci1 > 0)
                 {
                     var vtwohatpos = Math.Sqrt((2 * ds * awMax) / (ci1));
-                                       
+
                     var thresh_tmp = MathExt.MaxNaN(
                         Math.Sqrt(2 * ds * atMax),
                         Math.Sqrt((-2 * ds * Sqr(awMax)) / (ci1 * (ci1 * atMax - 2 * awMax))));
 
                     thresh = MathExt.MinNaN(vtwohatpos, thresh_tmp);
 
-                    if(thresh.IsNan())
+                    if (thresh.IsNan())
                     {
                         Assert.Fail();
                     }
@@ -371,11 +385,11 @@ public static class TrajectoryGenerator
                 else if (ci1 < 0)
                 {
                     var vonehatpos = Math.Sqrt(-((2 * ds * awMax) / (ci1)));
-                  
+
                     var thresh_tmp = MathExt.MaxNaN(
-                        Math.Sqrt(2 * ds * atMax), 
+                        Math.Sqrt(2 * ds * atMax),
                         Math.Sqrt((-2 * ds * Sqr(awMax)) / (ci1 * (ci1 * atMax + 2 * awMax))));
-                    
+
                     thresh = MathExt.MinNaN(vonehatpos, thresh_tmp);
 
                     if (thresh.IsNan())
@@ -405,7 +419,7 @@ public static class TrajectoryGenerator
         for (var i = 1; i < poses.Length; i++)
         {
             profile[i - 1].LinearVelocity = Math.Min(
-                profile[i - 1].LinearVelocity, 
+                profile[i - 1].LinearVelocity,
                 Bounds(i - 1, i)).ToReal<Velocity>();
         }
 
@@ -418,20 +432,6 @@ public static class TrajectoryGenerator
         }
 
         #endregion
-
-        // Angular Velocity:
-        for (var i = 0; i < poses.Length; i++)
-        {
-            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                (constraints.AngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
-        }
-
-        // Centripetal Acceleration:
-        for (var i = 0; i < poses.Length; i++)
-        { 
-            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
-        }
     }
 
     /// <summary>
