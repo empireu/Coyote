@@ -1,5 +1,6 @@
 ﻿using System.Numerics;
 using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using GameFramework.Utilities;
 
 namespace Coyote.Mathematics;
@@ -778,10 +779,57 @@ public readonly struct RealVector<TUnit> : IRealVector
     {
         return new RealVector<TUnit>(new double[size]);
     }
+
+    public static bool operator ==(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(RealVector<TUnit> a, RealVector<TUnit> b)
+    {
+        return !a.Equals(b);
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not RealVector<TUnit> other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(RealVector<TUnit> other)
+    {
+        if (Size != other.Size)
+        {
+            return false;
+        }
+
+        return _values.SequenceEqual(other._values);
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            var hash = 17;
+
+            for (var i = 0; i < _values.Length; i++)
+            {
+                hash = hash * 31 + _values[i].GetHashCode();
+            }
+
+            return hash;
+        }
+    }
 }
 
 public static class Vectors
 {
+    // Do not use 
+
     /// <summary>
     ///     Ensures that the <see cref="vector"/> has the specified size.
     /// </summary>
@@ -809,25 +857,11 @@ public static class Vectors
         }
     }
 
-    /// <summary>
-    ///     Ensures that all vectors have the same size.
-    /// </summary>
-    /// <exception cref="Exception">Thrown if validation failed.</exception>
-    public static void ValidateMany(params IRealVector[] vectors)
+    public static void Validate(IRealVector a, IRealVector b, IRealVector c, IRealVector d, IRealVector e, IRealVector f)
     {
-        if (vectors.Length <= 1)
+        if (a.Size != b.Size || b.Size != c.Size || c.Size != d.Size || d.Size != e.Size || e.Size != f.Size)
         {
-            return;
-        }
-
-        var size = vectors[0].Size;
-
-        for (var i = 1; i < vectors.Length; i++)
-        {
-            if (vectors[i].Size != size)
-            {
-                throw new Exception("Invalid vector set");
-            }
+            throw new Exception("Vectors are not compatible");
         }
     }
 }

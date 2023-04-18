@@ -45,7 +45,7 @@ internal sealed class PathEditor
     /// <summary>
     ///     Gets the rotation spline. This spline may be empty if no rotation points are specified.
     /// </summary>
-    public MappedQuinticSpline RotationSpline { get; } = new(1);
+    public QuinticSplineMapped RotationSpline { get; } = new(1);
 
     private readonly SplineRenderer _pathRenderer = new();
 
@@ -437,7 +437,7 @@ internal sealed class PathEditor
         _rotationPoints.Sort((entity1, entity2) =>
             entity1.Get<RotationPointComponent>().Parameter.CompareTo(entity2.Get<RotationPointComponent>().Parameter));
 
-        var builder = new MappedQuinticSplineBuilder(1);
+        var builder = new QuinticSplineMappedBuilder(1);
 
         var previousAngle = Rotation.Zero;
 

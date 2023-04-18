@@ -50,7 +50,7 @@ public readonly struct QuinticSplineSegment
         RealVector<Velocity> v1,
         RealVector<Displacement> p1)
     {
-        Vectors.ValidateMany(p0, v0, a0, a1, v1, p1);
+        Vectors.Validate(p0, v0, a0, a1, v1, p1);
 
         P0 = p0;
         V0 = v0;
@@ -587,7 +587,7 @@ public static class Splines
         RealVector<Displacement> p1,
         Real<Percentage> t)
     {
-        Vectors.ValidateMany(p0, v0, a0, a1, v1, p1);
+        Vectors.Validate(p0, v0, a0, a1, v1, p1);
 
         Span<double> values = stackalloc double[p0.Size];
 
@@ -608,7 +608,7 @@ public static class Splines
         RealVector<Displacement> p1,
         Real<Percentage> t)
     {
-        Vectors.ValidateMany(p0, v0, a0, a1, v1, p1);
+        Vectors.Validate(p0, v0, a0, a1, v1, p1);
 
         Span<double> values = stackalloc double[p0.Size];
 
@@ -629,7 +629,7 @@ public static class Splines
         RealVector<Displacement> p1,
         Real<Percentage> t)
     {
-        Vectors.ValidateMany(p0, v0, a0, a1, v1, p1);
+        Vectors.Validate(p0, v0, a0, a1, v1, p1);
 
         Span<double> values = stackalloc double[p0.Size];
 
