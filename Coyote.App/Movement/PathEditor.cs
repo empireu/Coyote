@@ -47,6 +47,8 @@ internal sealed class PathEditor
     /// </summary>
     public QuinticSplineMapped RotationSpline { get; } = new(1);
 
+    public int Version;
+
     private readonly SplineRenderer _pathRenderer = new();
 
     public PathEditor(GameApplication app, World world)
@@ -121,6 +123,8 @@ internal sealed class PathEditor
         return entity;
     }
 
+    public bool CanCreateRotationPoint => TranslationSpline.Segments.Count > 0;
+
     /// <summary>
     ///     Builds a rotation point close to the specified position.
     /// </summary>
@@ -177,7 +181,10 @@ internal sealed class PathEditor
     {
         _translationPoints.Clear();
         _rotationPoints.Clear();
+        _pathRenderer.Clear();
         ArcLength = Real<Displacement>.Zero;
+        RebuildTranslation();
+        RebuildRotationSpline();
     }
 
     public bool IsTranslationPoint(Entity entity)
@@ -333,6 +340,8 @@ internal sealed class PathEditor
     /// </summary>
     public void RebuildTranslation()
     {
+        Version++;
+
         TranslationSpline.Clear();
         _pathRenderer.Clear();
 
@@ -427,6 +436,8 @@ internal sealed class PathEditor
     /// </summary>
     public void RebuildRotationSpline()
     {
+        Version++;
+
         RotationSpline.Clear();
 
         if (_rotationPoints.Count < 2)
@@ -469,19 +480,6 @@ internal sealed class PathEditor
 
         OnRotationChanged?.Invoke();
     }
-
-    public static float Closest(float a, float b)
-    {
-        var dir = b % MathF.Tau - a % MathF.Tau;
-
-        if (MathF.Abs(dir) > MathF.PI)
-        {
-            dir = -(MathF.Sign(dir) * MathF.Tau) + dir;
-        }
-
-        return dir;
-    }
-
 
     /// <summary>
     ///     Retrieves translation-specific data from the translation point.
@@ -531,7 +529,10 @@ internal sealed class PathEditor
         }
 
         batch.TexturedQuad(
-            TranslationSpline.Evaluate(TranslationSpline.Project(position.ToRealVector<Displacement>())).ToVector2(),
+            TranslationSpline.Evaluate(
+                TranslationSpline
+                    .Project(position.ToRealVector<Displacement>()))
+                .ToVector2(),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);
     }

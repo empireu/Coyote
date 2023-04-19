@@ -36,6 +36,9 @@ internal class MotionProject
     [JsonInclude]
     public JsonRotationPoint[] RotationPoints { get; set; }
 
+    [JsonInclude]
+    public int Version { get; set; }
+
     public void Load(PathEditor editor)
     {
         editor.Clear();
@@ -63,6 +66,8 @@ internal class MotionProject
         }
 
         editor.RebuildRotationSpline();
+
+        editor.Version = Version;
     }
 
     public static MotionProject FromPath(PathEditor editor)

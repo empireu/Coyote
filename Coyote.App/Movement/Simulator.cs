@@ -56,10 +56,10 @@ internal sealed class Simulator
     public double MaxAngularVelocity { get; private set; }
     public double MaxAngularAcceleration { get; private set; }
 
-    public float Dx = 0.0015f;
-    public float Dy = 0.0015f;
+    public float Dx = 0.001f;
+    public float Dy = 0.001f;
     public float DTheta = MathF.PI / 64;
-    public float DParameter = 0.0005f;
+    public float DParameter = 0.00025f;
 
     public bool Update(float dt, out Pose pose)
     {

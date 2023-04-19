@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
@@ -21,6 +22,8 @@ namespace Coyote.App.Movement;
 
 internal class MotionEditorLayer : Layer, ITabStyle
 {
+    private const double ClearForceThreshold = 0.25;
+
     private enum ToolType
     {
         TranslateAdd,
@@ -55,7 +58,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private static readonly RgbaFloat AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
     private static readonly RgbaFloat AngularVelocityColor = new(1, 0.1f, 0.5f, 1f);
     private static readonly RgbaFloat AngularAccelerationColor = new(0.5f, 1f, 0.5f, 1f);
-
 
     private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
     private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
@@ -104,8 +106,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private bool _renderRotationPoints = true;
     private bool _renderRotationTangents = true;
 
-    private bool _renderPlayerVelocity = false;
-    private bool _renderPlayerAcceleration = false;
+    private bool _renderPlayerVelocity;
+    private bool _renderPlayerAcceleration;
+    private readonly Stopwatch _clearTimer = Stopwatch.StartNew();
 
     private readonly Simulator _simulator;
 
@@ -235,7 +238,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
                     break;
                 }
             case ToolType.RotateAdd:
-                _path.CreateRotationPoint(MouseWorld);
+                if (_path.CanCreateRotationPoint)
+                {
+                    _path.CreateRotationPoint(MouseWorld);
+                }
                 break;
             case ToolType.RotateRemove:
                 {
@@ -253,6 +259,9 @@ internal class MotionEditorLayer : Layer, ITabStyle
                 throw new ArgumentOutOfRangeException();
         }
     }
+
+    private bool HasUnsavedChanges => !_app.Project.MotionProjects.ContainsKey(_motionProjectName) ||
+                                      _app.Project.MotionProjects[_motionProjectName].Version != _path.Version;
 
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
@@ -315,6 +324,23 @@ internal class MotionEditorLayer : Layer, ITabStyle
             }
 
             ImGui.EndGroup();
+
+            ImGui.Separator();
+
+            if (ImGui.Button("Clear"))
+            {
+                if (_clearTimer.Elapsed.TotalSeconds > ClearForceThreshold && HasUnsavedChanges)
+                {
+                    _app.ToastInfo("You have unsaved changes! Click \"Clear\" faster to discard!");
+                }
+                else
+                {
+                    _world.Clear();
+                    _path.Clear();
+                }
+
+                _clearTimer.Restart();
+            }
         }
 
         ImGui.End();
@@ -560,6 +586,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private void SaveProject()
     {
         var motionProject = MotionProject.FromPath(_path);
+
+        motionProject.Version = _path.Version;
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
 
