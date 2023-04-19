@@ -50,6 +50,8 @@ internal class MotionProject
             component.AccelerationMarker.Get<PositionComponent>().Position = point.Acceleration;
         }
 
+        editor.RebuildTranslation();
+
         foreach (var point in RotationPoints)
         {
             var entity = editor.CreateRotationPoint(point.Position, false);
@@ -60,7 +62,6 @@ internal class MotionProject
             component.Parameter = point.Parameter.ToReal<Percentage>();
         }
 
-        editor.RebuildTranslation();
         editor.RebuildRotationSpline();
     }
 
