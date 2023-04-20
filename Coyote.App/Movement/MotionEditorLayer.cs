@@ -48,12 +48,12 @@ internal class MotionEditorLayer : Layer, ITabStyle
         { ToolType.RotateRemove, App.Asset("Images.DeleteRotationPoint.png") }
     };
 
-    public const float FieldSize = 3.66f;
-
+    private const float FieldSize = 3.66f;
     private const float MoveSpeed = 2f;
     private const float ZoomSpeed = 25;
     private const float MinZoom = 1f;
     private const float MaxZoom = 5f;
+
     private static readonly RgbaFloat VelocityColor = new(1, 0.1f, 0.1f, 1f);
     private static readonly RgbaFloat AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
     private static readonly RgbaFloat AngularVelocityColor = new(1, 0.1f, 0.5f, 1f);
@@ -549,8 +549,10 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
                     var dx = _simulator.Dx * factor;
                     var dy = _simulator.Dy * factor;
-                    var dTheta = _simulator.DTheta * factor;
-                    var dParameter = _simulator.DParameter * factor;
+                    var dAngleTranslation = _simulator.DAngleTranslation * factor;
+                    var dParameterTranslation = _simulator.DParameterTranslation * factor;
+                    var dAngleRotation = _simulator.DAngleRotation * factor;
+                    var dParameterRotation = _simulator.DParameterRotation * factor;
 
                     if (ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
                     {
@@ -562,14 +564,24 @@ internal class MotionEditorLayer : Layer, ITabStyle
                         _simulator.Dy = dy / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DTheta {factor}", ref dTheta, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    if (ImGui.SliderFloat($"DAngleT {factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
                     {
-                        _simulator.DTheta = dTheta / factor;
+                        _simulator.DAngleTranslation = dAngleTranslation / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DParam {factor}", ref dParameter, 0.001f, 10))
+                    if (ImGui.SliderFloat($"DParamT {factor}", ref dParameterTranslation, 0.001f, 10))
                     {
-                        _simulator.DParameter = dParameter / factor;
+                        _simulator.DParameterTranslation = dParameterTranslation / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DAngleR {factor}", ref dAngleRotation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    {
+                        _simulator.DAngleRotation = dAngleTranslation / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DParamR {factor}", ref dParameterRotation, 0.001f, 10))
+                    {
+                        _simulator.DParameterRotation = dParameterTranslation / factor;
                     }
 
                     if (ImGui.Button("Re-generate"))

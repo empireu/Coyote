@@ -7,14 +7,13 @@ namespace Coyote.App.Movement;
 
 internal sealed class Simulator
 {
+    /// <summary>
+    ///     Controls how often the trajectory is updated when editing.
+    /// </summary>
     private const double EditTimeRefreshThreshold = 0.5;
-
-    private const double RotationSplineSplitThreshold = 0.1;
-    private const double RotationSplineAngleThreshold = 0.01;
 
     private readonly App _app;
     private readonly PathEditor _editor;
-
     private readonly Stopwatch _editTime = Stopwatch.StartNew();
 
     public Trajectory? Trajectory { get; private set; }
@@ -58,8 +57,10 @@ internal sealed class Simulator
 
     public float Dx = 0.001f;
     public float Dy = 0.001f;
-    public float DTheta = MathF.PI / 64;
-    public float DParameter = 0.00025f;
+    public float DAngleTranslation = MathF.PI / 64;
+    public float DParameterTranslation = 0.00025f;
+    public float DAngleRotation = MathF.PI / 64;
+    public float DParameterRotation = 0.00025f;
 
     public bool Update(float dt, out Pose pose)
     {
@@ -89,14 +90,14 @@ internal sealed class Simulator
                     _editor.TranslationSpline,
                     Real<Percentage>.Zero,
                     Real<Percentage>.One,
-                    new Real<Percentage>(DParameter),
-                    new Twist(Dx, Dy, DTheta),
+                    new Real<Percentage>(DParameterTranslation),
+                    new Twist(Dx, Dy, DAngleTranslation),
                     int.MaxValue,
                     _editor.RotationSpline.IsEmpty
                         ? null
                         : (t0, t1) =>
                         {
-                            if ((t0 - t1).Abs() > RotationSplineSplitThreshold)
+                            if ((t0 - t1).Abs() > DParameterRotation)
                             {
                                 return true;
                             }
@@ -104,7 +105,7 @@ internal sealed class Simulator
                             var r0 = _editor.RotationSpline.Evaluate(t0);
                             var r1 = _editor.RotationSpline.Evaluate(t1);
 
-                            return Math.Abs(r0[0] - r1[0]) > RotationSplineAngleThreshold;
+                            return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
                         }
                 );
             });

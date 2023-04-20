@@ -13,7 +13,9 @@
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
-    <None Remove="Assets\Images\DeleteRotationPoint.png" />
+    <None Remove="Assets\Images\
+		  
+tationPoint.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
     <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />

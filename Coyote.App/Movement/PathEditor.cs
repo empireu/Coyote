@@ -323,7 +323,7 @@ internal sealed class PathEditor
     /// <param name="oldPosition">The old position of the entity.</param>
     /// <param name="trajectoryCallback">Callback for trajectory updates, if needed.</param>
     /// <param name="knobs">The child knobs. They will be displaced to match the new position of the parent.</param>
-    private void OnControlPointChanged(Entity entity, Vector2 oldPosition, Action trajectoryCallback, params Entity[] knobs)
+    private static void OnControlPointChanged(Entity entity, Vector2 oldPosition, Action trajectoryCallback, params Entity[] knobs)
     {
         var displacement = entity.Get<PositionComponent>().Position - oldPosition;
 
@@ -350,6 +350,8 @@ internal sealed class PathEditor
         if (_translationPoints.Count < 2)
         {
             DestroyRotationPoints();
+
+            OnTranslationChanged?.Invoke();
 
             return;
         }
@@ -442,6 +444,7 @@ internal sealed class PathEditor
 
         if (_rotationPoints.Count < 2)
         {
+            OnRotationChanged?.Invoke();
             return;
         }
 
@@ -516,11 +519,18 @@ internal sealed class PathEditor
         parameter = (float)markers.Parameter;
     }
 
+    /// <summary>
+    ///     Renders the translation path.
+    /// </summary>
+    /// <param name="batch"></param>
     public void SubmitPath(QuadBatch batch)
     {
         _pathRenderer.Submit(batch);
     }
 
+    /// <summary>
+    ///     Submits an indicator on the translation path using a projection of <see cref="position"/>.
+    /// </summary>
     public void SubmitIndicator(QuadBatch batch, Vector2 position)
     {
         if (TranslationSpline.Segments.Count == 0)
