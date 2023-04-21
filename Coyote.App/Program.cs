@@ -28,7 +28,6 @@ using var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<GameApplication>(s => s.GetRequiredService<App>());
 
         services.AddTransient<MotionEditorLayer>();
-        services.AddSingleton<TestLayer>();
     })
     .Build();
 

@@ -119,8 +119,6 @@ internal class App : GameApplication
 
             imGui.Submit += ImGuiOnSubmit;
         });
-
-        _layerController.Add(Layers.ConstructLayer<TestLayer>().Also(l => l.Disable()));
     }
 
     private string GetProjectFile(string name)
@@ -199,6 +197,8 @@ internal class App : GameApplication
                     {
                         disposable.Dispose();
                     }
+
+                    _layerController.Selected.IsEnabled = false;
 
                     Layers.RemoveLayer(_layerController.Selected);
 
