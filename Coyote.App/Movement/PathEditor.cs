@@ -17,8 +17,10 @@ internal sealed class PathEditor : IDisposable
     private const float PositionKnobSize = 0.05f;
     private const float RotationKnobSize = 0.035f;
     private const float IndicatorSize = 0.025f;
-    private const float KnobSensitivity = 5;
     private const float AddToEndThreshold = 0.05f;
+
+    // Required for robot code:
+    public float KnobSensitivity = 5;
 
     private readonly World _world;
 
@@ -491,7 +493,7 @@ internal sealed class PathEditor : IDisposable
     /// <param name="position">The world position of the translation point.</param>
     /// <param name="velocity">The relative velocity vector.</param>
     /// <param name="acceleration">The relative acceleration vector.</param>
-    private static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
+    private void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
     {
         position = translationPoint.Get<PositionComponent>().Position;
         var markers = translationPoint.Get<TranslationPointComponent>();

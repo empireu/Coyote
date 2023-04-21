@@ -61,6 +61,9 @@ internal class MotionProject
     public JsonRotationPoint[] RotationPoints { get; set; }
 
     [JsonInclude]
+    public float Scale { get; set; }
+
+    [JsonInclude]
     public JsonMotionConstraints Constraints { get; set; }
 
     [JsonInclude]
@@ -72,6 +75,7 @@ internal class MotionProject
     public void Load(PathEditor editor)
     {
         editor.Clear();
+        editor.KnobSensitivity = Scale;
 
         foreach (var point in TranslationPoints)
         {
@@ -134,6 +138,8 @@ internal class MotionProject
                 Parameter = (float)entity.Get<RotationPointComponent>().Parameter.Value
             };
         }
+
+        project.Scale = editor.KnobSensitivity;
 
         return project;
     }
