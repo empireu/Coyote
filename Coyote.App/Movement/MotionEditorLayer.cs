@@ -593,12 +593,12 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
                     if (ImGui.SliderFloat($"DAngleR {factor}", ref dAngleRotation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
                     {
-                        _simulator.DAngleRotation = dAngleTranslation / factor;
+                        _simulator.DAngleRotation = dAngleRotation / factor;
                     }
 
                     if (ImGui.SliderFloat($"DParamR {factor}", ref dParameterRotation, 0.001f, 10))
                     {
-                        _simulator.DParameterRotation = dParameterTranslation / factor;
+                        _simulator.DParameterRotation = dParameterRotation / factor;
                     }
                 }
             }
@@ -612,6 +612,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         var motionProject = MotionProject.FromPath(_path);
 
         motionProject.Version = _path.Version;
+       
         motionProject.Constraints = new JsonMotionConstraints
         {
             LinearVelocity = _simulator.MaxLinearVelocity,
@@ -619,6 +620,16 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             AngularVelocity = Angles.ToRadians(_simulator.MaxAngularVelocity),
             AngularAcceleration = Angles.ToRadians(_simulator.MaxAngularAcceleration),
             CentripetalAcceleration = _simulator.MaxCentripetalAcceleration
+        };
+
+        motionProject.Parameters = new JsonGenerationParameters
+        {
+            Dx = _simulator.Dx,
+            Dy = _simulator.Dy,
+            DAngleTranslation = _simulator.DAngleTranslation,
+            DParameterTranslation = _simulator.DParameterTranslation,
+            DAngleRotation = _simulator.DAngleRotation,
+            DParameterRotation = _simulator.DParameterRotation,
         };
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
@@ -634,12 +645,19 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         motionProject.Load(_path);
 
-        // Load constraints:
         _simulator.MaxLinearVelocity = (float)motionProject.Constraints.LinearVelocity;
         _simulator.MaxLinearAcceleration = (float)motionProject.Constraints.LinearAcceleration;
         _simulator.MaxCentripetalAcceleration = (float)motionProject.Constraints.CentripetalAcceleration;
         _simulator.MaxAngularVelocity = Angles.ToDegrees((float)motionProject.Constraints.AngularVelocity);
         _simulator.MaxAngularAcceleration = Angles.ToDegrees((float)motionProject.Constraints.AngularAcceleration);
+
+        var parameters = motionProject.Parameters;
+        _simulator.Dx = parameters.Dx;
+        _simulator.Dy = parameters.Dy;
+        _simulator.DAngleTranslation = parameters.DAngleTranslation;
+        _simulator.DParameterTranslation = parameters.DParameterTranslation;
+        _simulator.DAngleRotation = parameters.DAngleRotation;
+        _simulator.DParameterRotation = parameters.DParameterRotation;
     }
 
     protected override void Resize(Size size)

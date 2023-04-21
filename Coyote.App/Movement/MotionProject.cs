@@ -42,6 +42,16 @@ internal struct JsonMotionConstraints
     public double CentripetalAcceleration { get; set; }
 }
 
+internal struct JsonGenerationParameters
+{
+    public float Dx { get; set; }
+    public float Dy { get; set; }
+    public float DAngleTranslation { get; set; }
+    public float DParameterTranslation { get; set; }
+    public float DAngleRotation { get; set; }
+    public float DParameterRotation { get; set; }
+}
+
 internal class MotionProject
 {
     [JsonInclude]
@@ -52,6 +62,9 @@ internal class MotionProject
 
     [JsonInclude]
     public JsonMotionConstraints Constraints { get; set; }
+
+    [JsonInclude]
+    public JsonGenerationParameters Parameters { get; set; }
 
     [JsonInclude]
     public int Version { get; set; }
