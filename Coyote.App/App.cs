@@ -41,7 +41,6 @@ internal class App : GameApplication
 
     private string _projectName = "";
     private int _selectedIndex;
-    private bool _showProjectSettings;
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
@@ -159,34 +158,8 @@ internal class App : GameApplication
             if (ImGui.Button("Save"))
             {
                 Project.Save();
-            }
 
-            if (ImGui.Button("Project Settings"))
-            {
-                _showProjectSettings = true;
-            }
-
-            if (_showProjectSettings)
-            {
-                if (ImGui.Begin("Project Settings", ref _showProjectSettings))
-                {
-                    var maxVelocity = (float)(_project.Constraints.MaxVelocity).Value;
-                    var maxAcceleration = (float)(_project.Constraints.MaxAcceleration).Value;
-
-                    var changed = false;
-
-                    changed |= ImGui.SliderFloat("Max Velocity", ref maxVelocity, 0, 5);
-                    changed |= ImGui.SliderFloat("Max Acceleration", ref maxAcceleration, 0, 5);
-
-                    _project.Constraints = new MotionConstraints(maxVelocity, maxAcceleration);
-
-                    if (changed)
-                    {
-                        Project.SetChanged();
-                    }
-                }
-
-                ImGui.End();
+                ToastInfo("Saved");
             }
 
             if (_layerController.Selected != null)
@@ -343,7 +316,6 @@ internal class App : GameApplication
         {
             FileName = name,
             MotionProjects = new Dictionary<string, MotionProject>(),
-            Constraints = MotionConstraints.Default
         };
 
         _project.SetChanged();

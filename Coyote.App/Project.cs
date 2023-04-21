@@ -14,9 +14,6 @@ internal sealed class Project
     [JsonInclude]
     public Dictionary<string, MotionProject> MotionProjects { get; init; }
 
-    [JsonInclude]
-    public MotionConstraints Constraints { get; set; }
-
     [JsonIgnore]
     public bool IsChanged { get; private set; }
 

@@ -7,30 +7,6 @@ using static System.Double;
 
 namespace Coyote.Mathematics;
 
-public readonly struct MotionConstraints
-{
-    public static readonly MotionConstraints Default = new(1.5f, 1f);
-
-    [JsonInclude]
-    public Real<Velocity> MaxVelocity { get; }
-
-    [JsonInclude]
-    public Real<Acceleration> MaxAcceleration { get; }
-
-    [JsonConstructor]
-    public MotionConstraints(Real<Velocity> maxVelocity, Real<Acceleration> maxAcceleration)
-    {
-        MaxVelocity = maxVelocity;
-        MaxAcceleration = maxAcceleration;
-    }
-
-    public MotionConstraints(double maxVelocity, double maxAcceleration)
-    {
-        MaxVelocity = maxVelocity.ToReal<Velocity>();
-        MaxAcceleration = maxAcceleration.ToReal<Acceleration>();
-    }
-}
-
 public struct TrajectoryPoint
 {
     public CurvePose CurvePose;
@@ -86,10 +62,15 @@ public sealed class BaseTrajectoryConstraints
         CentripetalAcceleration = centripetalAcceleration;
     }
 
+    [JsonInclude]
     public Real<Velocity> LinearVelocity { get; }
+    [JsonInclude]
     public Real<Acceleration> LinearAcceleration { get; }
+    [JsonInclude]
     public Real<AngularVelocity> AngularVelocity { get; }
+    [JsonInclude]
     public Real<AngularAcceleration> AngularAcceleration { get; }
+    [JsonInclude]
     public Real<CentripetalAcceleration> CentripetalAcceleration { get; }
 }
 

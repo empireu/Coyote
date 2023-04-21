@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
@@ -489,22 +490,36 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
                 var lastPoint = _simulator.Last;
 
+                if (ImGui.Button("Re-generate"))
+                {
+                    _simulator.InvalidateTrajectory();
+                }
+
+                if (ImGui.CollapsingHeader("Motion Constraints"))
+                {
+                    ImGui.SliderFloat("Lin Velocity", ref _simulator.MaxLinearVelocity, 0.1f, 5f);
+                    ImGui.SliderFloat("Lin Acceleration", ref _simulator.MaxLinearAcceleration, 0.1f, 5f);
+                    ImGui.SliderFloat("Centripetal Acceleration²", ref _simulator.MaxCentripetalAcceleration, 0.1f, 5f);
+                    ImGui.SliderFloat("Ang Velocity", ref _simulator.MaxAngularVelocity, 10, 720);
+                    ImGui.SliderFloat("Ang Acceleration", ref _simulator.MaxAngularAcceleration, 10, 720);
+                }
+
                 if (ImGui.CollapsingHeader("Kinematics"))
                 {
                     ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
 
-                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxVelocity:F4} m/s");
+                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
                     ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxAcceleration:F4} m/s²");
+                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
                     ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxAngularVelocity:F4} rad/s");
+                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxAngularAcceleration:F4} rad/s²");
+                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
                     ImGui.Separator();
 
                     ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
@@ -585,11 +600,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     {
                         _simulator.DParameterRotation = dParameterTranslation / factor;
                     }
-
-                    if (ImGui.Button("Re-generate"))
-                    {
-                        _simulator.InvalidateTrajectory();
-                    }
                 }
             }
 
@@ -602,6 +612,14 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         var motionProject = MotionProject.FromPath(_path);
 
         motionProject.Version = _path.Version;
+        motionProject.Constraints = new JsonMotionConstraints
+        {
+            LinearVelocity = _simulator.MaxLinearVelocity,
+            LinearAcceleration = _simulator.MaxLinearAcceleration,
+            AngularVelocity = Angles.ToRadians(_simulator.MaxAngularVelocity),
+            AngularAcceleration = Angles.ToRadians(_simulator.MaxAngularAcceleration),
+            CentripetalAcceleration = _simulator.MaxCentripetalAcceleration
+        };
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
 
@@ -615,6 +633,13 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         _world.Clear();
 
         motionProject.Load(_path);
+
+        // Load constraints:
+        _simulator.MaxLinearVelocity = (float)motionProject.Constraints.LinearVelocity;
+        _simulator.MaxLinearAcceleration = (float)motionProject.Constraints.LinearAcceleration;
+        _simulator.MaxCentripetalAcceleration = (float)motionProject.Constraints.CentripetalAcceleration;
+        _simulator.MaxAngularVelocity = Angles.ToDegrees((float)motionProject.Constraints.AngularVelocity);
+        _simulator.MaxAngularAcceleration = Angles.ToDegrees((float)motionProject.Constraints.AngularAcceleration);
     }
 
     protected override void Resize(Size size)

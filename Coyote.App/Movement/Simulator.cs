@@ -50,10 +50,10 @@ internal sealed class Simulator : IDisposable
 
     public float Speed = 1;
 
-    public double MaxVelocity { get; private set; }
-    public double MaxAcceleration { get; private set; }
-    public double MaxAngularVelocity { get; private set; }
-    public double MaxAngularAcceleration { get; private set; }
+    public double MaxProfileVelocity { get; private set; }
+    public double MaxProfileAcceleration { get; private set; }
+    public double MaxProfileAngularVelocity { get; private set; }
+    public double MaxProfileAngularAcceleration { get; private set; }
 
     public float Dx = 0.001f;
     public float Dy = 0.001f;
@@ -61,6 +61,12 @@ internal sealed class Simulator : IDisposable
     public float DParameterTranslation = 0.00025f;
     public float DAngleRotation = MathF.PI / 64;
     public float DParameterRotation = 0.00025f;
+
+    public float MaxLinearVelocity = 1.5f;
+    public float MaxLinearAcceleration = 1f;
+    public float MaxCentripetalAcceleration = 0.5f;
+    public float MaxAngularVelocity = 180f;
+    public float MaxAngularAcceleration = 140f;
 
     public bool Update(float dt, out Pose pose)
     {
@@ -130,19 +136,19 @@ internal sealed class Simulator : IDisposable
             var generateTime = Measurements.MeasureTimeSpan(() =>
             {
                 Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
-                    new Real<Velocity>(2.5),
-                    new Real<Acceleration>(1.7),
-                    new Real<AngularVelocity>(Angles.ToRadians(220)),
-                    new Real<AngularAcceleration>(Angles.ToRadians(200)),
-                    new Real<CentripetalAcceleration>(1)), out trajectoryPoints);
+                    new Real<Velocity>(MaxLinearVelocity),
+                    new Real<Acceleration>(MaxLinearAcceleration),
+                    new Real<AngularVelocity>(Angles.ToRadians(MaxAngularVelocity)),
+                    new Real<AngularAcceleration>(Angles.ToRadians(MaxAngularAcceleration)),
+                    new Real<CentripetalAcceleration>(MaxCentripetalAcceleration)), out trajectoryPoints);
             });
 
             Assert.NotNull(ref trajectoryPoints);
 
-            MaxVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
-            MaxAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
-            MaxAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
-            MaxAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
+            MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
+            MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
+            MaxProfileAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
+            MaxProfileAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
 
             TotalTime = (float)Trajectory!.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;

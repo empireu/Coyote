@@ -28,6 +28,20 @@ internal struct JsonRotationPoint
     public float Parameter { get; set; }
 }
 
+internal struct JsonMotionConstraints
+{
+    [JsonInclude]
+    public double LinearVelocity { get; set; }
+    [JsonInclude]
+    public double LinearAcceleration { get; set; }
+    [JsonInclude]
+    public double AngularVelocity { get; set; }
+    [JsonInclude]
+    public double AngularAcceleration { get; set; }
+    [JsonInclude]
+    public double CentripetalAcceleration { get; set; }
+}
+
 internal class MotionProject
 {
     [JsonInclude]
@@ -35,6 +49,9 @@ internal class MotionProject
 
     [JsonInclude]
     public JsonRotationPoint[] RotationPoints { get; set; }
+
+    [JsonInclude]
+    public JsonMotionConstraints Constraints { get; set; }
 
     [JsonInclude]
     public int Version { get; set; }
