@@ -86,4 +86,72 @@ internal static class Extensions
     {
         return new Vector2(v.X, v.Y);
     }
+
+    /// <summary>
+    ///     Iterates over the items.
+    /// </summary>
+    /// <param name="enumerable"></param>
+    /// <param name="body">The function to invoke. If false is returned, iteration will end there.</param>
+    /// <returns>The original list.</returns>
+    public static void ForEach<TItem>(this IEnumerable<TItem> enumerable, Func<TItem, bool> body)
+    {
+        foreach (var item in enumerable)
+        {
+            if (!body(item))
+            {
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Iterates over the list of items.
+    /// </summary>
+    /// <param name="list"></param>
+    /// <param name="body">The function to invoke.</param>
+    /// <returns>The original list.</returns>
+    public static void ForEach<TItem>(this IEnumerable<TItem> list, Action<TItem> body)
+    {
+        foreach (var item in list)
+        {
+            body(item);
+        }
+    }
+
+    /// <summary>
+    ///     Iterates over the list of items.  This calls <see cref="ForEach{TList,TItem}"/>
+    ///     Afterwards, the list is cleared.
+    /// </summary>
+    /// <param name="list"></param>
+    /// <param name="body">The function to invoke. If false is returned, iteration will end there.</param>
+    /// <returns>The original list.</returns>
+    public static void RemoveAll<TItem>(this IList<TItem> list, Func<TItem, bool> body)
+    {
+        list.ForEach(body);
+        list.Clear();
+    }
+
+    /// <summary>
+    ///     Iterates over the list of items.
+    ///     Afterwards, the list is cleared.
+    /// </summary>
+    /// <param name="list"></param>
+    /// <param name="body">The function to invoke.</param>
+    /// <returns>The original list.</returns>
+    public static void RemoveAll<TItem>(this IList<TItem> list, Action<TItem> body)
+    {
+        list.ForEach(body);
+        list.Clear();
+    }
+
+    public static T Also<T>(this T obj, Action<T> action)
+    {
+        action(obj);
+        return obj;
+    }
+
+    public static T2 Map<T1, T2>(this T1 t1, Func<T1, T2> function)
+    {
+        return function(t1);
+    }
 }

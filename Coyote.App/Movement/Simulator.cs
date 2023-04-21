@@ -5,7 +5,7 @@ using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
 
-internal sealed class Simulator
+internal sealed class Simulator : IDisposable
 {
     /// <summary>
     ///     Controls how often the trajectory is updated when editing.
@@ -164,5 +164,10 @@ internal sealed class Simulator
         PlayTime += dt * Speed;
 
         return true;
+    }
+
+    public void Dispose()
+    {
+        
     }
 }

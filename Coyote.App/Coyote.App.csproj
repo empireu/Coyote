@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -13,10 +13,9 @@
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
-    <None Remove="Assets\Images\
-		  
-tationPoint.png" />
+    <None Remove="Assets\Images\&#xD;&#xA;		  &#xD;&#xA;tationPoint.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
+    <None Remove="Assets\Images\MotionEditorTab.png" />
     <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
@@ -33,6 +32,7 @@ tationPoint.png" />
     <EmbeddedResource Include="Assets\Images\Arrow.png" />
     <EmbeddedResource Include="Assets\Images\DeleteRotationPoint.png" />
     <EmbeddedResource Include="Assets\Images\DeleteTranslationPoint.png" />
+    <EmbeddedResource Include="Assets\Images\MotionEditorTab.png" />
     <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
     <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />

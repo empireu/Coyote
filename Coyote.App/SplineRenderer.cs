@@ -5,7 +5,7 @@ using Veldrid;
 
 namespace Coyote.App;
 
-public sealed class SplineRenderer
+public sealed class SplineRenderer : IDisposable
 {
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
@@ -47,5 +47,10 @@ public sealed class SplineRenderer
 
             batch.Line(start.Pose.Translation, end.Pose.Translation, LineColor, LineThickness);
         }
+    }
+
+    public void Dispose()
+    {
+
     }
 }

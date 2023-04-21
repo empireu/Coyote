@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Diagnostics;
+using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
 using Coyote.Mathematics;
@@ -7,11 +8,13 @@ using GameFramework.Assets;
 using GameFramework.Extensions;
 using GameFramework.Gui;
 using GameFramework.ImGui;
+using GameFramework.Layers;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Renderer.Text;
 using GameFramework.Scene;
 using GameFramework.Utilities;
+using GameFramework.Utilities.Extensions;
 using ImGuiNET;
 using Microsoft.Extensions.DependencyInjection;
 using Veldrid;
@@ -22,7 +25,7 @@ internal class App : GameApplication
 {
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
-
+    private static readonly Vector2 TabSize = new(12, 12);
     private readonly IServiceProvider _serviceProvider;
     
     public SdfFont Font { get; }
@@ -30,13 +33,11 @@ internal class App : GameApplication
 
     private readonly QuadBatch _toastBatch;
     private readonly QuadBatch _slideShowBatch;
-
-    private LayerController? _layerController;
+    private readonly LayerController _layerController = new();
 
     private Project? _project;
 
     private readonly string[] _detectedFiles;
-
 
     private string _projectName = "";
     private int _selectedIndex;
@@ -47,6 +48,10 @@ internal class App : GameApplication
     private readonly OrthographicCameraController2D _fullCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
 
     private readonly Sprite _wallpaper;
+
+    private readonly List<RegisteredLayer> _tabLayers = new();
+
+    private readonly Stopwatch _loadSw = new Stopwatch();
 
     public App(IServiceProvider serviceProvider)
     {
@@ -71,8 +76,15 @@ internal class App : GameApplication
         _slideShowBatch = new QuadBatch(this);
 
         _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
+        
+        RegisterTab("+T", "MotionEditorTab", () => Layers.ConstructLayer<MotionEditorLayer>());
 
         ResizeCamera();
+    }
+
+    private void RegisterTab(string label, string texture, Func<Layer> factory)
+    {
+        _tabLayers.Add(new RegisteredLayer(label, Resources.AssetManager.GetView(Asset($"Images.{texture}.png")), factory));
     }
 
     private void ResizeCamera()
@@ -104,15 +116,11 @@ internal class App : GameApplication
 
             ImGui.LoadIniSettingsFromDisk("imgui.ini");
 
+
             imGui.Submit += ImGuiOnSubmit;
         });
 
-        _layerController = new LayerController(
-            Layers.ConstructLayer<MotionEditorLayer>(),
-            Layers.ConstructLayer<TestLayer>()
-        );
-
-        _layerController.Selected.Disable();
+        _layerController.Add(Layers.ConstructLayer<TestLayer>().Also(l => l.Disable()));
     }
 
     private string GetProjectFile(string name)
@@ -122,7 +130,23 @@ internal class App : GameApplication
 
     private void ImGuiOnSubmit(ImGuiRenderer obj)
     {
-        Assert.NotNull(ref _layerController);
+        if (!_loadSw.IsRunning)
+        {
+            _loadSw.Start();
+            ToastInfo("Loading... Please wait!");
+        }
+
+        if (_loadSw.Elapsed.TotalSeconds >= ToastManagerOptions.DefaultEaseIn)
+        {
+            // pre-load
+            // This is the lazy solution.
+
+            Resources.AssetManager.GetSpriteForTexture(Asset("Images.PowerPlayField.jpg"));
+            Resources.AssetManager.GetSpriteForTexture(Asset("Images.Robot.png"));
+            Resources.AssetManager.GetSpriteForTexture(Asset("Images.Arrow.png"));
+        }
+
+        var imGui = _serviceProvider.GetRequiredService<ImGuiLayer>();
 
         ImGui.DockSpaceOverViewport(ImGui.GetMainViewport(), ImGuiDockNodeFlags.PassthruCentralNode);
 
@@ -134,33 +158,7 @@ internal class App : GameApplication
 
         if (ImGui.BeginMainMenuBar())
         {
-            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
-
-            foreach (var layerIndex in _layerController.Indices)
-            {
-                var isSelected = layerIndex == _layerController.SelectedIndex;
-                var style = _layerController[layerIndex] as ITabStyle;
-
-                if (isSelected)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Button, style?.SelectedColor ?? new Vector4(0.5f, 0.3f, 0.1f, 0.5f));
-                }
-                else
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Button, style?.IdleColor ?? new Vector4(0.1f, 0.7f, 0.8f, 0.5f));
-                }
-
-                if (ImGui.Button(_layerController[layerIndex].ToString()))
-                {
-                    _layerController.Select(layerIndex);
-                }
-
-                ImGui.PopStyleColor();
-            }
-
-            ImGui.PopStyleVar();
-
-            if(ImGui.Button("Save"))
+            if (ImGui.Button("Save"))
             {
                 Project.Save();
             }
@@ -192,6 +190,85 @@ internal class App : GameApplication
 
                 ImGui.End();
             }
+
+            if (_layerController.Selected != null)
+            {
+                if (ImGui.Button("Close Tab"))
+                {
+                    if (_layerController.Selected is IDisposable disposable)
+                    {
+                        disposable.Dispose();
+                    }
+
+                    Layers.RemoveLayer(_layerController.Selected);
+
+                    _layerController.Remove(_layerController.Selected);
+
+                    if (_layerController.Layers.Any())
+                    {
+                        _layerController.SwitchSelection(_layerController.Layers.Last());
+                    }
+                }
+            }
+
+            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 0f);
+
+            var histogram = new Dictionary<string, int>();
+
+            _layerController.Layers.ForEach(layer =>
+            {
+                var style = layer as ITabStyle;
+
+                if (layer.IsEnabled)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, style?.SelectedColor ?? new Vector4(0.5f, 0.3f, 0.1f, 0.5f));
+                }
+                else
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Button, style?.IdleColor ?? new Vector4(0.1f, 0.7f, 0.8f, 0.5f));
+                }
+
+                var layerName = layer.ToString()!;
+                histogram.AddOrUpdate(layerName, _ => 1, i => histogram[i] + 1);
+
+                if (ImGui.Button($"{histogram[layerName]} {layerName}"))
+                {
+                    _layerController.SwitchSelection(layer);
+                }
+
+                ImGui.PopStyleColor();
+            });
+
+            ImGui.PopStyleVar();
+
+            var addLayers = new List<Layer>();
+
+            for (var i = 0; i < _tabLayers.Count; i++)
+            {
+                var tab = _tabLayers[i];
+               
+                if (ImGui.ImageButton($"{i} {tab.Label}", imGui.Renderer.GetOrCreateImGuiBinding(Resources.Factory, tab.TabView), TabSize))
+                {
+                    addLayers.Add(tab.Factory());
+                }
+            }
+
+            addLayers.RemoveAll(l =>
+            {
+                _layerController.Add(l);
+
+                if (_layerController.Selected == null && l == addLayers.Last())
+                {
+                    _layerController.SwitchSelection(l);
+                }
+                else
+                {
+                    if (l.IsEnabled)
+                    {
+                        l.Disable();
+                    }
+                }
+            });
         }
 
         ImGui.EndMainMenuBar();
@@ -227,7 +304,6 @@ internal class App : GameApplication
                             {
                                 CreateProject(name);
                                 ToastInfo("Created Project");
-                                _layerController!.Selected.Enable();
                             }
                         }
                     }
@@ -246,8 +322,6 @@ internal class App : GameApplication
                             _project = Project.Load(_detectedFiles[_selectedIndex]);
 
                             ToastInfo("Loaded Project");
-
-                            _layerController!.Selected.Enable();
                         }
                     }
 
@@ -300,5 +374,19 @@ internal class App : GameApplication
         _toastBatch.Submit();
 
         base.AfterRender(frameInfo);
+    }
+
+    private sealed class RegisteredLayer
+    {
+        public string Label { get; }
+        public TextureView TabView { get; }
+        public Func<Layer> Factory { get; }
+
+        public RegisteredLayer(string label, TextureView tabView, Func<Layer> factory)
+        {
+            Label = label;
+            TabView = tabView;
+            Factory = factory;
+        }
     }
 }

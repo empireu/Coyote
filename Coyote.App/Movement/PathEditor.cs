@@ -10,7 +10,7 @@ using GameFramework.Utilities;
 
 namespace Coyote.App.Movement;
 
-internal sealed class PathEditor
+internal sealed class PathEditor : IDisposable
 {
     private const float InitialTranslation = 0.1f;
     private const float InitialKnobSize = 0.025f;
@@ -491,7 +491,7 @@ internal sealed class PathEditor
     /// <param name="position">The world position of the translation point.</param>
     /// <param name="velocity">The relative velocity vector.</param>
     /// <param name="acceleration">The relative acceleration vector.</param>
-    public static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
+    private static void UnpackTranslation(Entity translationPoint, out Vector2 position, out Vector2 velocity, out Vector2 acceleration)
     {
         position = translationPoint.Get<PositionComponent>().Position;
         var markers = translationPoint.Get<TranslationPointComponent>();
@@ -510,7 +510,7 @@ internal sealed class PathEditor
     /// <param name="position">The world position of the rotation point.</param>
     /// <param name="heading">The relative heading vector.</param>
     /// <param name="parameter">The translation parameter of the rotation point.</param>
-    public static void UnpackRotation(Entity rotationPoint, out Vector2 position, out Vector2 heading, out float parameter)
+    private static void UnpackRotation(Entity rotationPoint, out Vector2 position, out Vector2 heading, out float parameter)
     {
         position = rotationPoint.Get<PositionComponent>().Position;
         var markers = rotationPoint.Get<RotationPointComponent>();
@@ -522,7 +522,6 @@ internal sealed class PathEditor
     /// <summary>
     ///     Renders the translation path.
     /// </summary>
-    /// <param name="batch"></param>
     public void SubmitPath(QuadBatch batch)
     {
         _pathRenderer.Submit(batch);
@@ -549,4 +548,9 @@ internal sealed class PathEditor
 
     public event Action? OnTranslationChanged;
     public event Action? OnRotationChanged;
+
+    public void Dispose()
+    {
+        _pathRenderer.Dispose();
+    }
 }

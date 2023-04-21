@@ -20,7 +20,7 @@ using Point = System.Drawing.Point;
 
 namespace Coyote.App.Movement;
 
-internal class MotionEditorLayer : Layer, ITabStyle
+internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 {
     private const double ClearForceThreshold = 0.25;
 
@@ -105,7 +105,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private bool _renderTranslationAccelerationPoints = true;
     private bool _renderRotationPoints = true;
     private bool _renderRotationTangents = true;
-
     private bool _renderPlayerVelocity;
     private bool _renderPlayerAcceleration;
     private readonly Stopwatch _clearTimer = Stopwatch.StartNew();
@@ -113,6 +112,8 @@ internal class MotionEditorLayer : Layer, ITabStyle
     private readonly Simulator _simulator;
 
     private float _dt;
+
+    private bool _disposed;
 
     public MotionEditorLayer(App app, ImGuiLayer imGuiLayer)
     {
@@ -122,25 +123,23 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
         imGuiLayer.Submit += ImGuiLayerOnSubmit;
 
-        _cameraController = new OrthographicCameraController2D(
-            new OrthographicCamera(0, -1, 1),
-            translationInterpolate: 15f,
-            zoomInterpolate: 10);
-
-        _cameraController.FutureZoom = FieldSize;
-
-        _editorBatch = new QuadBatch(app);
-        _playerBatch = new QuadBatch(app)
+        _cameraController = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1), translationInterpolate: 15f, zoomInterpolate: 10)
         {
-            Effects = QuadBatchEffects.None with
+            FutureZoom = FieldSize
+        };
+
+        _editorBatch = app.Resources.BatchPool.Get();
+        _playerBatch = app.Resources.BatchPool.Get().Also(b =>
+        {
+            b.Effects = QuadBatchEffects.None with
             {
                 Transform = Matrix4x4.CreateOrthographic(
                     FieldSize,
                     FieldSize,
                     -1,
                     1)
-            }
-        };
+            };
+        });
 
         _editorProcessor = new PostProcessor(app);
         _editorProcessor.BackgroundColor = new RgbaFloat(25f / 255f, 25f / 255f, 25f / 255f, 1f);
@@ -265,6 +264,11 @@ internal class MotionEditorLayer : Layer, ITabStyle
 
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         if (!IsEnabled)
         {
             return;
@@ -289,8 +293,6 @@ internal class MotionEditorLayer : Layer, ITabStyle
                         new Vector2(32, 32), Vector2.Zero, new Vector2(1f, -1f)))
                 {
                     _selectedTool = value;
-
-                    _app.ToastInfo($"Now using {ToolDescriptions[_selectedTool]}");
 
                     ImGui.PopStyleColor();
 
@@ -804,5 +806,26 @@ internal class MotionEditorLayer : Layer, ITabStyle
         RenderEditor();
 
         _editorProcessor.Render();
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _imGuiLayer.Submit -= ImGuiLayerOnSubmit;
+        _app.Resources.BatchPool.Return(_editorBatch);
+        _app.Resources.BatchPool.Return(_playerBatch);
+        _editorProcessor.Dispose();
+        _playerTexture?.Dispose();
+        _playerFramebuffer?.Dispose();
+        _commandList.Dispose();
+        _path.Dispose();
+        _simulator.Dispose();
+        _world.Dispose();
     }
 }

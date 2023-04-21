@@ -1,50 +1,56 @@
-﻿using GameFramework.Layers;
+﻿using Arch.Core.Extensions;
+using GameFramework.Layers;
 
 namespace Coyote.App;
 
 internal class LayerController
 {
-    private readonly Layer[] _layers;
+    private readonly List<Layer> _layers = new();
+  
+    public IEnumerable<Layer> Layers => _layers;
 
-    public int SelectedIndex { get; private set; }
+    public Layer? Selected { get; set; }
 
-    public Layer Selected => _layers[SelectedIndex];
-
-    public LayerController(params Layer[] layers)
+    public void SwitchSelection(Layer newSelection)
     {
-        _layers = layers;
-
-        if (_layers.Length == 0)
+        foreach (var layer in _layers.Where(x => x != newSelection))
         {
-            throw new ArgumentException(nameof(layers));
-        }
-
-        var selected = _layers[SelectedIndex];
-
-        selected.Enable();
-
-        foreach (var layer in layers)
-        {
-            if (layer != selected)
+            if (layer.IsEnabled)
             {
                 layer.Disable();
             }
         }
+
+        if (!newSelection.IsEnabled)
+        {
+            newSelection.Enable();
+        }
+
+        Selected = newSelection;
     }
 
-    private void SwitchSelection(int newSelection)
+    public void Add(Layer layer)
     {
-        _layers[SelectedIndex].IsEnabled = false;
-        _layers[newSelection].IsEnabled = true;
-        SelectedIndex = newSelection;
+        if (_layers.Contains(layer))
+        {
+            throw new Exception("Duplicate layer");
+        }
+
+        _layers.Add(layer);
     }
 
-    public void Select(int index)
+    public void Remove(Layer layer)
     {
-        SwitchSelection(index);
+        if (!_layers.Contains(layer))
+        {
+            throw new Exception("Invalid layer");
+        }
+
+        if (Selected == layer)
+        {
+            Selected = null;
+        }
+
+        _layers.Remove(layer);
     }
-
-    public IEnumerable<int> Indices => Enumerable.Range(0, _layers.Length);
-
-    public Layer this[int index] => _layers[index];
 }
