@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using System.Numerics;
+using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -153,5 +154,57 @@ internal static class Extensions
     public static T2 Map<T1, T2>(this T1 t1, Func<T1, T2> function)
     {
         return function(t1);
+    }
+
+    /// <summary>
+    ///     Reads a line from the <see cref="stream"/>, with a limit of <see cref="maxLength"/> bytes.
+    /// </summary>
+    public static async ValueTask<string?> ReadLineSized(this Stream stream, int maxLength, CancellationToken token = default)
+    {
+        await using var ms = new MemoryStream();
+
+        var total = 0;
+        var buffer = new byte[1024];
+
+        while (total < maxLength)
+        {
+            int read;
+
+            try
+            {
+                read = await stream.ReadAsync(buffer, token);
+            }
+            catch (IOException)
+            {
+                // Connection closed
+
+                return null;
+            }
+
+            if (read == 0)
+            {
+                if (total > 0)
+                {
+                    break;
+                }
+
+                // Connection was closed without us receiving anything.
+                return null;
+            }
+
+            total += read;
+
+            ms.Write(buffer.AsSpan(0, read));
+
+            var end = buffer[read - 1];
+
+            if (end is 13 or 10)
+            {
+                // CR LF
+                break;
+            }
+        }
+
+        return Encoding.UTF8.GetString(ms.ToArray());
     }
 }

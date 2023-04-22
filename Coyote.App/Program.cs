@@ -1,4 +1,5 @@
 ﻿using Coyote.App;
+using Coyote.App.Integration;
 using Coyote.App.Movement;
 using GameFramework;
 using GameFramework.ImGui;
@@ -28,6 +29,8 @@ using var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<GameApplication>(s => s.GetRequiredService<App>());
 
         services.AddTransient<MotionEditorLayer>();
+
+        services.AddHostedService<RobotServer>();
     })
     .Build();
 
