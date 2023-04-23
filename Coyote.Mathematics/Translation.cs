@@ -175,4 +175,9 @@ public readonly struct Translation
     {
         return $"Translation [{Displacement}]";
     }
+
+    public static Translation Lerp(Translation a, Translation b, double t)
+    {
+        return new Translation(Real2<Displacement>.Lerp(a.Displacement, b.Displacement, t));
+    }
 }

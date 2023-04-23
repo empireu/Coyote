@@ -163,4 +163,9 @@ public readonly struct Rotation
     {
         return Angle.ApproxEqualsZero(tolerance);
     }
+
+    public static Rotation Lerp(Rotation a, Rotation b, double t)
+    {
+        return new Rotation(Math.Atan2(Real<Displacement>.Lerp(a.Sin, b.Sin, t), Real<Displacement>.Lerp(a.Cos, b.Cos, t)));
+    }
 }

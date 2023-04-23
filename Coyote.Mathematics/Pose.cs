@@ -244,7 +244,7 @@ public readonly struct Pose
         t = t.Clamped(0, 1);
 
         return new Pose(
-            Real2<Displacement>.Lerp(a.Translation, b.Translation, t),
-            Real<AngularDisplacement>.Lerp(a.Rotation, b.Rotation, t));
+            Translation.Lerp(a.Translation, b.Translation, t),
+            Rotation.Lerp(a.Rotation, b.Rotation, t));
     }
 }
