@@ -4,7 +4,7 @@ internal sealed class NodeBehaviorRegistry
 {
     private readonly List<NodeBehavior> _behaviors = new();
 
-    public void Register(NodeBehavior behavior)
+    public TNode Register<TNode>(TNode behavior) where TNode : NodeBehavior
     {
         if (_behaviors.Contains(behavior))
         {
@@ -12,6 +12,8 @@ internal sealed class NodeBehaviorRegistry
         }
 
         _behaviors.Add(behavior);
+
+        return behavior;
     }
 
     public NodeBehavior[] CreateSet()

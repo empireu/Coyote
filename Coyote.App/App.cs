@@ -69,8 +69,8 @@ internal class App : GameApplication
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
 
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
-        Font.Options.SetWeight(0.46f);
-        Font.Options.SetSmoothing(0.0125f);
+        Font.Options.SetWeight(0.465f);
+        Font.Options.SetSmoothing(0.015f);
 
         ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
@@ -88,24 +88,24 @@ internal class App : GameApplication
 
     private void RegisterNodes(NodeBehaviorRegistry reg)
     {
-        void Leaf(string name)
+        LeafNode Leaf(string name)
         {
-            reg.Register(new LeafNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+            return reg.Register(new LeafNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
         }
 
-        void Proxy(string name)
+        ProxyNode Proxy(string name)
         {
-            reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+            return reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
         }
         
-        void Decorator(string name)
+        DecoratorNode Decorator(string name)
         {
-            reg.Register(new DecoratorNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+            return reg.Register(new DecoratorNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
         }
 
         Proxy("Sequence");
-        Proxy("Selector");
-        Proxy("Parallel");
+        Proxy("Selector").Also(x => x.BackgroundColor = new Vector4(0.6f, 0.1f, 0.2f, 0.8f));
+        Proxy("Parallel").Also(x => x.BackgroundColor = new Vector4(0.2f, 0.5f, 0.1f, 0.8f));
 
         Decorator("Success");
     }

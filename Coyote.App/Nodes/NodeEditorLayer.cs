@@ -13,6 +13,7 @@ using Veldrid;
 using Arch.Core.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Utilities;
+using GameFramework.Utilities.Extensions;
 using ImGuiNET;
 
 namespace Coyote.App.Nodes;
@@ -28,8 +29,13 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private const float NodeIconSize = 0.1f;
     private const float RunOnceSize = 0.035f;
     private const float TerminalSize = 0.015f;
+    private const float ConnectionSize = 0.008f;
+    private const float GridDragGranularity = 100f;
 
+    private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
     private static readonly Vector4 SelectedTint = new(1.5f, 1.5f, 1.5f, 1.5f);
+    private static readonly RgbaFloat PreviewConnection = new(0.5f, 0.5f, 0.1f, 0.5f);
+    private static readonly RgbaFloat RealizedConnection = new(0.5f, 0.5f, 0.1f, 0.95f);
 
     private readonly App _app;
     private readonly ImGuiLayer _imGui;
@@ -48,6 +54,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private Entity? _selectedEntity;
     private int _pickIndex;
     private bool _dragLock;
+    private bool _dragParent;
 
     private readonly Sprite _runOnceSprite;
     private readonly Sprite _parentTerminalSprite;
@@ -66,7 +73,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         _editorBatch = app.Resources.BatchPool.Get();
 
         _editorProcessor = new PostProcessor(app);
-        _editorProcessor.BackgroundColor = new RgbaFloat(5f / 255f, 5f / 255f, 5f / 255f, 1f);
+        _editorProcessor.BackgroundColor = ClearColor;
 
         _world = World.Create();
 
@@ -81,9 +88,41 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private Vector2 _selectPoint;
 
+    private static RectangleF GetTerminalRect(Entity e, NodeTerminal terminal)
+    {
+        var position = terminal.Type == NodeTerminalType.Parent 
+            ? e.Get<NodeComponent>().Connections.GetParentPosition(e, BorderSize) 
+            : e.Get<NodeComponent>().Connections.GetChildPosition(terminal, e, BorderSize);
+
+        return new RectangleF(position.X - TerminalSize / 2, position.Y - TerminalSize / 2, TerminalSize, TerminalSize);
+    }
+
+    private bool IntersectsTerminal(Entity entity, NodeTerminal terminal)
+    {
+        return GetTerminalRect(entity, terminal).Contains(MouseWorld.ToPointF());
+    }
+
     private void SelectEntity()
     {
-        var entities = _world.Clip(MouseWorld, AlignMode.TopLeft);
+        bool IntersectsParentTerminal(Entity entity)
+        {
+            return IntersectsTerminal(entity, entity.Get<NodeComponent>().Connections.ParentTerminal);
+        }
+
+        List<Entity> ClipTerminalEntities()
+        {
+            return _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, rectangle, check) =>
+            {
+                if (check)
+                {
+                    return true;
+                }
+
+                return IntersectsParentTerminal(entity);
+            });
+        }
+
+        var entities = ClipTerminalEntities();
 
         if (entities.Count == 0)
         {
@@ -101,6 +140,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
 
             _selectPoint = entityPosition - MouseWorld;
+
+            if (IntersectsParentTerminal(_selectedEntity.Value))
+            {
+                _dragParent = true;
+            }
         }
     }
 
@@ -117,8 +161,76 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
             _dragLock = false;
         }
-        
+        else if(@event is {MouseButton: MouseButton.Left, Down: false})
+        {
+            if (_dragParent)
+            {
+                FormConnection();
+            }
+        }
+
         return true;
+    }
+
+    private void FormConnection()
+    {
+        Assert.IsTrue(_dragParent);
+
+        _dragParent = false;
+        var childEntity = Assert.NotNull(_selectedEntity);
+
+        var clipped = _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, rectangle, check) =>
+        {
+            if (check)
+            {
+                return true;
+            }
+
+            return entity.Get<NodeComponent>().Connections.ChildrenTerminals.Any(x => IntersectsTerminal(entity, x));
+        }).Where(x => x != childEntity).ToArray();
+
+        if (clipped.Length == 0)
+        {
+            return;
+        }
+
+        var parentEntity = clipped.First();
+
+        ref var parentComp = ref parentEntity.Get<NodeComponent>();
+        ref var childComp = ref childEntity.Get<NodeComponent>();
+
+        var parentTerm =
+            parentComp.Connections.ChildrenTerminals.FirstOrDefault(t =>
+                GetTerminalRect(parentEntity, t).Contains(MouseWorld.ToPointF()));
+
+        if (parentTerm == null)
+        {
+            return;
+        }
+
+        if (!childComp.Connections.ParentTerminal.AcceptsConnection(parentTerm, childEntity, parentEntity) ||
+            !parentTerm.AcceptsConnection(childComp.Connections.ParentTerminal, parentEntity, childEntity) ||
+            !childComp.Behavior.AcceptsParent(childEntity, parentEntity, parentTerm) ||
+            !parentComp.Behavior.AcceptsChild(parentEntity, childEntity))
+        {
+            return;
+        }
+        
+        // Remove old parent
+        childComp.Parent?.Unlink(childEntity);
+
+        // Prepare connections
+        childComp.Connections.ParentTerminal.PrepareConnection(parentTerm, childEntity, parentEntity);
+        parentTerm.PrepareConnection(childComp.Connections.ParentTerminal, parentEntity, childEntity);
+
+
+        // Form Connections
+
+        childComp.Parent = parentEntity;
+        parentComp.ChildrenRef.Instance.Add(new NodeChild(childEntity, parentTerm));
+
+        childComp.Connections.ParentTerminal.FinishConnection(parentTerm, childEntity, parentEntity);
+        parentTerm.FinishConnection(childComp.Connections.ParentTerminal, parentEntity, childEntity);
     }
 
     protected override void OnAdded()
@@ -171,7 +283,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         Assert.IsTrue(entity.Get<NodeComponent>().Behavior == behavior);
         
-        behavior.AttachComponents(in entity);
+        behavior.AttachComponents(entity);
 
         _dragLock = true;
 
@@ -186,13 +298,14 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         _editorProcessor.ResizeInputs(_app.Window.Size() * 2);
         _editorProcessor.SetOutput(_app.Device.SwapchainFramebuffer);
-        _editorBatch.UpdatePipelines(outputDescription: _editorProcessor.InputFramebuffer.OutputDescription, depthStencilState: DepthStencilStateDescription.DepthOnlyLessEqual);
+        _editorBatch.UpdatePipelines(outputDescription: _editorProcessor.InputFramebuffer.OutputDescription);
     }
 
     protected override void Resize(Size size)
     {
         UpdateEditorPipeline();
     }
+
     private void UpdateCamera(FrameInfo frameInfo)
     {
         if (!_imGui.Captured)
@@ -211,7 +324,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         _cameraController.Update(frameInfo.DeltaTime);
     }
 
-    private void UpdateSelection()
+    private void UpdateDragNode()
     {
         if (_imGui.Captured)
         {
@@ -223,46 +336,91 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             return;
         }
 
+        if (_dragParent)
+        {
+            return;
+        }
+
         var entity = _selectedEntity.Value;
         var newPosition = MouseWorld + _selectPoint;
 
         if (_app.Input.IsKeyDown(Key.ShiftLeft))
         {
-            newPosition *= 10;
-            newPosition = new Vector2(MathF.Truncate(newPosition.X) / 10f, MathF.Truncate(newPosition.Y) / 10f);
+            newPosition *= GridDragGranularity;
+            newPosition = new Vector2(MathF.Truncate(newPosition.X) / GridDragGranularity, MathF.Truncate(newPosition.Y) / GridDragGranularity);
         }
 
-
         entity.Move(newPosition);
+    }
+
+    private void RenderConnectionPreview()
+    {
+        if (!_dragParent)
+        {
+            return;
+        }
+
+        var entity = Assert.NotNull(_selectedEntity);
+
+        RenderLineConnection(entity.Get<NodeComponent>().Connections.GetParentPosition(entity, BorderSize), MouseWorld, PreviewConnection);
+    }
+
+    private void RenderLineConnection(Vector2 a, Vector2 b, RgbaFloat4 color)
+    {
+        if (b.Y < a.Y)
+        {
+            (a, b) = (b, a);
+        }
+
+        var height = b.Y - a.Y;
+
+        a.X -= ConnectionSize / 2f;
+        b.X -= ConnectionSize / 2f;
+
+        _editorBatch.Quad(b, new Vector2(ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
+        _editorBatch.Quad(a + new Vector2(0, height / 2), new Vector2(ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
+        _editorBatch.Quad(new Vector2(Math.Min(a.X, b.X), a.Y + height / 2), new Vector2(Math.Abs(a.X - b.X) + ConnectionSize, ConnectionSize), color, align: AlignMode.TopLeft);
     }
 
     protected override void Update(FrameInfo frameInfo)
     {
         UpdateCamera(frameInfo); 
-        UpdateSelection();
+        UpdateDragNode();
     }
 
     private void RenderEditor()
     {
-        void Draw(ForEachWithEntity<PositionComponent, ScaleComponent, NodeComponent> callback)
+        void RenderPass(Action a)
         {
             _editorBatch.Clear();
-
-            var query = _world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>());
-
-            foreach (var chunk in query.GetChunkIterator())
-            {
-                foreach (var entity in chunk.Entities)
-                {
-                    callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(), ref entity.Get<NodeComponent>());
-                }
-            }
-
+            a();
             _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
         }
 
-        Draw(RenderNodeContent);
-        Draw(RenderNodeTerminals);
+        void RenderPassEntity(ForEachWithEntity<PositionComponent, ScaleComponent, NodeComponent> callback)
+        {
+            RenderPass(() =>
+            {
+                var query = _world.Query(new QueryDescription()
+                    .WithAll<PositionComponent, ScaleComponent, NodeComponent>());
+
+                foreach (var chunk in query.GetChunkIterator())
+                {
+                    foreach (var entity in chunk.Entities)
+                    {
+                        callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(),
+                            ref entity.Get<NodeComponent>());
+                    }
+                }
+            });
+        }
+
+        var contentTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeContent));
+        var connectionTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeConnections));
+        var previewTime = Measurements.MeasureTimeSpan(() => RenderPass(RenderConnectionPreview));
+        var terminalTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeTerminals));
+        
+        Console.WriteLine($"content: {contentTime.TotalMilliseconds:F2}, conn: {connectionTime.TotalMilliseconds:F2}, prev: {previewTime.TotalMilliseconds:F2}, term: {terminalTime.TotalMilliseconds:F2}");
     }
 
     /// <summary>
@@ -347,15 +505,20 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         }
     }
 
+    private void RenderNodeConnections(in Entity e, ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref NodeComponent nodeComponent)
+    {
+        foreach (var childNode in nodeComponent.ChildrenRef.Instance)
+        {
+            RenderLineConnection(nodeComponent.Connections.GetChildPosition(childNode.Terminal, e, BorderSize), childNode.Entity.Get<NodeComponent>().Connections.GetParentPosition(childNode.Entity, BorderSize), RealizedConnection);
+        }
+    }
 
     protected override void Render(FrameInfo frameInfo)
     {
         _editorBatch.Effects = QuadBatchEffects.Transformed(_cameraController.Camera.CameraMatrix);
 
         _editorProcessor.ClearColor();
-
         RenderEditor();
-
         _editorProcessor.Render();
     }
 

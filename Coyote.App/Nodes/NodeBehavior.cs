@@ -21,12 +21,17 @@ public class NodeTerminal
 
     public NodeTerminalType Type { get; }
 
-    public virtual bool AcceptConnection(NodeTerminal child, Entity entity)
+    public virtual bool AcceptsConnection(NodeTerminal other, Entity actualEntity, Entity remoteEntity)
     {
         return true;
     }
 
-    public virtual void Unlink()
+    public virtual void PrepareConnection(NodeTerminal other, Entity actualEntity, Entity remoteEntity)
+    {
+
+    }
+
+    public virtual void FinishConnection(NodeTerminal other, Entity actualEntity, Entity remoteEntity)
     {
 
     }
@@ -69,6 +74,18 @@ public class NodeConnectionSet
     }
 }
 
+public readonly struct NodeChild
+{
+    public Entity Entity { get; }
+    public NodeTerminal Terminal { get; }
+
+    public NodeChild(Entity entity, NodeTerminal terminal)
+    {
+        Entity = entity;
+        Terminal = terminal;
+    }
+}
+
 public struct NodeComponent
 {
     public NodeBehavior Behavior;
@@ -77,7 +94,7 @@ public struct NodeComponent
     public string Description;
 
     public Entity? Parent;
-    public Ref<List<Entity>> ChildrenRef;
+    public Ref<List<NodeChild>> ChildrenRef;
 
     [StringEditor]
     public string Name;
@@ -87,8 +104,6 @@ public struct NodeComponent
 
     public NodeConnectionSet Connections;
 }
-
-#region Abstract
 
 public abstract class NodeBehavior
 {
@@ -101,8 +116,8 @@ public abstract class NodeBehavior
         BackgroundColor = backgroundColor;
     }
 
-    public TextureSampler Icon { get; }
-    public Vector4 BackgroundColor { get; }
+    public TextureSampler Icon { get; set; }
+    public Vector4 BackgroundColor { get; set; }
 
     public Entity CreateEntity(World world, Vector2 position)
     {
@@ -111,7 +126,7 @@ public abstract class NodeBehavior
             new NodeComponent
             {
                 Behavior = this,
-                ChildrenRef = new Ref<List<Entity>>(new List<Entity>()),
+                ChildrenRef = new Ref<List<NodeChild>>(new List<NodeChild>()),
                 Description = ToString() ?? string.Empty,
                 ExecuteOnce = true,
                 Name = string.Empty,
@@ -125,12 +140,20 @@ public abstract class NodeBehavior
 
     }
 
-    public virtual void AttachComponents(in Entity entity)
+    public virtual void AttachComponents(Entity entity)
     {
         
     }
 
-    public abstract bool AcceptsChildConnection(Entity entity);
+    public virtual bool AcceptsChild(Entity actualEntity, Entity remoteEntity)
+    {
+        return true;
+    }
+
+    public virtual bool AcceptsParent(Entity actualEntity, Entity remoteEntity, NodeTerminal remoteTerminal)
+    {
+        return true;
+    }
 
     public override string ToString()
     {
@@ -140,55 +163,36 @@ public abstract class NodeBehavior
 
 public class LeafNode : NodeBehavior
 {
-    public override bool AcceptsChildConnection(Entity entity)
-    {
-        return false;
-    }
-
     public LeafNode(TextureSampler icon, string name) : base(icon, new(0.1f, 0.6f, 0.0f, 0.7f), name) { }
 }
 
 public class ProxyNode : NodeBehavior
 {
-    public override bool AcceptsChildConnection(Entity entity)
-    {
-        return true;
-    }
-
     public ProxyNode(TextureSampler icon, string name) : base(icon, new(0.3f, 0.6f, 0.1f, 0.7f), name) { }
 
     protected override void AttachTerminals(NodeConnectionSet connections)
     {
+        connections.ChildrenTerminals.Add(new NodeTerminal(NodeTerminalType.Children));
         connections.ChildrenTerminals.Add(new NodeTerminal(NodeTerminalType.Children));
     }
 }
 
 public class DecoratorTerminal : NodeTerminal
 {
-    public DecoratorTerminal() : base(NodeTerminalType.Children)
-    {
+    public DecoratorTerminal() : base(NodeTerminalType.Children) { }
 
-    }
-
-    public override bool AcceptConnection(NodeTerminal child, Entity entity)
+    public override void PrepareConnection(NodeTerminal other, Entity actualEntity, Entity remoteEntity)
     {
-        if (entity.Get<NodeComponent>().ChildrenRef.Instance.Count > 0)
+        if (actualEntity.Get<NodeComponent>().ChildrenRef.Instance.Count > 0)
         {
-            entity.UnlinkChildren();
+            actualEntity.UnlinkChildren();
         }
-
-        return true;
     }
 }
 
 public class DecoratorNode : NodeBehavior
 {
-    public override bool AcceptsChildConnection(Entity entity)
-    {
-        return entity.Get<NodeComponent>().ChildrenRef.Instance.Count == 0;
-    }
-
-    public DecoratorNode(TextureSampler icon, string name) : base(icon, new(0.5f, 0.5f, 0.5f, 0.7f), name) { }
+    public DecoratorNode(TextureSampler icon, string name) : base(icon, new(0.25f, 0.25f, 0.75f, 0.5f), name) { }
 
     protected override void AttachTerminals(NodeConnectionSet connections)
     {
@@ -196,18 +200,27 @@ public class DecoratorNode : NodeBehavior
     }
 }
 
-#endregion
-
 public static class NodeExtensions
 {
     public static void UnlinkChildren(this Entity parent)
     {
-        parent.Get<NodeComponent>().ChildrenRef.Instance.RemoveAll(child =>
-        {
-            var component = child.Get<NodeComponent>();
+        var children = parent.Get<NodeComponent>().ChildrenRef.Instance.ToArray();
 
-            component.Parent = null;
-            component.Connections.ParentTerminal.Unlink();
-        });
+        foreach (var child in children)
+        {
+            parent.Unlink(child.Entity);
+        }
+
+        parent.Get<NodeComponent>().ChildrenRef.Instance.Clear();
+    }
+
+
+    public static void Unlink(this Entity parent, Entity child)
+    {
+        ref var parentComp = ref parent.Get<NodeComponent>();
+        ref var childComp = ref child.Get<NodeComponent>();
+
+        Assert.IsTrue(parentComp.ChildrenRef.Instance.RemoveAll(x => x.Entity == child) == 1, "Unlink invalid child");
+        childComp.Parent = null;
     }
 }
