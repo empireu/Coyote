@@ -22,7 +22,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 {
     private const float MoveSpeed = 2f;
     private const float ZoomSpeed = 35;
-    private const float MinZoom = 0.1f;
+    private const float MinZoom = 1.0f;
     private const float MaxZoom = 20f;
     private const float FontSize = 0.1f;
     private const float BorderSize = 0.01f;
@@ -31,9 +31,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private const float TerminalSize = 0.015f;
     private const float ConnectionSize = 0.008f;
     private const float GridDragGranularity = 100f;
+    private const float CamDragSpeed = 5f;
+    private const float KeyboardCamInterpolateSpeed = 15;
+    private const float DragCamInterpolateSpeed = 35;
 
     private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
-    private static readonly Vector4 SelectedTint = new(1.5f, 1.5f, 1.5f, 1.5f);
+    private static readonly Vector4 SelectedTint = new(1.1f, 1.1f, 1.1f, 1.2f);
     private static readonly RgbaFloat PreviewConnection = new(0.5f, 0.5f, 0.1f, 0.5f);
     private static readonly RgbaFloat RealizedConnection = new(0.5f, 0.5f, 0.1f, 0.95f);
 
@@ -45,7 +48,6 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private readonly QuadBatch _editorBatch;
 
-    // Used by the editor (translation and rotation)"
     private readonly PostProcessor _editorProcessor;
     private readonly OrthographicCameraController2D _cameraController;
 
@@ -53,8 +55,15 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private Entity? _selectedEntity;
     private int _pickIndex;
+
+    // Locked dragging a node
     private bool _dragLock;
+    
+    // Locked dragging a parent terminal
     private bool _dragParent;
+
+    // Dragging the camera with the mouse
+    private bool _dragCamera;
 
     private readonly Sprite _runOnceSprite;
     private readonly Sprite _parentTerminalSprite;
@@ -68,7 +77,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         _cameraController = new OrthographicCameraController2D(
             new OrthographicCamera(0, -1, 1),
-            translationInterpolate: 15f, zoomInterpolate: 10);
+            translationInterpolate: KeyboardCamInterpolateSpeed, zoomInterpolate: 10);
 
         _editorBatch = app.Resources.BatchPool.Get();
 
@@ -167,6 +176,14 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             {
                 FormConnection();
             }
+        }
+        else if (@event is { MouseButton: MouseButton.Right, Down: true })
+        {
+            _dragCamera = true;
+        }
+        else if (@event is { MouseButton: MouseButton.Right, Down: false })
+        {
+            _dragCamera = false;
         }
 
         return true;
@@ -316,6 +333,17 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                     MoveSpeed * frameInfo.DeltaTime,
                     0);
             }
+
+            if (_dragCamera)
+            {
+                var delta = (_app.Input.MouseDelta / new Vector2(_app.Window.Width, _app.Window.Height)) * new Vector2(-1, 1) * _cameraController.Camera.Zoom * CamDragSpeed;
+                _cameraController.FuturePosition2 += delta;
+                _cameraController.TranslationInterpolate = DragCamInterpolateSpeed;
+            }
+            else
+            {
+                _cameraController.TranslationInterpolate = KeyboardCamInterpolateSpeed;
+            }
         }
 
         _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
@@ -390,37 +418,33 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private void RenderEditor()
     {
-        void RenderPass(Action a)
+        void RenderPass(Action submit)
         {
             _editorBatch.Clear();
-            a();
-            _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
+            submit();
+            _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer, wait: false);
         }
 
         void RenderPassEntity(ForEachWithEntity<PositionComponent, ScaleComponent, NodeComponent> callback)
         {
             RenderPass(() =>
             {
-                var query = _world.Query(new QueryDescription()
-                    .WithAll<PositionComponent, ScaleComponent, NodeComponent>());
+                var query = _world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>());
 
                 foreach (var chunk in query.GetChunkIterator())
                 {
                     foreach (var entity in chunk.Entities)
                     {
-                        callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(),
-                            ref entity.Get<NodeComponent>());
+                        callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(), ref entity.Get<NodeComponent>());
                     }
                 }
             });
         }
 
-        var contentTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeContent));
-        var connectionTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeConnections));
-        var previewTime = Measurements.MeasureTimeSpan(() => RenderPass(RenderConnectionPreview));
-        var terminalTime = Measurements.MeasureTimeSpan(() => RenderPassEntity(RenderNodeTerminals));
-        
-        Console.WriteLine($"content: {contentTime.TotalMilliseconds:F2}, conn: {connectionTime.TotalMilliseconds:F2}, prev: {previewTime.TotalMilliseconds:F2}, term: {terminalTime.TotalMilliseconds:F2}");
+        RenderPassEntity(RenderNodeContent);
+        RenderPassEntity(RenderNodeConnections);
+        RenderPass(RenderConnectionPreview);
+        RenderPassEntity(RenderNodeTerminals);
     }
 
     /// <summary>
