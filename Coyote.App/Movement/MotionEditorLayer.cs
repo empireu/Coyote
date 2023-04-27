@@ -163,10 +163,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         RegisterHandler<MouseEvent>(OnMouseEvent);
     }
 
-    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(
-        _app.Input.MousePosition,
-        _app.Window.Width,
-        _app.Window.Height);
+    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(_app.Input.MousePosition, _app.Window.Width, _app.Window.Height);
 
     private Vector2 _selectPoint;
 
@@ -760,11 +757,14 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
     private void UpdateCamera(FrameInfo frameInfo)
     {
-        foreach (var inputDownKey in _app.Input.DownKeys)
+        if (!_imGuiLayer.Captured)
         {
-            _cameraController.ProcessKey(inputDownKey,
-                MoveSpeed * frameInfo.DeltaTime,
-                0);
+            foreach (var inputDownKey in _app.Input.DownKeys)
+            {
+                _cameraController.ProcessKey(inputDownKey,
+                    MoveSpeed * frameInfo.DeltaTime,
+                    0);
+            }
         }
 
         _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;

@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
+using Coyote.App.Nodes;
 using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Assets;
@@ -50,9 +51,9 @@ internal class App : GameApplication
 
     private readonly List<RegisteredLayer> _tabLayers = new();
 
-    private readonly Stopwatch _loadSw = new Stopwatch();
+    private readonly Stopwatch _loadSw = new();
 
-    public App(IServiceProvider serviceProvider)
+    public App(IServiceProvider serviceProvider, NodeBehaviorRegistry behaviors)
     {
         _serviceProvider = serviceProvider;
 
@@ -69,6 +70,7 @@ internal class App : GameApplication
 
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
         Font.Options.SetWeight(0.46f);
+        Font.Options.SetSmoothing(0.0125f);
 
         ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
@@ -76,7 +78,10 @@ internal class App : GameApplication
 
         _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
         
+        behaviors.Register(new Proxy(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Sequence.png")).Texture));
+
         RegisterTab("+T", "MotionEditorTab", () => Layers.ConstructLayer<MotionEditorLayer>());
+        RegisterTab("+N", "NodeEditorTab", () => Layers.ConstructLayer<NodeEditorLayer>());
 
         ResizeCamera();
     }

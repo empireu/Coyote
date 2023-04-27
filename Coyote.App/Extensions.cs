@@ -39,7 +39,7 @@ internal static class Extensions
         return new RectangleF(position.X - scale.X / 2, position.Y - scale.Y / 2, scale.X, scale.Y);
     }
 
-    public static List<Entity> Clip(this World world, Vector2 pickPosition)
+    public static List<Entity> Clip(this World world, Vector2 pickPosition, AlignMode align = AlignMode.Center)
     {
         var query = world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent>());
         var results = new List<Entity>();
@@ -48,7 +48,12 @@ internal static class Extensions
         {
             foreach (var entity in chunk.Entities)
             {
-                if (!entity.IsAlive() || !entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y))
+                if (
+                    !entity.IsAlive() || 
+                    !(align == AlignMode.Center 
+                        ? entity.GetRectangle().Contains(pickPosition.X, pickPosition.Y) 
+                        : entity.GetRectangle().Contains(pickPosition.X - entity.GetRectangle().Width / 2, pickPosition.Y + entity.GetRectangle().Height / 2))
+                    )
                 {
                     continue;
                 }
@@ -206,5 +211,10 @@ internal static class Extensions
         }
 
         return Encoding.UTF8.GetString(ms.ToArray());
+    }
+
+    public static Vector2 MaxWith(this Vector2 a, Vector2 b)
+    {
+        return new Vector2(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
     }
 }

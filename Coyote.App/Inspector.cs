@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Reflection;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Nodes;
 using GameFramework.Utilities.Extensions;
 using GameFramework.Utilities;
 using ImGuiNET;
@@ -61,6 +62,7 @@ internal static class Inspector
         Applicators = new ConcurrentDictionary<Type, ApplyDelegate>();
 
         Applicators.TryAdd(typeof(PositionComponent), ApplyPositionComponent);
+        Applicators.TryAdd(typeof(NodeComponent), ApplyNodeComponent);
     }
 
     private static void ApplyPositionComponent(object newValue, Entity entity)
@@ -68,6 +70,13 @@ internal static class Inspector
         var component = Assert.Is<PositionComponent>(newValue);
 
         entity.Move(component.Position);
+    }
+
+    private static void ApplyNodeComponent(object newValue, Entity entity)
+    {
+        var component = Assert.Is<NodeComponent>(newValue);
+
+        entity.Set(component);
     }
 
     private static string StringEditor(object instance, string name, EditorAttribute baseAttribute)
