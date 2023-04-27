@@ -7,6 +7,7 @@ using GameFramework.PostProcessing;
 using GameFramework.Renderer.Batch;
 using GameFramework.Scene;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using GameFramework.ImGui;
 using Veldrid;
 using Arch.Core.Extensions;
@@ -25,9 +26,9 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private const float FontSize = 0.1f;
     private const float BorderSize = 0.01f;
     private const float NodeIconSize = 0.1f;
-    private const float RunOnceSize = 0.025f;
+    private const float RunOnceSize = 0.035f;
 
-    private static readonly Vector4 SelectedTint = new(1.2f, 1.2f, 1.2f, 1.2f);
+    private static readonly Vector4 SelectedTint = new(1.5f, 1.5f, 1.5f, 1.5f);
 
     private readonly App _app;
     private readonly ImGuiLayer _imGui;
@@ -47,7 +48,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private int _pickIndex;
     private bool _dragLock;
 
-    private Sprite _runOnceSprite;
+    private readonly Sprite _runOnceSprite;
 
     public NodeEditorLayer(App app, ImGuiLayer imGui, NodeBehaviorRegistry behaviorRegistry)
     {
@@ -255,6 +256,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     /// <summary>
     ///     Renders a node and re-fits the scale based on the rendered surface.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RenderNodeContent(in Entity e, ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref NodeComponent nodeComponent)
     {
         var isSelected = e == _selectedEntity;
@@ -308,6 +310,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         font.Render(_editorBatch, position + iconSize with { Y = 0 } + new Vector2(2 * BorderSize, 0), nodeComponent.Description, size: FontSize);
 
         _editorBatch.Quad(position, surface, isSelected ? nodeComponent.Behavior.BackgroundColor * SelectedTint : nodeComponent.Behavior.BackgroundColor, align: AlignMode.TopLeft);
+
+        if (nodeComponent.ExecuteOnce)
+        {
+            _editorBatch.TexturedQuad(position, Vector2.One * RunOnceSize, _runOnceSprite.Texture, align: AlignMode.TopLeft);
+        }
 
         scaleComponent.Scale = surface;
     }

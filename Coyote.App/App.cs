@@ -78,12 +78,36 @@ internal class App : GameApplication
 
         _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
         
-        behaviors.Register(new Proxy(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Sequence.png")).Texture));
+        RegisterNodes(behaviors);
 
         RegisterTab("+T", "MotionEditorTab", () => Layers.ConstructLayer<MotionEditorLayer>());
         RegisterTab("+N", "NodeEditorTab", () => Layers.ConstructLayer<NodeEditorLayer>());
 
         ResizeCamera();
+    }
+
+    private void RegisterNodes(NodeBehaviorRegistry reg)
+    {
+        void Leaf(string name)
+        {
+            reg.Register(new LeafNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+
+        void Proxy(string name)
+        {
+            reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+        
+        void Decorator(string name)
+        {
+            reg.Register(new DecoratorNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+
+        Proxy("Sequence");
+        Proxy("Selector");
+        Proxy("Parallel");
+
+        Decorator("Success");
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)

@@ -26,14 +26,17 @@ public struct NodeComponent
 
 public abstract class NodeBehavior
 {
-    protected NodeBehavior(TextureSampler icon)
+    private readonly string _name;
+
+    protected NodeBehavior(TextureSampler icon, Vector4 backgroundColor, string name)
     {
+        _name = name;
         Icon = icon;
+        BackgroundColor = backgroundColor;
     }
 
     public TextureSampler Icon { get; }
-
-    public abstract Vector4 BackgroundColor { get; }
+    public Vector4 BackgroundColor { get; }
 
     public Entity CreateEntity(World world, Vector2 position)
     {
@@ -56,49 +59,41 @@ public abstract class NodeBehavior
     }
 
     public abstract bool AcceptsChildConnection(Entity entity);
+
+    public override string ToString()
+    {
+        return _name;
+    }
 }
 
 public class LeafNode : NodeBehavior
 {
-    public override Vector4 BackgroundColor => new(0.1f, 0.6f, 0.0f, 0.7f);
-    
-
     public override bool AcceptsChildConnection(Entity entity)
     {
         return false;
     }
 
-    public LeafNode(TextureSampler icon) : base(icon)
-    {
-    }
+    public LeafNode(TextureSampler icon, string name) : base(icon, new(0.1f, 0.6f, 0.0f, 0.7f), name) { }
 }
 
-public class Proxy : NodeBehavior
+public class ProxyNode : NodeBehavior
 {
-    public override Vector4 BackgroundColor => new(0.3f, 0.6f, 0.1f, 0.7f);
-
     public override bool AcceptsChildConnection(Entity entity)
     {
         return true;
     }
 
-    public Proxy(TextureSampler icon) : base(icon)
-    {
-    }
+    public ProxyNode(TextureSampler icon, string name) : base(icon, new(0.3f, 0.6f, 0.1f, 0.7f), name) { }
 }
 
 public class DecoratorNode : NodeBehavior
 {
-    public override Vector4 BackgroundColor => new(0.5f, 0.5f, 0.5f, 0.7f);
-
     public override bool AcceptsChildConnection(Entity entity)
     {
         return entity.Get<NodeComponent>().ChildrenRef.Instance.Count == 0;
     }
 
-    public DecoratorNode(TextureSampler icon) : base(icon)
-    {
-    }
+    public DecoratorNode(TextureSampler icon, string name) : base(icon, new(0.5f, 0.5f, 0.5f, 0.7f), name) { }
 }
 
 #endregion
