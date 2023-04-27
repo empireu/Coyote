@@ -27,6 +27,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private const float BorderSize = 0.01f;
     private const float NodeIconSize = 0.1f;
     private const float RunOnceSize = 0.035f;
+    private const float TerminalSize = 0.015f;
 
     private static readonly Vector4 SelectedTint = new(1.5f, 1.5f, 1.5f, 1.5f);
 
@@ -49,6 +50,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private bool _dragLock;
 
     private readonly Sprite _runOnceSprite;
+    private readonly Sprite _parentTerminalSprite;
+    private readonly Sprite _childTerminalSprite;
 
     public NodeEditorLayer(App app, ImGuiLayer imGui, NodeBehaviorRegistry behaviorRegistry)
     {
@@ -68,6 +71,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         _world = World.Create();
 
         _runOnceSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.RunOnce.png"));
+        _parentTerminalSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Nodes.InputTerminal.png"));
+        _childTerminalSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Nodes.OutputTerminal.png"));
 
         imGui.Submit += ImGuiOnSubmit;
 
@@ -239,24 +244,30 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private void RenderEditor()
     {
-        _editorBatch.Clear();
-        var query = _world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>());
-
-        foreach (var chunk in query.GetChunkIterator())
+        void Draw(ForEachWithEntity<PositionComponent, ScaleComponent, NodeComponent> callback)
         {
-            foreach (var entity in chunk.Entities)
+            _editorBatch.Clear();
+
+            var query = _world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>());
+
+            foreach (var chunk in query.GetChunkIterator())
             {
-                RenderNodeContent(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(), ref entity.Get<NodeComponent>());
+                foreach (var entity in chunk.Entities)
+                {
+                    callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(), ref entity.Get<NodeComponent>());
+                }
             }
+
+            _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
         }
-        
-        _editorBatch.Submit(framebuffer: _editorProcessor.InputFramebuffer);
+
+        Draw(RenderNodeContent);
+        Draw(RenderNodeTerminals);
     }
 
     /// <summary>
     ///     Renders a node and re-fits the scale based on the rendered surface.
     /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RenderNodeContent(in Entity e, ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref NodeComponent nodeComponent)
     {
         var isSelected = e == _selectedEntity;
@@ -318,6 +329,24 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         scaleComponent.Scale = surface;
     }
+
+    private void RenderNodeTerminals(in Entity e, ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref NodeComponent nodeComponent)
+    {
+        var set = nodeComponent.Connections;
+
+        void SubmitTerminal(Vector2 position, NodeTerminal terminal)
+        {
+            _editorBatch.TexturedQuad(position, Vector2.One * TerminalSize, terminal.Type == NodeTerminalType.Children ? _childTerminalSprite.Texture : _parentTerminalSprite.Texture);
+        }
+
+        SubmitTerminal(set.GetParentPosition(e, BorderSize), set.ParentTerminal);
+        
+        foreach (var terminal in set.ChildrenTerminals)
+        {
+            SubmitTerminal(set.GetChildPosition(terminal, e, BorderSize), terminal);
+        }
+    }
+
 
     protected override void Render(FrameInfo frameInfo)
     {
