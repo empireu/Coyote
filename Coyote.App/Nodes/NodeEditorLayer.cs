@@ -203,7 +203,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 return true;
             }
 
-            return entity.Get<NodeComponent>().Connections.ChildrenTerminals.Any(x => IntersectsTerminal(entity, x));
+            return entity.Get<NodeComponent>().Connections.ChildTerminals.Any(x => IntersectsTerminal(entity, x));
         }).Where(x => x != childEntity).ToArray();
 
         if (clipped.Length == 0)
@@ -217,7 +217,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         ref var childComp = ref childEntity.Get<NodeComponent>();
 
         var parentTerm =
-            parentComp.Connections.ChildrenTerminals.FirstOrDefault(t =>
+            parentComp.Connections.ChildTerminals.FirstOrDefault(t =>
                 GetTerminalRect(parentEntity, t).Contains(MouseWorld.ToPointF()));
 
         if (parentTerm == null)
@@ -273,6 +273,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             if (ImGui.Button("OK"))
             {
                 Place();
+            }
+
+            if (ImGui.Button("Save"))
+            {
+                var result = NodeProject.FromNodeWorld(_world);
+
             }
         }
 
@@ -523,7 +529,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         SubmitTerminal(set.GetParentPosition(e, BorderSize), set.ParentTerminal);
         
-        foreach (var terminal in set.ChildrenTerminals)
+        foreach (var terminal in set.ChildTerminals)
         {
             SubmitTerminal(set.GetChildPosition(terminal, e, BorderSize), terminal);
         }

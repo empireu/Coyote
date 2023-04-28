@@ -11,6 +11,11 @@ internal sealed class NodeBehaviorRegistry
             throw new InvalidOperationException("Duplicate behavior");
         }
 
+        if (_behaviors.Any(x => x.Name.Equals(behavior.Name)))
+        {
+            throw new InvalidOperationException("Duplicate node name");
+        }
+
         _behaviors.Add(behavior);
 
         return behavior;
