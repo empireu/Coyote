@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Arch.Core;
 using Arch.Core.Extensions;
+using GameFramework.Utilities;
 
 namespace Coyote.App.Nodes;
 
@@ -15,6 +16,9 @@ internal struct JsonChild
 
 internal class JsonNode
 {
+    [JsonInclude]
+    public JsonVector2 Position { get; set; }
+
     [JsonInclude]
     public string BehaviorId { get; set; }
 
@@ -51,6 +55,7 @@ internal class NodeProject
 
             return new JsonNode
             {
+                Position = entity.Get<PositionComponent>().Position,
                 BehaviorId = component.Behavior.Name,
                 Name = component.Name,
                 Description = component.Description,
@@ -59,6 +64,7 @@ internal class NodeProject
                 Children = component
                     .ChildrenRef
                     .Instance
+                    .OrderBy(n => n.Entity.Get<PositionComponent>().Position.X)
                     .Select(childConnection =>
                         new JsonChild
                         {
@@ -74,5 +80,41 @@ internal class NodeProject
         {
             RootNodes = rootEntities.Select(Traverse).ToArray()
         };
+    }
+
+    public void Load(World world, IEnumerable<NodeBehavior> behaviors)
+    {
+        var behaviorMap = behaviors.ToDictionary(b => b.Name, b => b);
+
+        Entity Traverse(JsonNode node)
+        {
+            if (!Assert.NotNull(behaviorMap).TryGetValue(node.BehaviorId, out var behavior))
+            {
+                throw new Exception($"Failed to deserialize node with internal name \"{node.Name}\"");
+            }
+
+            var entity = behavior.CreateEntity(world, node.Position);
+            ref var parentComp = ref entity.Get<NodeComponent>();
+
+            parentComp.Name = node.Name;
+            parentComp.Description = node.Description;
+            parentComp.ExecuteOnce = node.ExecuteOnce;
+
+            behavior.InitialLoad(entity, node.SavedData);
+
+            foreach (var nodeChild in node.Children)
+            {
+                entity.LinkTo(Traverse(nodeChild.Node), parentComp.Terminals.GetTerminal(nodeChild.TerminalId));
+            }
+
+            behavior.AfterLoad(entity);
+
+            return entity;
+        }
+
+        RootNodes.ForEach(node =>
+        {
+            Traverse(node);
+        });
     }
 }

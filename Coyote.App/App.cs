@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
 using Coyote.App.Nodes;
-using Coyote.Mathematics;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
@@ -28,8 +27,14 @@ internal class App : GameApplication
     private const string Extension = "awoo";
     private static readonly Vector2 TabSize = new(12, 12);
     private readonly IServiceProvider _serviceProvider;
-    
+
+    private const float DefaultWeight = 0.465f;
+    private const float DefaultSmoothing = 0.015f;
+    private const float ToastWeight = 0.45f;
+    private const float ToastSmoothing = 0.05f;
+
     public SdfFont Font { get; }
+
     public ToastManager ToastManager { get; }
 
     private readonly QuadBatch _toastBatch;
@@ -53,6 +58,20 @@ internal class App : GameApplication
 
     private readonly Stopwatch _loadSw = new();
 
+    // Better to switch them like this instead of creating a copy:
+
+    private void SetDefaultFont()
+    {
+        Font.Options.SetWeight(DefaultWeight);
+        Font.Options.SetSmoothing(DefaultSmoothing);
+    }
+
+    private void SetToastFont()
+    {
+        Font.Options.SetWeight(ToastWeight);
+        Font.Options.SetSmoothing(ToastSmoothing);
+    }
+
     public App(IServiceProvider serviceProvider, NodeBehaviorRegistry behaviors)
     {
         _serviceProvider = serviceProvider;
@@ -69,8 +88,7 @@ internal class App : GameApplication
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
 
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
-        Font.Options.SetWeight(0.465f);
-        Font.Options.SetSmoothing(0.015f);
+        SetDefaultFont();
 
         ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
@@ -341,13 +359,9 @@ internal class App : GameApplication
     {
         Assert.IsTrue(_project == null);
 
-        _project =  new Project
-        {
-            FileName = name,
-            MotionProjects = new Dictionary<string, MotionProject>(),
-        };
-
-        _project.SetChanged();
+        _project = Project
+            .CreateEmpty(name)
+            .Also(p => p.SetChanged());
     }
 
     public static EmbeddedResourceKey Asset(string name)
@@ -367,12 +381,16 @@ internal class App : GameApplication
 
     protected override void AfterRender(FrameInfo frameInfo)
     {
+        SetToastFont();
+
         _toastBatch.Clear();
         _toastBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
 
         ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.925f);
 
         _toastBatch.Submit();
+
+        SetDefaultFont();
 
         base.AfterRender(frameInfo);
     }

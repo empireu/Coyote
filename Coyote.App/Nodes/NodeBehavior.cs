@@ -66,6 +66,12 @@ public class NodeConnectionSet
 
     }
 
+    public NodeTerminal GetTerminal(int id)
+    {
+        return _childTerminals.Find(x => x.Id == id) 
+               ?? throw new Exception($"Failed to get terminal with ID {id}");
+    }
+
     public NodeTerminal ParentTerminal { get; }
 
     public IReadOnlyList<NodeTerminal> ChildTerminals => _childTerminals;
@@ -146,7 +152,7 @@ public struct NodeComponent
     [BoolEditor]
     public bool ExecuteOnce;
 
-    public NodeConnectionSet Connections;
+    public NodeConnectionSet Terminals;
 }
 
 public abstract class NodeBehavior
@@ -169,7 +175,7 @@ public abstract class NodeBehavior
 
     public Entity CreateEntity(World world, Vector2 position)
     {
-        return world.Create(
+        var entity = world.Create(
             new PositionComponent { Position = position },
             new NodeComponent
             {
@@ -178,10 +184,14 @@ public abstract class NodeBehavior
                 Description = ToString() ?? string.Empty,
                 ExecuteOnce = true,
                 Name = string.Empty,
-                Connections = new NodeConnectionSet(new NodeTerminal(NodeTerminalType.Parent, 0))
+                Terminals = new NodeConnectionSet(new NodeTerminal(NodeTerminalType.Parent, 0))
                     .Also(AttachTerminals)
             },
             new ScaleComponent());
+
+        AttachComponents(entity);
+
+        return entity;
     }
 
     /// <summary>
@@ -233,13 +243,18 @@ public abstract class NodeBehavior
     }
 
     /// <summary>
-    ///     Called to deserialize the custom data of this node.
+    ///     Called when the node is being deserialized, before the child nodes are deserialized.
     /// </summary>
-    public virtual void Load(Entity entity, string storedData)
+    public virtual void InitialLoad(Entity entity, string storedData)
     {
 
     }
-    
+
+    /// <summary>
+    ///     Called when the node is being deserialized, after all child nodes have been loaded.
+    /// </summary>
+    public virtual void AfterLoad(Entity entity) { }
+
     public override string ToString()
     {
         return Name;
@@ -299,7 +314,7 @@ public class DecoratorNode : NodeBehavior
 public static class NodeExtensions
 {
     /// <summary>
-    ///     Un-links all the children of this node using <see cref="Unlink"/>
+    ///     Un-links all the children of this node using <see cref="UnlinkFrom"/>
     /// </summary>
     /// <param name="parent"></param>
     public static void UnlinkChildren(this Entity parent)
@@ -308,7 +323,7 @@ public static class NodeExtensions
 
         foreach (var child in children)
         {
-            parent.Unlink(child.Entity);
+            parent.UnlinkFrom(child.Entity);
         }
 
         parent.Get<NodeComponent>().ChildrenRef.Instance.Clear();
@@ -319,12 +334,61 @@ public static class NodeExtensions
     /// </summary>
     /// <param name="parent">The parent node.</param>
     /// <param name="child">The child node.</param>
-    public static void Unlink(this Entity parent, Entity child)
+    public static void UnlinkFrom(this Entity parent, Entity child)
     {
         ref var parentComp = ref parent.Get<NodeComponent>();
         ref var childComp = ref child.Get<NodeComponent>();
 
         Assert.IsTrue(parentComp.ChildrenRef.Instance.RemoveAll(x => x.Entity == child) == 1, "Unlink invalid child");
         childComp.Parent = null;
+    }
+
+    /// <summary>
+    ///     Checks if two nodes can link.
+    /// </summary>
+    /// <param name="parentEntity">The desired parent of <seealso cref="childEntity"/>.</param>
+    /// <param name="childEntity">The desired child of <see cref="parentEntity"/>. If this entity already has a parent, it will be removed using <see cref="UnlinkFrom"/>.</param>
+    /// <param name="parentTerminal">A terminal of the <see cref="parentEntity"/>.</param>
+    /// <returns>True if the two nodes can link, as per <see cref="NodeTerminal.AcceptsConnection"/>, <see cref="NodeBehavior.AcceptsParent"/> and <see cref="NodeBehavior.AcceptsChild"/>. Otherwise, false.</returns>
+    public static bool CanLinkTo(this Entity parentEntity, Entity childEntity, NodeTerminal parentTerminal)
+    {
+        var parent = parentEntity.Get<NodeComponent>();
+        var child = childEntity.Get<NodeComponent>();
+
+        return child.Terminals.ParentTerminal.AcceptsConnection(parentTerminal, childEntity, parentEntity) &&
+               parentTerminal.AcceptsConnection(child.Terminals.ParentTerminal, parentEntity, childEntity) &&
+               child.Behavior.AcceptsParent(childEntity, parentEntity, parentTerminal) &&
+               parent.Behavior.AcceptsChild(parentEntity, childEntity);
+    }
+
+    /// <summary>
+    ///     Links two nodes, removing the old parent from the child node.
+    /// </summary>
+    /// <param name="parentEntity">The desired parent of <seealso cref="childEntity"/>.</param>
+    /// <param name="childEntity">The desired child of <see cref="parentEntity"/>. If this entity already has a parent, it will be removed using <see cref="UnlinkFrom"/>.</param>
+    /// <param name="parentTerminal">A terminal of the <see cref="parentEntity"/>.</param>
+    public static void LinkTo(this Entity parentEntity, Entity childEntity, NodeTerminal parentTerminal)
+    {
+        if (!parentEntity.CanLinkTo(childEntity, parentTerminal))
+        {
+            throw new InvalidOperationException("Cannot link nodes");
+        }
+
+        ref var parent = ref parentEntity.Get<NodeComponent>();
+        ref var child = ref childEntity.Get<NodeComponent>();
+
+        // Remove old parent:
+        child.Parent?.UnlinkFrom(childEntity);
+
+        // Prepare connections:
+        child.Terminals.ParentTerminal.PrepareConnection(parentTerminal, childEntity, parentEntity);
+        parentTerminal.PrepareConnection(child.Terminals.ParentTerminal, parentEntity, childEntity);
+
+        // Form connections:
+        child.Parent = parentEntity;
+        parent.ChildrenRef.Instance.Add(new NodeChild(childEntity, parentTerminal));
+
+        child.Terminals.ParentTerminal.FinishConnection(parentTerminal, childEntity, parentEntity);
+        parentTerminal.FinishConnection(child.Terminals.ParentTerminal, parentEntity, childEntity);
     }
 }
