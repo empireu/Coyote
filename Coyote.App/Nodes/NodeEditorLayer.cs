@@ -292,7 +292,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                     _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent component) =>
                     {
-                        component.Behavior.Analyze(entity, analysis);
+                        component.Behavior.Analyze(entity, analysis, _app.Project);
 
                         foreach (var message in messages)
                         {

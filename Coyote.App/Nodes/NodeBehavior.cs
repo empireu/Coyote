@@ -313,7 +313,7 @@ public abstract class NodeBehavior
     /// </summary>
     public virtual void AfterLoad(Entity entity) { }
 
-    public virtual void Analyze(Entity entity, NodeAnalysis analysis) { }
+    public virtual void Analyze(Entity entity, NodeAnalysis analysis, Project project) { }
 
     /// <summary>
     ///     Submits an <see cref="ImGui"/> inspector interface. The call happens inside a window block, so windows should not be created here.
@@ -395,30 +395,21 @@ public class DecoratorNode : NodeBehavior
     {
         connections.AddChildTerminal(new DecoratorTerminal(0));
     }
-
-    public override void Analyze(Entity entity, NodeAnalysis analysis)
-    {
-        analysis.Warn("Warning 1").Warn("Warning 2").Warn("Warning 3").Error("Error 1");
-    }
 }
 
 public sealed class MotionNode : NodeBehavior
 {
     public struct MotionNodeTerminalBinding
     {
-        public MotionNodeTerminalBinding(int terminalId, string motionProject, string marker)
+        public MotionNodeTerminalBinding(int terminalId, string marker)
         {
             TerminalId = terminalId;
-            MotionProject = motionProject;
             Marker = marker;
         }
 
         [JsonInclude]
         public int TerminalId { get; set; }
-        
-        [JsonInclude]
-        public string MotionProject { get; set; }
-
+      
         [JsonInclude]
         public string Marker { get; set; }
     }
@@ -426,17 +417,17 @@ public sealed class MotionNode : NodeBehavior
     public class MotionNodeState
     {
         [JsonInclude]
+        public string MotionProject { get; set; } = string.Empty;
+
+        [JsonInclude]
         public List<MotionNodeTerminalBinding> Bindings { get; set; } = new();
 
         // GUI state:
-
-        [JsonIgnore]
-        public string SelectedProjectLabel = string.Empty;
-
         [JsonIgnore]
         public string SelectedMarkerLabel = string.Empty;
     }
 
+    // Proxy so we don't have to use Ref anywhere.
     public struct MotionNodeComponent
     {
         public MotionNodeState State;
@@ -509,94 +500,87 @@ public sealed class MotionNode : NodeBehavior
 
         try
         {
-            if (ImGui.CollapsingHeader("Marker Bindings"))
+            void LabelScan(string[] names, ref string selected, string comboLbl)
             {
-                ImGui.BeginGroup();
+                var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
+
+                if (idx == -1)
                 {
-                    nint bindingIdx = 0;
-                    foreach (var binding in state.Bindings)
+                    idx = 0;
+                }
+
+                ImGui.Combo(comboLbl, ref idx, names, names.Length);
+
+                if (names.Length != 0)
+                {
+                    idx = Math.Clamp(idx, 0, names.Length);
+                    selected = names[idx];
+                }
+            }
+
+            var projectName = state.MotionProject;
+            LabelScan(project.MotionProjects.Keys.ToArray(), ref projectName, "Project");
+            state.MotionProject = projectName;
+
+            if (project.MotionProjects.TryGetValue(projectName, out var motionProject))
+            {
+                if (ImGui.CollapsingHeader("Marker Bindings"))
+                {
+                    ImGui.BeginGroup();
                     {
-                        ImGui.PushID(bindingIdx++);
-
-                        try
+                        nint bindingIdx = 0;
+                        foreach (var binding in state.Bindings)
                         {
-                            ImGui.Text($"Project: {binding.MotionProject}");
-                            ImGui.Text($"Marker: {binding.Marker}");
+                            ImGui.PushID(bindingIdx++);
 
-                            ImGui.SameLine();
-
-                            void MarkDelete()
+                            try
                             {
-                                if (!deleted!.Contains(binding))
+                                ImGui.Text(binding.Marker);
+
+                                ImGui.SameLine();
+
+                                void MarkDelete()
                                 {
-                                    deleted!.Add(binding);
+                                    if (!deleted!.Contains(binding))
+                                    {
+                                        deleted!.Add(binding);
+                                    }
+
+                                    changed = true;
                                 }
 
-                                changed = true;
+                                if (ImGui.Button("-"))
+                                {
+                                    MarkDelete();
+                                }
+
+                                ImGui.Separator();
+
+                                // Destroy bindings with invalid markers:
+                                if (!motionProject.Markers.Any(x => x.Name.Equals(binding.Marker)))
+                                {
+                                    MarkDelete();
+                                }
                             }
-
-                            if (ImGui.Button("-"))
+                            finally
                             {
-                                MarkDelete();
-                            }
-
-                            ImGui.Separator();
-
-                            // Destroy bindings with invalid markers:
-
-                            if (!project.MotionProjects.TryGetValue(binding.MotionProject, out var motionProject))
-                            {
-                                MarkDelete();
-                                continue;
-                            }
-
-                            if (!motionProject.Markers.Any(x => x.Name.Equals(binding.Marker)))
-                            {
-                                MarkDelete();
-                                continue;
+                                ImGui.PopID();
                             }
                         }
-                        finally
+
+                        if (state.Bindings.Count == 0)
                         {
-                            ImGui.PopID();
+                            ImGui.Text("None");
                         }
                     }
 
-                    if (state.Bindings.Count == 0)
+                    ImGui.EndGroup();
+
+                    ImGui.Separator();
+
+                    ImGui.Text("Create New");
                     {
-                        ImGui.Text("None");
-                    }
-                }
-                
-                ImGui.EndGroup();
-
-                ImGui.Separator();
-
-                ImGui.Text("Create New");
-                {
-                    void LabelScan(string[] names, ref string selected, string comboLbl)
-                    {
-                        var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
-
-                        if (idx == -1)
-                        {
-                            idx = 0;
-                        }
-
-                        ImGui.Combo(comboLbl, ref idx, names, names.Length);
-
-                        if (names.Length != 0)
-                        {
-                            idx = Math.Clamp(idx, 0, names.Length);
-                            selected = names[idx];
-                        }
-                    }
-
-                    LabelScan(project.MotionProjects.Keys.ToArray(), ref state.SelectedProjectLabel, "Project");
-
-                    if (project.MotionProjects.TryGetValue(state.SelectedProjectLabel, out var motionProject))
-                    {
-                        LabelScan(motionProject.Markers.Select(x=>x.Name).ToArray(), ref state.SelectedMarkerLabel, "Marker");
+                        LabelScan(motionProject.Markers.Select(x => x.Name).ToArray(), ref state.SelectedMarkerLabel, "Marker");
 
                         var marker = state.SelectedMarkerLabel;
 
@@ -618,13 +602,17 @@ public sealed class MotionNode : NodeBehavior
                                 });
 
                                 node.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, terminalId));
-                                state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, state.SelectedProjectLabel, marker));
+                                state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, marker));
 
                                 changed = true;
                             }
                         }
                     }
                 }
+            }
+            else
+            {
+                state.Bindings.ToArray().ForEach(b => DestroyBinding(entity, b));
             }
         }
         finally
@@ -644,20 +632,39 @@ public sealed class MotionNode : NodeBehavior
     {
         ref var state = ref entity.Get<MotionNodeComponent>().State;
 
-        var removed = new List<MotionNodeTerminalBinding>();
+        if (!project.MotionProjects.TryGetValue(state.MotionProject, out var motionProject))
+        {
+            state
+                .Bindings
+                .Bind()
+                .ForEach(b => DestroyBinding(entity, b));
+        }
+        else
+        {
+            state
+                .Bindings
+                .Where(b => !motionProject.Markers.Any(m => m.Name.Equals(b.Marker)))
+                .Bind()
+                .ForEach(b => DestroyBinding(entity, b));
+        }
+    }
+
+    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    {
+        var node = entity.Get<NodeComponent>();
+        var state = entity.Get<MotionNodeComponent>().State;
+
+        if (!project.MotionProjects.ContainsKey(state.MotionProject))
+        {
+            analysis.Error("Motion project not set");
+        }
 
         foreach (var binding in state.Bindings)
         {
-            if (!project.MotionProjects.TryGetValue(binding.MotionProject, out var motionProject) ||
-                !motionProject.Markers.Any(x => x.Name.Equals(binding.Marker)))
+            if (node.ChildrenRef.Instance.All(x => x.Terminal.Id != binding.TerminalId))
             {
-                removed.Add(binding);
+                analysis.Warn($"Empty marker tree for \"{binding.Marker}\"");
             }
-        }
-
-        foreach (var binding in removed)
-        {
-            DestroyBinding(entity, binding);
         }
     }
 }

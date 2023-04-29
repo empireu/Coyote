@@ -225,4 +225,6 @@ internal static class Extensions
     {
         return Rotation.FromDirection(r2.X, r2.Y);
     }
+
+    public static T[] Bind<T>(this IEnumerable<T> e) => e.ToArray();
 }
