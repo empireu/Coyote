@@ -5,7 +5,7 @@ using GameFramework.Utilities;
 
 namespace Coyote.App.Nodes;
 
-internal struct JsonChild
+public struct JsonChild
 {
     [JsonInclude]
     public int TerminalId { get; set; }
@@ -14,7 +14,7 @@ internal struct JsonChild
     public JsonNode Node { get; set; }
 }
 
-internal class JsonNode
+public sealed class JsonNode
 {
     [JsonInclude]
     public JsonVector2 Position { get; set; }
@@ -38,7 +38,7 @@ internal class JsonNode
     public JsonChild[] Children { get; set; }
 }
 
-internal class NodeProject
+public class NodeProject
 {
     [JsonInclude]
     public JsonNode[] RootNodes { get; set; }

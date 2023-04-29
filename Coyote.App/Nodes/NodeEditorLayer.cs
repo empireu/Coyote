@@ -10,6 +10,7 @@ using System.Numerics;
 using GameFramework.ImGui;
 using Veldrid;
 using Arch.Core.Extensions;
+using Coyote.App.Movement;
 using GameFramework.Renderer;
 using GameFramework.Utilities;
 using GameFramework.Utilities.Extensions;
@@ -92,7 +93,20 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         imGui.Submit += ImGuiOnSubmit;
 
+        app.Project.OnMotionProjectChanged += ProjectOnOnMotionProjectChanged;
+
         UpdateEditorPipeline();
+    }
+
+    private void ProjectOnOnMotionProjectChanged(MotionProject obj)
+    {
+        _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity e, ref NodeComponent comp) =>
+        {
+            if (comp.Behavior.ListenForProjectUpdate)
+            {
+                comp.Behavior.OnProjectUpdate(e, _app.Project);
+            }
+        });
     }
 
     private Vector2 _selectPoint;
@@ -374,7 +388,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 }
                 else
                 {
-                    Inspector.SubmitEditor(_selectedEntity.Value);
+                    var entity = _selectedEntity.Value;
+
+                    Inspector.SubmitEditor(entity);
+
+                    entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project);
                 }
             }
 
@@ -525,18 +543,10 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         {
             RenderPass(() =>
             {
-                var query = _world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>());
-
-                foreach (var chunk in query.GetChunkIterator())
-                {
-                    foreach (var entity in chunk.Entities)
-                    {
-                        if (entity.IsAlive())
-                        {
-                            callback(entity, ref entity.Get<PositionComponent>(), ref entity.Get<ScaleComponent>(), ref entity.Get<NodeComponent>());
-                        }
-                    }
-                }
+                _world.Query(
+                    new QueryDescription()
+                        .WithAll<PositionComponent, ScaleComponent, NodeComponent>(), 
+                    callback);
             });
         }
 
@@ -554,6 +564,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         var isSelected = e == _selectedEntity;
         var surface = Vector2.Zero;
         var behavior = nodeComponent.Behavior;
+
+        if (behavior.Icon.IsInvalid)
+        {
+            Assert.Fail("Invalid behavior icon");
+        }
+
         var font = _app.Font;
         var position = positionComponent.Position;
 

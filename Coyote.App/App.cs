@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
+using System.Xml.Linq;
 using Coyote.App.Movement;
 using Coyote.App.Nodes;
 using GameFramework;
@@ -126,6 +127,8 @@ internal class App : GameApplication
         Proxy("Parallel").Also(x => x.BackgroundColor = new Vector4(0.2f, 0.5f, 0.1f, 0.8f));
 
         Decorator("Success");
+
+        reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)

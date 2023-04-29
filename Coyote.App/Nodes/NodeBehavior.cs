@@ -1,8 +1,12 @@
 ﻿using System.Numerics;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Utilities;
+using ImGuiNET;
 
 namespace Coyote.App.Nodes;
 
@@ -94,6 +98,14 @@ public class NodeConnectionSet
         }
 
         _childTerminals.Add(child);
+    }
+
+    public void RemoveChildTerminal(NodeTerminal child)
+    {
+        if (!_childTerminals.Remove(child))
+        {
+            throw new InvalidOperationException("This set didn't have the specified child terminal");
+        }
     }
 
     // Maybe get rid of this borderSize
@@ -303,7 +315,31 @@ public abstract class NodeBehavior
 
     public virtual void Analyze(Entity entity, NodeAnalysis analysis) { }
 
-    public virtual void SubmitInspector(Entity entity) { }
+    /// <summary>
+    ///     Submits an <see cref="ImGui"/> inspector interface. The call happens inside a window block, so windows should not be created here.
+    /// </summary>
+    /// <param name="entity">The entity being edited.</param>
+    /// <param name="project">The current project.</param>
+    /// <returns>True, if the project was mutated.</returns>
+    public virtual bool SubmitInspector(Entity entity, Project project)
+    {
+        return false;
+    }
+
+    /// <summary>
+    ///     If true, <see cref="OnProjectUpdate"/> will be called when the project version changes.
+    /// </summary>
+    public virtual bool ListenForProjectUpdate => false;
+
+    /// <summary>
+    ///     Called when <see cref="ListenForProjectUpdate"/> is true and the project version has changed.
+    /// </summary>
+    /// <param name="entity"></param>
+    /// <param name="project"></param>
+    public virtual void OnProjectUpdate(Entity entity, Project project)
+    {
+
+    }
 
     public override string ToString()
     {
@@ -363,6 +399,266 @@ public class DecoratorNode : NodeBehavior
     public override void Analyze(Entity entity, NodeAnalysis analysis)
     {
         analysis.Warn("Warning 1").Warn("Warning 2").Warn("Warning 3").Error("Error 1");
+    }
+}
+
+public sealed class MotionNode : NodeBehavior
+{
+    public struct MotionNodeTerminalBinding
+    {
+        public MotionNodeTerminalBinding(int terminalId, string motionProject, string marker)
+        {
+            TerminalId = terminalId;
+            MotionProject = motionProject;
+            Marker = marker;
+        }
+
+        [JsonInclude]
+        public int TerminalId { get; set; }
+        
+        [JsonInclude]
+        public string MotionProject { get; set; }
+
+        [JsonInclude]
+        public string Marker { get; set; }
+    }
+
+    public class MotionNodeState
+    {
+        [JsonInclude]
+        public List<MotionNodeTerminalBinding> Bindings { get; set; } = new();
+
+        // GUI state:
+
+        [JsonIgnore]
+        public string SelectedProjectLabel = string.Empty;
+
+        [JsonIgnore]
+        public string SelectedMarkerLabel = string.Empty;
+    }
+
+    public struct MotionNodeComponent
+    {
+        public MotionNodeState State;
+    }
+
+    public MotionNode(TextureSampler icon, string name) : base(icon, new Vector4(0.95f, 0.8f, 0.5f, 0.7f), name)
+    {
+        
+    }
+
+    public override bool ListenForProjectUpdate => true;
+
+    public override void AttachComponents(Entity entity)
+    {
+        entity.Add(new MotionNodeComponent
+        {
+            State = new MotionNodeState()
+        });
+    }
+
+    public override string Save(Entity entity)
+    {
+        return JsonSerializer.Serialize(entity.Get<MotionNodeComponent>().State);
+    }
+
+    public override void InitialLoad(Entity entity, string storedData)
+    {
+        var state = JsonSerializer.Deserialize<MotionNodeState>(storedData) ?? throw new Exception("Failed to deserialize motion node");
+
+        entity.Get<MotionNodeComponent>().State = state;
+
+        ref var component = ref entity.Get<NodeComponent>();
+
+        foreach (var binding in state.Bindings)
+        {
+            component.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, binding.TerminalId));
+        }
+    }
+
+    private static void DestroyBinding(Entity entity, MotionNodeTerminalBinding binding)
+    {
+        var node = entity.Get<NodeComponent>();
+        ref var state = ref entity.Get<MotionNodeComponent>().State;
+
+        node
+            .ChildrenRef
+            .Instance
+            .Where(c => c.Terminal.Id == binding.TerminalId)
+            .ToArray()
+            .ForEach(child => entity.UnlinkFrom(child.Entity));
+
+        var terminalResults = node.Terminals.ChildTerminals.Where(x => x.Id == binding.TerminalId).ToArray();
+
+        Assert.IsTrue(terminalResults.Length == 1, $"Failed to get the expected number of terminals ({terminalResults.Length})");
+
+        Assert.IsTrue(state.Bindings.Remove(binding));
+        node.Terminals.RemoveChildTerminal(terminalResults.First());
+    }
+
+    public override bool SubmitInspector(Entity entity, Project project)
+    {
+        ref var node = ref entity.Get<NodeComponent>();
+        ref var state = ref entity.Get<MotionNodeComponent>().State;
+
+        var deleted = new List<MotionNodeTerminalBinding>();
+
+        var changed = false;
+
+        ImGui.PushID("Motion Node Inspector");
+
+        try
+        {
+            if (ImGui.CollapsingHeader("Marker Bindings"))
+            {
+                ImGui.BeginGroup();
+                {
+                    nint bindingIdx = 0;
+                    foreach (var binding in state.Bindings)
+                    {
+                        ImGui.PushID(bindingIdx++);
+
+                        try
+                        {
+                            ImGui.Text($"Project: {binding.MotionProject}");
+                            ImGui.Text($"Marker: {binding.Marker}");
+
+                            ImGui.SameLine();
+
+                            void MarkDelete()
+                            {
+                                if (!deleted!.Contains(binding))
+                                {
+                                    deleted!.Add(binding);
+                                }
+
+                                changed = true;
+                            }
+
+                            if (ImGui.Button("-"))
+                            {
+                                MarkDelete();
+                            }
+
+                            ImGui.Separator();
+
+                            // Destroy bindings with invalid markers:
+
+                            if (!project.MotionProjects.TryGetValue(binding.MotionProject, out var motionProject))
+                            {
+                                MarkDelete();
+                                continue;
+                            }
+
+                            if (!motionProject.Markers.Any(x => x.Name.Equals(binding.Marker)))
+                            {
+                                MarkDelete();
+                                continue;
+                            }
+                        }
+                        finally
+                        {
+                            ImGui.PopID();
+                        }
+                    }
+
+                    if (state.Bindings.Count == 0)
+                    {
+                        ImGui.Text("None");
+                    }
+                }
+                
+                ImGui.EndGroup();
+
+                ImGui.Separator();
+
+                ImGui.Text("Create New");
+                {
+                    void LabelScan(string[] names, ref string selected, string comboLbl)
+                    {
+                        var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
+
+                        if (idx == -1)
+                        {
+                            idx = 0;
+                        }
+
+                        ImGui.Combo(comboLbl, ref idx, names, names.Length);
+
+                        if (names.Length != 0)
+                        {
+                            idx = Math.Clamp(idx, 0, names.Length);
+                            selected = names[idx];
+                        }
+                    }
+
+                    LabelScan(project.MotionProjects.Keys.ToArray(), ref state.SelectedProjectLabel, "Project");
+
+                    if (project.MotionProjects.TryGetValue(state.SelectedProjectLabel, out var motionProject))
+                    {
+                        LabelScan(motionProject.Markers.Select(x=>x.Name).ToArray(), ref state.SelectedMarkerLabel, "Marker");
+
+                        var marker = state.SelectedMarkerLabel;
+
+                        if (motionProject.Markers.Any(x => x.Name.Equals(marker)))
+                        {
+                            if (ImGui.Button("Create"))
+                            {
+                                var terminalId = node.Terminals.ChildTerminals.Map(terminals =>
+                                {
+                                    var idx = 0;
+                                    var lookup = terminals.Select(x => x.Id).ToHashSet();
+
+                                    while (lookup.Contains(idx))
+                                    {
+                                        idx++;
+                                    }
+
+                                    return idx;
+                                });
+
+                                node.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, terminalId));
+                                state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, state.SelectedProjectLabel, marker));
+
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            ImGui.PopID();
+        }
+
+        foreach (var binding in deleted)
+        {
+            DestroyBinding(entity, binding);
+        }
+
+        return changed;
+    }
+
+    public override void OnProjectUpdate(Entity entity, Project project)
+    {
+        ref var state = ref entity.Get<MotionNodeComponent>().State;
+
+        var removed = new List<MotionNodeTerminalBinding>();
+
+        foreach (var binding in state.Bindings)
+        {
+            if (!project.MotionProjects.TryGetValue(binding.MotionProject, out var motionProject) ||
+                !motionProject.Markers.Any(x => x.Name.Equals(binding.Marker)))
+            {
+                removed.Add(binding);
+            }
+        }
+
+        foreach (var binding in removed)
+        {
+            DestroyBinding(entity, binding);
+        }
     }
 }
 

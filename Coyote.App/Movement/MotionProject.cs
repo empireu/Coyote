@@ -4,7 +4,7 @@ using Coyote.Mathematics;
 
 namespace Coyote.App.Movement;
 
-internal struct JsonTranslationPoint
+public struct JsonTranslationPoint
 {
     [JsonInclude]
     public JsonVector2 Position { get; set; }
@@ -16,7 +16,7 @@ internal struct JsonTranslationPoint
     public JsonVector2 Acceleration { get; set; }
 }
 
-internal struct JsonRotationPoint
+public struct JsonRotationPoint
 {
     [JsonInclude]
     public JsonVector2 Position { get; set; }
@@ -28,7 +28,7 @@ internal struct JsonRotationPoint
     public float Parameter { get; set; }
 }
 
-internal struct JsonMarker
+public struct JsonMarker
 {
     [JsonInclude]
     public JsonVector2 Position { get; set; }
@@ -40,7 +40,7 @@ internal struct JsonMarker
     public string Name { get; set; }
 }
 
-internal struct JsonMotionConstraints
+public struct JsonMotionConstraints
 {
     [JsonInclude]
     public double LinearVelocity { get; set; }
@@ -54,7 +54,7 @@ internal struct JsonMotionConstraints
     public double CentripetalAcceleration { get; set; }
 }
 
-internal struct JsonGenerationParameters
+public struct JsonGenerationParameters
 {
     public float Dx { get; set; }
     public float Dy { get; set; }
@@ -64,7 +64,7 @@ internal struct JsonGenerationParameters
     public float DParameterRotation { get; set; }
 }
 
-internal class MotionProject
+public sealed class MotionProject
 {
     [JsonInclude]
     public JsonTranslationPoint[] TranslationPoints { get; set; }

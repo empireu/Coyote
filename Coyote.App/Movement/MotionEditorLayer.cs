@@ -724,6 +724,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         };
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
+        _app.Project.SetChanged(motionProject);
 
         _app.Project.Save();
     }

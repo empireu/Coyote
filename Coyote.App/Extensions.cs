@@ -44,41 +44,31 @@ internal static class Extensions
     public static List<Entity> Clip(this World world, Vector2 pickPosition, AlignMode align = AlignMode.Center, SizeF? margin = null, ClipConditionDelegate? condition = null)
     {
         margin ??= SizeF.Empty;
-        condition ??= (entity, rectangle, check) => check;
-
-        var query = world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent>());
+        condition ??= (_, _, check) => check;
         var results = new List<Entity>();
 
-        foreach (var chunk in query)
-        {
-            foreach (var entity in chunk.Entities)
+        world.Query(new QueryDescription().WithAll<PositionComponent, ScaleComponent>(), new ForEachWithEntity<PositionComponent, ScaleComponent>(
+            (in Entity e, ref PositionComponent _, ref ScaleComponent _) =>
             {
-                if (!entity.IsAlive())
-                {
-                    continue;
-                }
-
-                var r = entity.GetRectangle();
+                var r = e.GetRectangle();
+               
                 r.Inflate(margin.Value);
 
-                if (!condition(entity, r, (align == AlignMode.Center
+                if (!condition(e, r, align == AlignMode.Center
                         ? r.Contains(pickPosition.X, pickPosition.Y)
                         : r.Contains(pickPosition.X - r.Width / 2,
-                            pickPosition.Y + r.Height / 2)
-                        ))
-                    )
+                            pickPosition.Y + r.Height / 2)))
                 {
-                    continue;
+                    return;
                 }
 
-                if (entity.Has<SpriteComponent>() && entity.Get<SpriteComponent>().Disabled)
+                if (e.Has<SpriteComponent>() && e.Get<SpriteComponent>().Disabled)
                 {
-                    continue;
+                    return;
                 }
 
-                results.Add(entity);
-            }
-        }
+                results.Add(e);
+            }));
 
         return results;
     }

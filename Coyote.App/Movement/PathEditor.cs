@@ -7,11 +7,10 @@ using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
-using GameFramework.Utilities.Extensions;
 
 namespace Coyote.App.Movement;
 
-internal sealed class PathEditor : IDisposable
+public sealed class PathEditor : IDisposable
 {
     private const float InitialTranslation = 0.1f;
     private const float InitialKnobSize = 0.025f;

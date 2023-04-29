@@ -6,7 +6,7 @@ using Exception = System.Exception;
 
 namespace Coyote.App;
 
-internal sealed class Project
+public sealed class Project
 {
     public static Project CreateEmpty(string name)
     {
@@ -40,6 +40,14 @@ internal sealed class Project
         File.WriteAllText(FileName, JsonSerializer.Serialize(this));
         IsChanged = false;
     }
+
+    public void SetChanged(MotionProject project)
+    {
+        SetChanged();
+        OnMotionProjectChanged?.Invoke(project);
+    }
+
+    public event Action<MotionProject>? OnMotionProjectChanged;
 
     public static Project Load(string fileName)
     {
