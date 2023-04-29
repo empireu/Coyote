@@ -155,6 +155,52 @@ public struct NodeComponent
     public NodeConnectionSet Terminals;
 }
 
+public sealed class NodeAnalysis
+{
+    private readonly List<Message> _messages;
+
+    public static Vector4 MessageColor(MessageType type)
+    {
+        return type switch
+        {
+            MessageType.Warning => new Vector4(1f, 1f, 0f, 0.8f),
+            MessageType.Error => new Vector4(1f, 0f, 0f, 1f),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+        };
+    }
+
+    public enum MessageType
+    {
+        Warning,
+        Error
+    }
+   
+    public readonly struct Message
+    {
+        public MessageType Type { get; }
+        public string Text { get; }
+
+        public Message(MessageType type, string text)
+        {
+            Type = type;
+            Text = text;
+        }
+    }
+
+    public NodeAnalysis(List<Message> messages)
+    {
+        _messages = messages;
+    }
+
+    public NodeAnalysis With(Message message)
+    {
+        _messages.Add(message);
+        return this;
+    }
+    public NodeAnalysis Warn(string text) => With(new Message(MessageType.Warning, text));
+    public NodeAnalysis Error(string text) => With(new Message(MessageType.Error, text));
+}
+
 public abstract class NodeBehavior
 {
     /// <summary>
@@ -255,6 +301,10 @@ public abstract class NodeBehavior
     /// </summary>
     public virtual void AfterLoad(Entity entity) { }
 
+    public virtual void Analyze(Entity entity, NodeAnalysis analysis) { }
+
+    public virtual void SubmitInspector(Entity entity) { }
+
     public override string ToString()
     {
         return Name;
@@ -308,6 +358,11 @@ public class DecoratorNode : NodeBehavior
     protected override void AttachTerminals(NodeConnectionSet connections)
     {
         connections.AddChildTerminal(new DecoratorTerminal(0));
+    }
+
+    public override void Analyze(Entity entity, NodeAnalysis analysis)
+    {
+        analysis.Warn("Warning 1").Warn("Warning 2").Warn("Warning 3").Error("Error 1");
     }
 }
 

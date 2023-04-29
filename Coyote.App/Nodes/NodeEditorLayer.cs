@@ -19,7 +19,6 @@ namespace Coyote.App.Nodes;
 
 internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 {
-    private const float MoveSpeed = 2f;
     private const float ZoomSpeed = 35;
     private const float MinZoom = 2.0f;
     private const float MaxZoom = 10f;
@@ -255,27 +254,66 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         try
         {
-
             if (ImGui.Begin("Nodes"))
             {
                 ImGui.Combo(
-                    "Place",
+                    "Behavior",
                     ref _selectedBehaviorIndex,
                     _nodeBehaviors.Select(x => x.ToString()).ToArray(),
                     _nodeBehaviors.Length);
 
-                if (ImGui.Button("OK"))
+                if (ImGui.Button("Place"))
                 {
                     Place();
                 }
 
-                if (ImGui.Button("Save"))
+                if (ImGui.CollapsingHeader("Analysis"))
                 {
-                    var result = NodeProject.FromNodeWorld(_world);
+                    var messages = new List<NodeAnalysis.Message>();
+                    var analysis = new NodeAnalysis(messages);
 
-                    _world.Clear();
+                    Entity? highlight = null;
+                    
+                    nint id = 1;
 
-                    result.Load(_world, _nodeBehaviors);
+                    _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent component) =>
+                    {
+                        component.Behavior.Analyze(entity, analysis);
+
+                        foreach (var message in messages)
+                        {
+                            ImGui.TextColored(NodeAnalysis.MessageColor(message.Type), message.Text);
+                        }
+
+                        if (messages.Count > 0)
+                        {
+                            ImGui.PushID(id++);
+
+                            if (ImGui.Button("Highlight"))
+                            {
+                                highlight = entity;
+                            }
+                            
+                            ImGui.PopID();
+
+                            ImGui.Separator();
+                        }
+
+                        messages.Clear();
+                    });
+
+                    if (highlight.HasValue)
+                    {
+                        _selectedEntity = highlight.Value;
+                       
+                        _cameraController.FuturePosition2 = _selectedEntity.Value.Map(entity =>
+                        {
+                            var position = entity.Get<PositionComponent>().Position;
+                            var scale = entity.Get<ScaleComponent>().Scale;
+
+                            return position + scale / 2;
+                        });
+                    }
                 }
             }
 
