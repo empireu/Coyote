@@ -201,6 +201,8 @@ internal sealed class PathEditor : IDisposable
             marker.Get<MarkerComponent>().Parameter = param;
             marker.Get<SpriteComponent>().Transform = GetMarkerSpriteTransform(param);
         });
+
+        OnMarkerChanged?.Invoke();
     }
 
     /// <summary>
@@ -238,6 +240,8 @@ internal sealed class PathEditor : IDisposable
         });
 
         _markerPoints.Add(entity);
+
+        OnMarkerChanged?.Invoke();
 
         return entity;
     }
@@ -332,6 +336,8 @@ internal sealed class PathEditor : IDisposable
 
         _world.Destroy(entity);
         _markerPoints.Remove(entity);
+      
+        OnMarkerChanged?.Invoke();
 
         Version++;
     }
@@ -666,6 +672,7 @@ internal sealed class PathEditor : IDisposable
 
     public event Action? OnTranslationChanged;
     public event Action? OnRotationChanged;
+    public event Action? OnMarkerChanged;
 
     public void Dispose()
     {

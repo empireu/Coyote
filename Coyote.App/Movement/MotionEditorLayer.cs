@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
+using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -68,6 +69,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
     private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
     private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
+
+    private static readonly Vector4 PendingMarkerColor = new(0.8f, 0.1f, 0.1f, 1.0f);
+    private static readonly Vector4 HitMarkerColor = new(0.1f, 0.9f, 0f, 1.0f);
 
     private readonly App _app;
     private readonly ImGuiLayer _imGuiLayer;
@@ -302,7 +306,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
     private bool HasUnsavedChanges => !_app.Project.MotionProjects.ContainsKey(_motionProjectName) ||
                                       _app.Project.MotionProjects[_motionProjectName].Version != _path.Version;
-
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
         if (_disposed)
@@ -319,6 +322,18 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         try
         {
+            var hoveredMarkersEntities = _world.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
+
+            if (hoveredMarkersEntities.Length > 0)
+            {
+                var marker = hoveredMarkersEntities.First().Get<MarkerComponent>();
+                var hit = _simulator.MarkerEvents.Any(x => x.Marker.Parameter == marker.Parameter);
+
+                ImGui.BeginTooltip();
+                ImGui.TextColored(hit ? HitMarkerColor : PendingMarkerColor, marker.Name);
+                ImGui.EndTooltip();
+            }
+
             if (ImGui.Begin("Tools"))
             {
                 ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
@@ -608,6 +623,20 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                         }
                     }
 
+                    if (ImGui.CollapsingHeader("Marker Events"))
+                    {
+                        ImGui.BeginGroup();
+
+                        foreach (var @event in _simulator.MarkerEvents)
+                        {
+                            ImGui.Text(@event.Marker.Label);
+                            ImGui.Text($"T+{@event.HitTime.Value:F4}s");
+                            ImGui.Separator();
+                        }
+
+                        ImGui.EndGroup();
+                    }
+
                     if (ImGui.CollapsingHeader("Point Density"))
                     {
                         const int factor = 1000;
@@ -648,6 +677,8 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                         {
                             _simulator.DParameterRotation = dParameterRotation / factor;
                         }
+
+                        ImGui.Text($"Points: {_simulator.Points}");
                     }
                 }
 
