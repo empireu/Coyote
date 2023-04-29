@@ -30,7 +30,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         TranslateAdd,
         TranslateDelete,
         RotateAdd,
-        RotateRemove
+        RotateDelete,
+        MarkerAdd,
+        MarkerDelete
     }
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
@@ -38,7 +40,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         { ToolType.TranslateAdd, "Add Translation Points" },
         { ToolType.TranslateDelete, "Delete Translation Points" },
         { ToolType.RotateAdd, "Add Rotation Points" },
-        { ToolType.RotateRemove, "Delete Rotation Points" }
+        { ToolType.RotateDelete, "Delete Rotation Points" },
+        { ToolType.MarkerAdd, "Add Markers" },
+        { ToolType.MarkerDelete, "Delete Markers" }
     };
 
     private static readonly Dictionary<ToolType, IResourceKey> ToolTextures = new()
@@ -46,7 +50,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         { ToolType.TranslateAdd, App.Asset("Images.AddTranslationPoint.png") },
         { ToolType.TranslateDelete, App.Asset("Images.DeleteTranslationPoint.png") },
         { ToolType.RotateAdd, App.Asset("Images.AddRotationPoint.png") },
-        { ToolType.RotateRemove, App.Asset("Images.DeleteRotationPoint.png") }
+        { ToolType.RotateDelete, App.Asset("Images.DeleteRotationPoint.png") },
+        { ToolType.MarkerAdd, App.Asset("Images.AddMarker.png") },
+        { ToolType.MarkerDelete, App.Asset("Images.DeleteMarker.png") }
     };
 
     private const float FieldSize = 3.66f;
@@ -240,7 +246,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     _path.CreateRotationPoint(MouseWorld);
                 }
                 break;
-            case ToolType.RotateRemove:
+            case ToolType.RotateDelete:
                 {
                     SelectEntity();
 
@@ -252,6 +258,24 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     _selectedEntity = null;
                     break;
                 }
+            case ToolType.MarkerAdd:
+                if (_path.CanCreateMarker)
+                {
+                    _path.CreateMarker(MouseWorld);
+                }
+                break;
+            case ToolType.MarkerDelete:
+            {
+                SelectEntity();
+
+                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsMarker(_selectedEntity.Value))
+                {
+                    _path.DestroyMarker(_selectedEntity.Value);
+                }
+
+                _selectedEntity = null;
+                break;
+            }
             default:
                 throw new ArgumentOutOfRangeException();
         }

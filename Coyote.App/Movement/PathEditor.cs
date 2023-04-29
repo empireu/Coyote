@@ -7,6 +7,7 @@ using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
+using GameFramework.Utilities.Extensions;
 
 namespace Coyote.App.Movement;
 
@@ -16,6 +17,8 @@ internal sealed class PathEditor : IDisposable
     private const float InitialKnobSize = 0.025f;
     private const float PositionKnobSize = 0.05f;
     private const float RotationKnobSize = 0.035f;
+    private const float MarkerSize = 0.1f;
+    private const float MarkerYOffset = 0.07f;
     private const float IndicatorSize = 0.025f;
     private const float AddToEndThreshold = 0.05f;
 
@@ -26,13 +29,16 @@ internal sealed class PathEditor : IDisposable
 
     private readonly List<Entity> _translationPoints = new();
     private readonly List<Entity> _rotationPoints = new();
+    private readonly List<Entity> _markerPoints = new();
 
     public IReadOnlyList<Entity> TranslationPoints => _translationPoints;
     public IReadOnlyList<Entity> RotationPoints => _rotationPoints;
+    public IReadOnlyList<Entity> MarkerPoints => _markerPoints;
 
     private readonly Sprite _positionSprite;
     private readonly Sprite _velocitySprite;
     private readonly Sprite _accelerationSprite;
+    private readonly Sprite _markerSprite;
 
     /// <summary>
     ///     Gets the arc length of the translation path.
@@ -60,10 +66,11 @@ internal sealed class PathEditor : IDisposable
         _positionSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.PositionMarker.png"));
         _velocitySprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.VelocityMarker.png"));
         _accelerationSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.AccelerationMarker.png"));
+        _markerSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Marker.png"));
     }
 
     /// <summary>
-    ///     Creates a translation point at the specified position.
+    ///     Creates a translation point at the specified <see cref="position"/>.
     /// </summary>
     /// <param name="position">The world position of the translation point.</param>
     /// <param name="rebuildPath">If true, the path will be re-built. If bulk creation is wanted, setting this to false can reduce extraneous computation.</param>
@@ -128,7 +135,7 @@ internal sealed class PathEditor : IDisposable
     public bool CanCreateRotationPoint => TranslationSpline.Segments.Count > 0;
 
     /// <summary>
-    ///     Builds a rotation point close to the specified position.
+    ///     Builds a rotation point close to the specified <see cref="position"/>.
     /// </summary>
     /// <param name="position">
     ///     The world position of the rotation point.
@@ -155,7 +162,7 @@ internal sealed class PathEditor : IDisposable
                 // Remap position after projection.
                 pos = entity.Get<PositionComponent>().Position;
 
-                ReProjectRotationPoint(entity);
+                ReProjectPathElement(entity, param => entity.Get<RotationPointComponent>().Parameter = param);
 
                 // Also move the knob to the re-projected position and re-build the spline.
                 OnControlPointChanged(entity, pos, RebuildRotationSpline, headingKnob);
@@ -175,6 +182,71 @@ internal sealed class PathEditor : IDisposable
         return entity;
     }
 
+    public bool CanCreateMarker => TranslationSpline.Segments.Count > 0;
+
+    private Pose GetMarkerSpriteTransform(Real<Percentage> parameter)
+    {
+        var rotation = TranslationSpline
+            .EvaluateVelocity(parameter)
+            .ToVector2()
+            .Exp();
+
+        return new Pose(new Translation(0, MarkerYOffset).Rotated(rotation), rotation);
+    }
+
+    private Pose GetMarkerSpriteTransform(Entity marker)
+    {
+        return GetMarkerSpriteTransform(marker.Get<MarkerComponent>().Parameter);
+    }
+
+    private void ProjectMarker(Entity marker)
+    {
+        ReProjectPathElement(marker, param =>
+        {
+            marker.Get<MarkerComponent>().Parameter = param;
+            marker.Get<SpriteComponent>().Transform = GetMarkerSpriteTransform(param);
+        });
+    }
+
+    /// <summary>
+    ///     Creates a displacement marker close to the specified <see cref="position"/>.
+    /// </summary>
+    /// <param name="position">
+    ///     The world position of the marker.
+    ///     This position will be projected onto the translation path and the final position will be the projected position.
+    /// </param>
+    /// <returns>The new marker entity.</returns>
+    public Entity CreateMarker(Vector2 position)
+    {
+        // Needed because we are not re-building the path (which increments the version in the case of translation and rotation points).
+        Version++;
+
+        // These are pretty similar to rotation points. They get projected onto the path and we use them with our node system to 
+        // trigger actions on the trajectory.
+        var translationParameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
+        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
+
+        var entity = _world.Create(new PositionComponent
+        {
+            Position = projectedPosition,
+            UpdateCallback = (entity, _) =>
+            {
+                ProjectMarker(entity);
+            }
+        },
+        new ScaleComponent { Scale = Vector2.One * MarkerSize },
+        new MarkerComponent { Parameter = translationParameter },
+        new SpriteComponent
+        {
+            Sprite = _markerSprite, 
+            Transform = GetMarkerSpriteTransform(translationParameter)
+        });
+
+        _markerPoints.Add(entity);
+
+        return entity;
+    }
+
     /// <summary>
     ///     Clears all tracked points.
     ///     This will not delete anything from the <see cref="World"/>.
@@ -183,6 +255,8 @@ internal sealed class PathEditor : IDisposable
     {
         _translationPoints.Clear();
         _rotationPoints.Clear();
+        _markerPoints.Clear();
+
         _pathRenderer.Clear();
         ArcLength = Real<Displacement>.Zero;
         RebuildTranslation();
@@ -197,6 +271,11 @@ internal sealed class PathEditor : IDisposable
     public bool IsRotationPoint(Entity entity)
     {
         return _rotationPoints.Contains(entity);
+    }
+
+    public bool IsMarker(Entity entity)
+    {
+        return _markerPoints.Contains(entity);
     }
 
     /// <summary>
@@ -245,6 +324,24 @@ internal sealed class PathEditor : IDisposable
     }
 
     /// <summary>
+    ///     Destroys a marker. This also deletes it from the world.
+    /// </summary>
+    /// <param name="entity">The entity to destroy.</param>
+    /// <exception cref="InvalidOperationException">Thrown if the entity is not a tracked marker.</exception>
+    public void DestroyMarker(Entity entity)
+    {
+        if (!IsMarker(entity))
+        {
+            throw new InvalidOperationException("Entity is not marker!");
+        }
+
+        _world.Destroy(entity);
+        _markerPoints.Remove(entity);
+
+        Version++;
+    }
+
+    /// <summary>
     ///     Destroys all rotation points by calling <see cref="DestroyRotationPoint"/>.
     /// </summary>
     private void DestroyRotationPoints()
@@ -257,6 +354,21 @@ internal sealed class PathEditor : IDisposable
         }
 
         Assert.IsTrue(_rotationPoints.Count == 0);
+    }
+
+    /// <summary>
+    ///     Destroys all markers by calling <see cref="DestroyMarker"/>
+    /// </summary>
+    private void DestroyMarkers()
+    {
+        var points = _markerPoints.ToArray();
+
+        foreach (var marker in points)
+        {
+            DestroyMarker(marker);
+        }
+
+        Assert.IsTrue(_markerPoints.Count == 0);
     }
 
     /// <summary>
@@ -352,6 +464,7 @@ internal sealed class PathEditor : IDisposable
         if (_translationPoints.Count < 2)
         {
             DestroyRotationPoints();
+            DestroyMarkers();
 
             OnTranslationChanged?.Invoke();
 
@@ -380,21 +493,15 @@ internal sealed class PathEditor : IDisposable
         ArcLength = TranslationSpline.ComputeArcLength();
 
         RefitRotationPoints();
+        RefitMarkers();
+
         RebuildRotationSpline();
 
         OnTranslationChanged?.Invoke();
     }
 
     /// <summary>
-    ///     Re-fits the rotation points on a modified translation arc.
-    ///     This is done in the following steps:
-    ///         - The original position is obtained
-    ///         - The position is projected onto the new arc
-    ///         - The rotation point's <see cref="RotationPointComponent.Parameter"/> is updated to the re-projected one.
-    ///         - The rotation point's world position is updated to the re-projected position.
-    ///         - Knobs are updated with the displacement.
-    ///
-    ///     Because multiple projections are needed, this is an expensive operation.
+    ///     Refits rotation points using <see cref="ReProjectPathElement"/> and moves the control knobs to updated positions.
     /// </summary>
     private void RefitRotationPoints()
     {
@@ -406,32 +513,46 @@ internal sealed class PathEditor : IDisposable
 
         foreach (var rotationPoint in _rotationPoints)
         {
-            ref var position = ref rotationPoint.Get<PositionComponent>().Position;
-            var oldPosition = position;
+            var oldPosition = rotationPoint.Get<PositionComponent>().Position;
 
-            ref var component = ref rotationPoint.Get<RotationPointComponent>();
-
-            // Refit rotation point on arc (assuming the arc was edited):
-            component.Parameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
-
-            // Remove projection errors by updating the position again:
-            position = TranslationSpline.Evaluate(component.Parameter).ToVector2();
+            ReProjectPathElement(rotationPoint, param => rotationPoint.Get<RotationPointComponent>().Parameter = param);
 
             // Move knob to new position:
-            OnControlPointChanged(rotationPoint, oldPosition, () => { }, component.HeadingMarker);
+            OnControlPointChanged(rotationPoint, oldPosition, () => { }, rotationPoint.Get<RotationPointComponent>().HeadingMarker);
         }
     }
 
     /// <summary>
-    ///     Re-projects the position of the rotation point on the spline. The parameter and world position are updated.
+    ///     Refits markers using <see cref="ProjectMarker"/>
     /// </summary>
-    /// <param name="point"></param>
-    private void ReProjectRotationPoint(Entity point)
+    private void RefitMarkers()
+    {
+        if (TranslationSpline.Segments.Count == 0)
+        {
+            Assert.Fail();
+            return;
+        }
+
+        foreach (var marker in _markerPoints)
+        {
+            ProjectMarker(marker);
+        }
+    }
+
+    /// <summary>
+    ///     Projects the path element on a modified translation arc.
+    ///     This is done in the following steps:
+    ///         - The original position is obtained
+    ///         - The position is projected onto the new arc
+    ///         - The rotation point's parameter is updated to the re-projected one using <see cref="applyUpdate"/>
+    ///         - The rotation point's world position is updated to the re-projected position
+    /// </summary>
+    private void ReProjectPathElement(Entity point, Action<Real<Percentage>> applyUpdate)
     {
         var position = point.Get<PositionComponent>().Position;
         var parameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
 
-        point.Get<RotationPointComponent>().Parameter = parameter;
+        applyUpdate(parameter);
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
     }
 

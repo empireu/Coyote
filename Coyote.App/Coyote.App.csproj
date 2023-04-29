@@ -10,11 +10,14 @@
   <ItemGroup>
     <None Remove="Assets\Fonts\Roboto.font" />
     <None Remove="Assets\Images\AccelerationMarker.png" />
+    <None Remove="Assets\Images\AddMarker.png" />
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
     <None Remove="Assets\Images\&#xD;&#xA;		  &#xD;&#xA;tationPoint.png" />
+    <None Remove="Assets\Images\DeleteMarker.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
+    <None Remove="Assets\Images\Marker.png" />
     <None Remove="Assets\Images\MotionEditorTab.png" />
     <None Remove="Assets\Images\NodeEditorTab.png" />
     <None Remove="Assets\Images\Nodes\Action.png" />
@@ -39,11 +42,14 @@
   <ItemGroup>
     <EmbeddedResource Include="Assets\Fonts\Roboto.font" />
     <EmbeddedResource Include="Assets\Images\AccelerationMarker.png" />
+    <EmbeddedResource Include="Assets\Images\AddMarker.png" />
     <EmbeddedResource Include="Assets\Images\AddRotationPoint.png" />
     <EmbeddedResource Include="Assets\Images\AddTranslationPoint.png" />
     <EmbeddedResource Include="Assets\Images\Arrow.png" />
+    <EmbeddedResource Include="Assets\Images\DeleteMarker.png" />
     <EmbeddedResource Include="Assets\Images\DeleteRotationPoint.png" />
     <EmbeddedResource Include="Assets\Images\DeleteTranslationPoint.png" />
+    <EmbeddedResource Include="Assets\Images\Marker.png" />
     <EmbeddedResource Include="Assets\Images\MotionEditorTab.png" />
     <EmbeddedResource Include="Assets\Images\NodeEditorTab.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Action.png" />

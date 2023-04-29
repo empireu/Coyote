@@ -29,6 +29,7 @@ internal struct RotationComponent
 internal struct SpriteComponent
 {
     public Sprite Sprite;
+    public Pose? Transform;
     public bool Disabled;
 }
 
@@ -51,5 +52,10 @@ internal struct RotationPointComponent
     public const float HeadingLineThickness = 0.01f;
 
     public Entity HeadingMarker;
+    public Real<Percentage> Parameter;
+}
+
+internal struct MarkerComponent
+{
     public Real<Percentage> Parameter;
 }
