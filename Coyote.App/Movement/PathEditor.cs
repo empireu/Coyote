@@ -194,11 +194,6 @@ internal sealed class PathEditor : IDisposable
         return new Pose(new Translation(0, MarkerYOffset).Rotated(rotation), rotation);
     }
 
-    private Pose GetMarkerSpriteTransform(Entity marker)
-    {
-        return GetMarkerSpriteTransform(marker.Get<MarkerComponent>().Parameter);
-    }
-
     private void ProjectMarker(Entity marker)
     {
         ReProjectPathElement(marker, param =>
@@ -235,7 +230,7 @@ internal sealed class PathEditor : IDisposable
             }
         },
         new ScaleComponent { Scale = Vector2.One * MarkerSize },
-        new MarkerComponent { Parameter = translationParameter },
+        new MarkerComponent { Parameter = translationParameter, Name = "Marker" },
         new SpriteComponent
         {
             Sprite = _markerSprite, 

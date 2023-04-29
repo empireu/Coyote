@@ -261,7 +261,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             case ToolType.MarkerAdd:
                 if (_path.CanCreateMarker)
                 {
-                    _path.CreateMarker(MouseWorld);
+                    EnsureUniqueMarkerName(_path.CreateMarker(MouseWorld));
                 }
                 break;
             case ToolType.MarkerDelete:
@@ -279,6 +279,25 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    private void EnsureUniqueMarkerName(Entity marker)
+    {
+        ref var component = ref marker.Get<MarkerComponent>();
+        var name = component.Name;
+
+        if (name.StartsWith("Marker ") && int.TryParse(name.Replace("Marker ", ""), out _))
+        {
+            name = "Marker";
+        }
+
+        var duplicates = 0;
+        while (_path.MarkerPoints.Any(x => x != marker && x.Get<MarkerComponent>().Name.Equals(name)))
+        {
+            name = $"{component.Name} {++duplicates}";
+        }
+
+        component.Name = name;
     }
 
     private bool HasUnsavedChanges => !_app.Project.MotionProjects.ContainsKey(_motionProjectName) ||
@@ -487,7 +506,10 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                 }
                 else
                 {
-                    Inspector.SubmitEditor(_selectedEntity.Value);
+                    if (Inspector.SubmitEditor(_selectedEntity.Value))
+                    {
+                        OnUserChange();
+                    }
                 }
             }
 
@@ -636,6 +658,13 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         {
             ImGui.PopID();
         }
+    }
+
+    private void OnUserChange()
+    {
+        var entity = Assert.NotNull(_selectedEntity);
+        Assert.IsTrue(entity.IsAlive());
+        EnsureUniqueMarkerName(entity);
     }
 
     private void SaveProject()

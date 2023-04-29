@@ -58,4 +58,7 @@ internal struct RotationPointComponent
 internal struct MarkerComponent
 {
     public Real<Percentage> Parameter;
+
+    [StringEditor]
+    public string Name;
 }

@@ -28,6 +28,18 @@ internal struct JsonRotationPoint
     public float Parameter { get; set; }
 }
 
+internal struct JsonMarker
+{
+    [JsonInclude]
+    public JsonVector2 Position { get; set; }
+
+    [JsonInclude]
+    public float Parameter { get; set; }
+
+    [JsonInclude]
+    public string Name { get; set; }
+}
+
 internal struct JsonMotionConstraints
 {
     [JsonInclude]
@@ -59,6 +71,9 @@ internal class MotionProject
 
     [JsonInclude]
     public JsonRotationPoint[] RotationPoints { get; set; }
+
+    [JsonInclude]
+    public JsonMarker[] Markers { get; set; }
 
     [JsonInclude]
     public float Scale { get; set; }
@@ -101,6 +116,16 @@ internal class MotionProject
 
         editor.RebuildRotationSpline();
 
+        foreach (var marker in Markers)
+        {
+            var entity = editor.CreateMarker(marker.Position);
+
+            ref var component = ref entity.Get<MarkerComponent>();
+
+            component.Parameter = marker.Parameter.ToReal<Percentage>();
+            component.Name = marker.Name;
+        }
+
         editor.Version = Version;
     }
 
@@ -109,7 +134,8 @@ internal class MotionProject
         var project = new MotionProject
         {
             TranslationPoints = new JsonTranslationPoint[editor.TranslationPoints.Count],
-            RotationPoints = new JsonRotationPoint[editor.RotationPoints.Count]
+            RotationPoints = new JsonRotationPoint[editor.RotationPoints.Count],
+            Markers = new JsonMarker[editor.MarkerPoints.Count]
         };
 
         for (var i = 0; i < editor.TranslationPoints.Count; i++)
@@ -124,8 +150,7 @@ internal class MotionProject
             };
         }
 
-        var sortedRotationPoints =
-            editor.RotationPoints.OrderBy(x => x.Get<RotationPointComponent>().Parameter).ToArray();
+        var sortedRotationPoints = editor.RotationPoints.OrderBy(x => x.Get<RotationPointComponent>().Parameter).ToArray();
 
         for (var i = 0; i < editor.RotationPoints.Count; i++)
         {
@@ -136,6 +161,20 @@ internal class MotionProject
                 Position = entity.Get<PositionComponent>().Position,
                 Heading = entity.Get<RotationPointComponent>().HeadingMarker.Get<PositionComponent>().Position,
                 Parameter = (float)entity.Get<RotationPointComponent>().Parameter.Value
+            };
+        }
+
+        var sortedMarkers = editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter).ToArray();
+
+        for (var i = 0; i < sortedMarkers.Length; i++)
+        {
+            var entity = sortedMarkers[i];
+
+            project.Markers[i] = new JsonMarker
+            {
+                Position = entity.Get<PositionComponent>().Position,
+                Parameter = (float)entity.Get<MarkerComponent>().Parameter.Value,
+                Name = entity.Get<MarkerComponent>().Name
             };
         }
 

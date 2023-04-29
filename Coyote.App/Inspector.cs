@@ -63,6 +63,7 @@ internal static class Inspector
 
         Applicators.TryAdd(typeof(PositionComponent), ApplyPositionComponent);
         Applicators.TryAdd(typeof(NodeComponent), ApplyNodeComponent);
+        Applicators.TryAdd(typeof(MarkerComponent), ApplyMarkerComponent);
     }
 
     private static void ApplyPositionComponent(object newValue, Entity entity)
@@ -75,6 +76,13 @@ internal static class Inspector
     private static void ApplyNodeComponent(object newValue, Entity entity)
     {
         var component = Assert.Is<NodeComponent>(newValue);
+
+        entity.Set(component);
+    }
+
+    private static void ApplyMarkerComponent(object newValue, Entity entity)
+    {
+        var component = Assert.Is<MarkerComponent>(newValue);
 
         entity.Set(component);
     }
@@ -119,9 +127,11 @@ internal static class Inspector
         return value;
     }
 
-    public static void SubmitEditor(Entity entity)
+    public static bool SubmitEditor(Entity entity)
     {
         var components = entity.GetAllComponents();
+
+        var changed = false;
 
         foreach (var component in components)
         {
@@ -166,6 +176,11 @@ internal static class Inspector
                         fieldInfo.Name.AddSpacesToSentence(true),
                         attribute);
 
+                    if (newValue != storedInstance)
+                    {
+                        changed = true;
+                    }
+
                     ImGui.Separator();
 
                     fieldInfo.SetValue(component, newValue);
@@ -181,5 +196,7 @@ internal static class Inspector
 
             HeaderVisible[componentName] = visible;
         }
+
+        return changed;
     }
 }
