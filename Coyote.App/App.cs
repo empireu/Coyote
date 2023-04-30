@@ -124,11 +124,12 @@ internal class App : GameApplication
 
         Proxy("Sequence");
         Proxy("Selector").Also(x => x.BackgroundColor = new Vector4(0.6f, 0.1f, 0.2f, 0.8f));
-        Proxy("Parallel").Also(x => x.BackgroundColor = new Vector4(0.2f, 0.5f, 0.1f, 0.8f));
 
         Decorator("Success");
 
         reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
+        reg.Register(new ParallelNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Parallel.png")).Texture, "Parallel"));
+
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)
