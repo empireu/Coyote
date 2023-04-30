@@ -40,7 +40,7 @@ internal sealed class Simulator : IDisposable
         _editTime.Restart();
     }
 
-    public float PlayTime { get; private set; }
+    public float PlayTime;
     public TrajectoryPoint Last { get; private set; }
     public float TotalTime { get; private set; }
     public float TotalLength { get; private set; }
@@ -195,17 +195,9 @@ internal sealed class Simulator : IDisposable
             _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
         }
 
-        if (PlayTime > Trajectory.TimeRange.End)
-        {
-            PlayTime = 0;
-            pose = Pose.Zero;
-            _markerEvents.Clear();
-            return false;
-        }
-
-        Last = Trajectory.Evaluate(PlayTime.ToReal<Time>());
+        Last = Trajectory.Evaluate(PlayTime.ToReal<Time>().Clamped(0, Trajectory.TimeRange.End));
         pose = Last.CurvePose.Pose;
-        pose -= new Rotation(Math.PI / 2);
+        pose -= new Rotation(Math.PI / 2); // Graphic points upwards with identity transform
 
         foreach (var marker in _markers.Where(x => !_markerEvents.Any(e => e.Marker.Parameter.Equals(x.Parameter))).Where(x => Last.CurvePose.Parameter >= x.Parameter))
         {
@@ -215,6 +207,12 @@ internal sealed class Simulator : IDisposable
         }
         
         PlayTime += dt * Speed;
+
+        if (PlayTime > Trajectory.TimeRange.End)
+        {
+            PlayTime = 0;
+            _markerEvents.Clear();
+        }
 
         return true;
     }

@@ -598,12 +598,29 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     {
                         ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
 
+                        if (_simulator.TotalTime > 0)
+                        {
+                            var playTime = _simulator.PlayTime;
+
+                            if (ImGui.SliderFloat("Scrub Timeline", ref playTime, 0f, _simulator.TotalTime))
+                            {
+                                // Prevent ImGui rounding causing the simulator to reset:
+                                _simulator.PlayTime = Math.Clamp(playTime, 0f, _simulator.TotalTime);
+                            }
+                        }
+
                         if (ImGui.Button("Normal"))
                         {
                             _simulator.Speed = 1;
                         }
 
                         ImGui.SameLine();
+
+                        if (ImGui.Button("Pause"))
+                        {
+                            _simulator.Speed = 0;
+                        }
+
                         if (ImGui.Button("0.75"))
                         {
                             _simulator.Speed = 0.75f;
