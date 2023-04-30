@@ -398,6 +398,14 @@ public class ProxyNode : NodeBehavior
     {
         connections.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, 0));
     }
+
+    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    {
+        if (entity.Children().Count == 0)
+        {
+            analysis.Warn("Proxy node doesn't have children");
+        }
+    }
 }
 
 /// <summary>
@@ -426,6 +434,14 @@ public class DecoratorNode : NodeBehavior
     protected override void AttachTerminals(NodeConnectionSet connections)
     {
         connections.AddChildTerminal(new DecoratorTerminal(0));
+    }
+
+    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    {
+        if (entity.Children().Count == 0)
+        {
+            analysis.Warn("Decorator doesn't have children");
+        }
     }
 }
 
