@@ -969,6 +969,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         _editorProcessor.Render();
     }
 
+    public override string ToString()
+    {
+        return $"Motion | {_motionProjectName}";
+    }
+
     public void Dispose()
     {
         if (_disposed)

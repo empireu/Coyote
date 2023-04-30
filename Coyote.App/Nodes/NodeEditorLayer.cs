@@ -753,6 +753,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private bool _disposed;
 
+    public override string ToString()
+    {
+        return $"Nodes | {_nodeProjectName}";
+    }
+
     public void Dispose()
     {
         if (_disposed)
