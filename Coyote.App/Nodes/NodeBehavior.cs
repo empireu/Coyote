@@ -1,10 +1,13 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework.Renderer;
+using GameFramework.Scene;
 using GameFramework.Utilities;
 using ImGuiNET;
 
@@ -267,51 +270,120 @@ public abstract class NodeBehavior
     ///     This is used to attach extra components to it.
     /// </summary>
     /// <param name="entity"></param>
-    public virtual void AttachComponents(Entity entity)
+    public virtual void AttachComponents(Entity entity) { }
+
+    #region Rules
+
+    /// <summary>
+    ///     Checks if <see cref="actualEntity"/> can have <see cref="childCandidate"/> as a child.
+    ///     First, <see cref="AcceptsChildConnection"/> is tested on <see cref="actualEntity"/> and <see cref="childCandidate"/>.
+    ///     If it passes, <see cref="AcceptsSibling"/> of the <b>actual</b> children of <b>actual</b>Entity is tested against the child<b>Candidate</b> with a null parent (null because the children are <b>actual</b> children).
+    ///     If it passes, <see cref="AcceptsDownstreamNode"/> of <see cref="actualEntity"/> is tested in a downwards pass over all <b>candidate</b> nodes, starting from <see cref="childCandidate"/>
+    /// </summary>
+    public bool CanLinkChild(Entity actualEntity, Entity childCandidate)
     {
-        
+        if (!AcceptsChildConnection(actualEntity, childCandidate))
+        {
+            return false;
+        }
+
+        var actualChildrenActual = actualEntity.Get<NodeComponent>().ChildrenRef.Instance.Select(x => x.Entity).ToHashSet();
+
+        if (actualChildrenActual.Any(c => !c.Get<NodeComponent>().Behavior.AcceptsSibling(c, null, childCandidate)))
+        {
+            return false;
+        }
+
+        var behavior = actualEntity.Get<NodeComponent>().Behavior;
+
+        return !childCandidate.TreeAny(downCandidate => !behavior.AcceptsDownstreamNode(actualEntity, downCandidate));
     }
 
     /// <summary>
-    ///     Checks if <see cref="actualEntity"/> can have the entity <see cref="remoteEntity"/> as a child node.
+    ///     Checks if <see cref="actualEntity"/> can have <see cref="parentCandidate"/> as a parent.
+    ///     First, <see cref="AcceptsParentConnection"/> is tested on <see cref="actualEntity"/> and <see cref="parentCandidate"/>.
+    ///     If it passes, <see cref="AcceptsSibling"/> of <see cref="actualEntity"/> is tested against all <b>candidate</b> siblings (children of <see cref="parentCandidate"/>) with the <see cref="parentCandidate"/> as parameter.
+    ///     If it passes, <see cref="AcceptsUpstreamNode"/> of <see cref="actualEntity"/> is tested in an upwards pass over all <b>candidate</b> nodes, starting from <see cref="parentCandidate"/>. These nodes would trace the unique path to the root of the <b>candidate</b> upper tree, as per <see cref="NodeExtensions.TreeAnyUp"/>
     /// </summary>
-    public virtual bool AcceptsChild(Entity actualEntity, Entity remoteEntity)
+    public bool CanLinkParent(Entity actualEntity, Entity parentCandidate)
+    {
+        if (!AcceptsParentConnection(actualEntity, parentCandidate))
+        {
+            return false;
+        }
+
+        var candidateSiblingsCandidate = parentCandidate.Get<NodeComponent>().ChildrenRef.Instance.Select(x=>x.Entity).ToHashSet();
+
+        if (candidateSiblingsCandidate.Any(sibling => !AcceptsSibling(actualEntity, parentCandidate, sibling)))
+        {
+            return false;
+        }
+
+        var behavior = actualEntity.Get<NodeComponent>().Behavior;
+
+        return !parentCandidate.TreeAnyUp(upCandidate => !behavior.AcceptsUpstreamNode(actualEntity, upCandidate), true);
+    }
+
+    protected virtual bool AcceptsChildConnection(Entity actualEntity, Entity childCandidate)
+    {
+        return AcceptsUpstreamNode(actualEntity, childCandidate);
+    }
+
+    protected virtual bool AcceptsParentConnection(Entity actualEntity, Entity parentCandidate)
+    {
+        return AcceptsUpstreamNode(actualEntity, parentCandidate);
+    }
+
+    /// <summary>
+    ///     Checks if <see cref="bottomActual"/> can have the node <see cref="downstreamCandidate"/> under it.
+    ///     <see cref="downstreamCandidate"/> is either a direct child or in the subtree.
+    /// </summary>
+    protected virtual bool AcceptsDownstreamNode(Entity bottomActual, Entity downstreamCandidate)
     {
         return true;
     }
 
     /// <summary>
-    ///     Checks if <see cref="actualEntity"/> can have the <see cref="remoteEntity"/> as a parent node.
+    ///     Checks if <see cref="topActual"/> can have the node <see cref="upstreamCandidate"/> above it.
+    ///     <see cref="upstreamCandidate"/> is either the parent or in the parent tree.
     /// </summary>
-    /// <param name="actualEntity"></param>
-    /// <param name="remoteEntity"></param>
-    /// <param name="remoteTerminal">The target terminal, owned by <see cref="remoteEntity"/></param>
-    /// <returns></returns>
-    public virtual bool AcceptsParent(Entity actualEntity, Entity remoteEntity, NodeTerminal remoteTerminal)
+    protected virtual bool AcceptsUpstreamNode(Entity topActual, Entity upstreamCandidate)
     {
         return true;
     }
+
+    /// <summary>
+    ///     Checks if <see cref="actualEntity"/> accepts the <see cref="siblingCandidate"/> as a sibling.
+    ///     If <see cref="parentCandidate"/> is null, <see cref="siblingCandidate"/> is a candidate child for the actual parent (the parent of <see cref="actualEntity"/>). Otherwise, <see cref="actualEntity"/> does not have a parent and <see cref="siblingCandidate"/> is a child of <see cref="parentCandidate"/>.
+    /// </summary>
+    protected virtual bool AcceptsSibling(Entity actualEntity, Entity? parentCandidate, Entity siblingCandidate)
+    {
+        return true;
+    }
+
+    #endregion
+
+    #region Saving
 
     /// <summary>
     ///     Called to serialize the custom data of this node.
     /// </summary>
     public virtual string Save(Entity entity)
     {
-        return "";
+        return string.Empty;
     }
 
     /// <summary>
     ///     Called when the node is being deserialized, before the child nodes are deserialized.
     /// </summary>
-    public virtual void InitialLoad(Entity entity, string storedData)
-    {
-
-    }
+    public virtual void InitialLoad(Entity entity, string storedData) { }
 
     /// <summary>
     ///     Called when the node is being deserialized, after all child nodes have been loaded.
     /// </summary>
     public virtual void AfterLoad(Entity entity) { }
+
+    #endregion
 
     public virtual void Analyze(Entity entity, NodeAnalysis analysis, Project project) { }
 
@@ -336,10 +408,7 @@ public abstract class NodeBehavior
     /// </summary>
     /// <param name="entity"></param>
     /// <param name="project"></param>
-    public virtual void OnProjectUpdate(Entity entity, Project project)
-    {
-
-    }
+    public virtual void OnProjectUpdate(Entity entity, Project project) { }
 
     public override string ToString()
     {
@@ -397,7 +466,18 @@ public class DecoratorNode : NodeBehavior
     }
 }
 
-public sealed class MotionNode : NodeBehavior
+#region Behavior Marker Interfaces
+
+// These are mostly used in node connection validation.
+
+/// <summary>
+///     Marks a drivetrain behavior. Anything that changes the state of the drivetrain should implement this.
+/// </summary>
+public interface IDriveBehavior { }
+
+#endregion
+
+public sealed class MotionNode : NodeBehavior, IDriveBehavior
 {
     public struct MotionNodeTerminalBinding
     {
@@ -433,11 +513,9 @@ public sealed class MotionNode : NodeBehavior
         public MotionNodeState State;
     }
 
-    public MotionNode(TextureSampler icon, string name) : base(icon, new Vector4(0.95f, 0.8f, 0.5f, 0.7f), name)
-    {
-        
-    }
-
+    public MotionNode(TextureSampler icon, string name) : base(icon, new Vector4(0.95f, 0.8f, 0.5f, 0.7f), name) { }
+    
+    // Listen for marker deletes and updates
     public override bool ListenForProjectUpdate => true;
 
     public override void AttachComponents(Entity entity)
@@ -467,6 +545,10 @@ public sealed class MotionNode : NodeBehavior
         }
     }
 
+    /// <summary>
+    ///     Destroys the <see cref="binding"/> (removing the terminal from <see cref="NodeComponent.Terminals"/>
+    ///     and <see cref="MotionNodeState.Bindings"/>), un-linking all children connected to it using <see cref="NodeExtensions.UnlinkFrom"/>
+    /// </summary>
     private static void DestroyBinding(Entity entity, MotionNodeTerminalBinding binding)
     {
         var node = entity.Get<NodeComponent>();
@@ -500,6 +582,7 @@ public sealed class MotionNode : NodeBehavior
 
         try
         {
+            // Show combo box using a string as persistent state and a potentially empty item list.
             void LabelScan(string[] names, ref string selected, string comboLbl)
             {
                 var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
@@ -612,7 +695,8 @@ public sealed class MotionNode : NodeBehavior
             }
             else
             {
-                state.Bindings.ToArray().ForEach(b => DestroyBinding(entity, b));
+                // Motion project does not exist, so destroy all bindings.
+                state.Bindings.Bind().ForEach(b => DestroyBinding(entity, b));
             }
         }
         finally
@@ -620,10 +704,7 @@ public sealed class MotionNode : NodeBehavior
             ImGui.PopID();
         }
 
-        foreach (var binding in deleted)
-        {
-            DestroyBinding(entity, binding);
-        }
+        deleted.Bind().ForEach(b => DestroyBinding(entity, b));
 
         return changed;
     }
@@ -634,6 +715,8 @@ public sealed class MotionNode : NodeBehavior
 
         if (!project.MotionProjects.TryGetValue(state.MotionProject, out var motionProject))
         {
+            // Project no longer exists, destroy bindings.
+
             state
                 .Bindings
                 .Bind()
@@ -641,6 +724,8 @@ public sealed class MotionNode : NodeBehavior
         }
         else
         {
+            // Destroy any bindings whose markers might have gotten deleted.
+
             state
                 .Bindings
                 .Where(b => !motionProject.Markers.Any(m => m.Name.Equals(b.Marker)))
@@ -659,31 +744,32 @@ public sealed class MotionNode : NodeBehavior
             analysis.Error("Motion project not set");
         }
 
-        foreach (var binding in state.Bindings)
+        foreach (var binding in state.Bindings.Where(binding => node.ChildrenRef.Instance.All(child => child.Terminal.Id != binding.TerminalId)))
         {
-            if (node.ChildrenRef.Instance.All(x => x.Terminal.Id != binding.TerminalId))
-            {
-                analysis.Warn($"Empty marker tree for \"{binding.Marker}\"");
-            }
+            analysis.Warn($"Empty marker tree for \"{binding.Marker}\"");
         }
+    }
+
+    protected override bool AcceptsUpstreamNode(Entity actualEntity, Entity upstreamCandidate)
+    {
+        return upstreamCandidate.IsNotBehavior<IDriveBehavior>();
+    }
+
+    protected override bool AcceptsDownstreamNode(Entity actualEntity, Entity downstreamCandidate)
+    {
+        return downstreamCandidate.IsNotBehavior<IDriveBehavior>();
     }
 }
 
 public static class NodeExtensions
 {
     /// <summary>
-    ///     Un-links all the children of this node using <see cref="UnlinkFrom"/>
+    ///     Un-links all the children of this node using <see cref="UnlinkFrom"/> and clears the children collection.
     /// </summary>
     /// <param name="parent"></param>
     public static void UnlinkChildren(this Entity parent)
     {
-        var children = parent.Get<NodeComponent>().ChildrenRef.Instance.ToArray();
-
-        foreach (var child in children)
-        {
-            parent.UnlinkFrom(child.Entity);
-        }
-
+        parent.Get<NodeComponent>().ChildrenRef.Instance.Bind().ForEach(c => parent.UnlinkFrom(c.Entity));
         parent.Get<NodeComponent>().ChildrenRef.Instance.Clear();
     }
 
@@ -702,12 +788,12 @@ public static class NodeExtensions
     }
 
     /// <summary>
-    ///     Checks if two nodes can link.
+    ///     Checks if two nodes can link using the rules imposed by <see cref="NodeBehavior.CanLinkParent"/>, <see cref="NodeBehavior.CanLinkChild"/> and <see cref="NodeTerminal.AcceptsConnection"/>.
     /// </summary>
     /// <param name="parentEntity">The desired parent of <seealso cref="childEntity"/>.</param>
     /// <param name="childEntity">The desired child of <see cref="parentEntity"/>. If this entity already has a parent, it will be removed using <see cref="UnlinkFrom"/>.</param>
     /// <param name="parentTerminal">A terminal of the <see cref="parentEntity"/>.</param>
-    /// <returns>True if the two nodes can link, as per <see cref="NodeTerminal.AcceptsConnection"/>, <see cref="NodeBehavior.AcceptsParent"/> and <see cref="NodeBehavior.AcceptsChild"/>. Otherwise, false.</returns>
+    /// <returns>True if the two nodes can link, as per <see cref="NodeTerminal.AcceptsConnection"/>, <see cref="NodeBehavior.CanLinkParent"/> and <see cref="NodeBehavior.CanLinkChild"/>. Otherwise, false.</returns>
     public static bool CanLinkTo(this Entity parentEntity, Entity childEntity, NodeTerminal parentTerminal)
     {
         var parent = parentEntity.Get<NodeComponent>();
@@ -715,16 +801,20 @@ public static class NodeExtensions
 
         return child.Terminals.ParentTerminal.AcceptsConnection(parentTerminal, childEntity, parentEntity) &&
                parentTerminal.AcceptsConnection(child.Terminals.ParentTerminal, parentEntity, childEntity) &&
-               child.Behavior.AcceptsParent(childEntity, parentEntity, parentTerminal) &&
-               parent.Behavior.AcceptsChild(parentEntity, childEntity);
+               child.Behavior.CanLinkParent(childEntity, parentEntity) &&
+               parent.Behavior.CanLinkChild(parentEntity, childEntity);
     }
 
     /// <summary>
     ///     Links two nodes, removing the old parent from the child node.
+    ///     Firstly, the old parent of <see cref="childEntity"/> is removed using <see cref="UnlinkFrom"/>.
+    ///     Then, <see cref="NodeTerminal.PrepareConnection"/> is called on both terminals to prepare the connection.
+    ///     Finally, the parent of the <see cref="childEntity"/> is updated, <see cref="childEntity"/> is added to the <see cref="parentEntity"/>'s children list, and <see cref="NodeTerminal.FinishConnection"/> is called on both terminals.
     /// </summary>
     /// <param name="parentEntity">The desired parent of <seealso cref="childEntity"/>.</param>
     /// <param name="childEntity">The desired child of <see cref="parentEntity"/>. If this entity already has a parent, it will be removed using <see cref="UnlinkFrom"/>.</param>
     /// <param name="parentTerminal">A terminal of the <see cref="parentEntity"/>.</param>
+    /// <exception cref="InvalidOperationException">Thrown if the <see cref="CanLinkTo"/> test fails.</exception>
     public static void LinkTo(this Entity parentEntity, Entity childEntity, NodeTerminal parentTerminal)
     {
         if (!parentEntity.CanLinkTo(childEntity, parentTerminal))
@@ -748,5 +838,136 @@ public static class NodeExtensions
 
         child.Terminals.ParentTerminal.FinishConnection(parentTerminal, childEntity, parentEntity);
         parentTerminal.FinishConnection(child.Terminals.ParentTerminal, parentEntity, childEntity);
+    }
+
+    /// <summary>
+    ///     Tree scan consumer, used in Node Tree traversals.
+    /// </summary>
+    /// <param name="entity">The entity found during the search.</param>
+    /// <returns>If true, the search will continue. Otherwise, the search will end and no more entities will be discovered.</returns>
+    public delegate bool TreeScanConsumerDelegate(in Entity entity);
+
+    /// <summary>
+    ///     Scans the tree in Depth First Order, starting from <see cref="root"/> inclusively.
+    /// </summary>
+    /// <returns>True if the search finished. False if <see cref="consumer"/> returned false.</returns>
+    public static bool TreeScan(this Entity root, TreeScanConsumerDelegate consumer)
+    {
+        consumer(root);
+
+        var children = root.Get<NodeComponent>().ChildrenRef.Instance;
+
+        for (var i = 0; i < children.Count; i++)
+        {
+            if (!TreeScan(children[i].Entity, consumer))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    ///     Searches the tree using <see cref="TreeScan"/> for an element that matches the <see cref="predicate"/>.
+    /// </summary>
+    /// <param name="root">The root node, as per <see cref="TreeScan"/></param>
+    /// <param name="predicate">The entity predicate. Once this evaluates to <c>True</c>, the search stops and <c>True</c> is returned.</param>
+    /// <returns>True if an element matches the predicate. Otherwise, false.</returns>
+    public static bool TreeAny(this Entity root, Predicate<Entity> predicate)
+    {
+        var found = false;
+
+        root.TreeScan((in Entity e) =>
+        {
+            if (predicate(e))
+            {
+                found = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        return found;
+    }
+
+    /// <summary>
+    ///     Scans the unique path to the root node, starting from <see cref="lowermost"/>.
+    /// </summary>
+    /// <param name="lowermost">The node to start the search at.</param>
+    /// <param name="consumer">A consumer for nodes.</param>
+    /// <param name="inclusive">If true, <see cref="lowermost"/> will also be sent to the consumer. Otherwise, the search will start at <see cref="lowermost"/>'s parent.</param>
+    public static void TreeScanUp(this Entity lowermost, TreeScanConsumerDelegate consumer, bool inclusive)
+    {
+        if (!inclusive)
+        {
+            var next = lowermost.Get<NodeComponent>().Parent;
+
+            if (next == null)
+            {
+                return;
+            }
+
+            lowermost = next.Value;
+        }
+
+        while (true)
+        {
+            if (!consumer(lowermost))
+            {
+                break;
+            }
+
+            ref var component = ref lowermost.Get<NodeComponent>();
+
+            if (component.Parent == null)
+            {
+                return;
+            }
+
+            lowermost = component.Parent.Value;
+        }
+    }
+
+    /// <summary>
+    ///     Searches the tree using <see cref="TreeScanUp"/> for an element that matches the <see cref="predicate"/>.
+    /// </summary>
+    /// <param name="lowermost">The bottom node, as per <see cref="TreeScanUp"/></param>
+    /// <param name="predicate">The entity predicate. Once this evaluates to <c>True</c>, the search stops and <c>True</c> is returned.</param>
+    /// <param name="inclusive">If true, <see cref="lowermost"/> is not checked and the search starts at its parent.</param>
+    /// <returns>True if an element matches the predicate. Otherwise, false.</returns>
+    public static bool TreeAnyUp(this Entity lowermost, Predicate<Entity> predicate, bool inclusive)
+    {
+        var found = false;
+
+        lowermost.TreeScanUp((in Entity e) =>
+        {
+            if (predicate(e))
+            {
+                found = true;
+                return false;
+            }
+
+            return true;
+        }, inclusive);
+
+        return found;
+    }
+
+    /// <summary>
+    ///     Checks if the <see cref="NodeComponent"/> is of type <see cref="TBehavior"/>.
+    /// </summary>
+    public static bool IsBehavior<TBehavior>(this Entity entity)
+    {
+        return entity.Get<NodeComponent>().Behavior is TBehavior;
+    }
+
+    /// <summary>
+    ///     Checks if the <see cref="NodeComponent"/> is not of type <see cref="TBehavior"/>.
+    /// </summary>
+    public static bool IsNotBehavior<TBehavior>(this Entity entity)
+    {
+        return entity.Get<NodeComponent>().Behavior is not TBehavior;
     }
 }

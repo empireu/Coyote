@@ -392,7 +392,10 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                     Inspector.SubmitEditor(entity);
 
-                    entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project);
+                    if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project))
+                    {
+                        //todo
+                    }
                 }
             }
 
