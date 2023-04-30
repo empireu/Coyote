@@ -287,6 +287,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
     private void EnsureUniqueMarkerName(Entity marker)
     {
+        if (!marker.Has<MarkerComponent>())
+        {
+            return;
+        }
+
         ref var component = ref marker.Get<MarkerComponent>();
         var name = component.Name;
 

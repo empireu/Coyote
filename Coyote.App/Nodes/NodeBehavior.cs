@@ -8,6 +8,8 @@ using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Movement;
+using Coyote.Mathematics;
 using GameFramework.Renderer;
 using GameFramework.Scene;
 using GameFramework.Utilities;
@@ -447,6 +449,9 @@ public interface IDriveBehavior : INonParallelBehavior { }
 
 public sealed class MotionNode : NodeBehavior, IDriveBehavior
 {
+    private const double WarnDxy = 0.01;
+    private const double WarnDTheta = Math.PI / 64;
+
     public struct MotionNodeTerminalBinding
     {
         public MotionNodeTerminalBinding(int terminalId, string marker)
@@ -715,6 +720,54 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         foreach (var binding in state.Bindings.Where(binding => node.ChildrenRef.Instance.All(child => child.Terminal.Id != binding.TerminalId)))
         {
             analysis.Warn($"Empty marker tree for \"{binding.Marker}\"");
+        }
+
+        if (project.MotionProjects.TryGetValue(state.MotionProject, out var motionProjectActual))
+        {
+            // Analyze path continuity between nodes.
+            // This is a partial solution, it only considers nodes under the same proxy.
+            // Also, should we only include sequences? Some other control nodes may make the analysis below inaccurate:
+            if (node.Parent != null)
+            {
+                var sequence = node.Parent.Value
+                    .ChildrenEnt()
+                    .WithBehavior<MotionNode>()
+                    .Where(b => project.MotionProjects.ContainsKey(b.Get<MotionNodeComponent>().State.MotionProject))
+                    .Where(c => c != entity)
+                    // Also should be equivalent to the above condition:
+                    .Where(x => x.Position().X < entity.Position().X)
+                    .Bind();
+
+                if (sequence.Length > 0)
+                {
+                    var motionProjectPrevious = project
+                        .MotionProjects[sequence.MaxBy(x => x.Position().X).Get<MotionNodeComponent>().State.MotionProject];
+
+                    static Pose GetPose(MotionProject p, Index indexer)
+                    {
+                        return new Pose(
+                            new Translation(p.TranslationPoints[indexer].Position),
+                            Rotation.Exp(
+                                (p.RotationPoints.Length >= 2
+                                    ? p.RotationPoints[indexer].Heading
+                                    : p.TranslationPoints[indexer].Velocity)
+                                .Map(v => new Real2<Displacement>(v.X, v.Y)))
+                        );
+                    }
+
+                    var actualPosActual = GetPose(motionProjectActual, 0);
+                    var targetPosActual = GetPose(motionProjectPrevious, ^1);
+
+                    var actualErrorActual = targetPosActual.Log(actualPosActual);
+
+                    if (actualErrorActual.Dx.Abs() > WarnDxy || 
+                        actualErrorActual.Dy.Abs() > WarnDxy ||
+                        actualErrorActual.DTheta.Abs() > WarnDTheta)
+                    {
+                        analysis.Warn("Motion continuity between current and previous node is broken, which may lead to unexpected results");
+                    }
+                }
+            }
         }
     }
 

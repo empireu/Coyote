@@ -35,24 +35,24 @@ public readonly struct Rotation
 
     }
 
-    public static Rotation FromDirection(Real2<Displacement> direction)
+    public static Rotation Exp(Real2<Displacement> direction)
     {
         return new Rotation(Math.Atan2(direction.Y, direction.X).ToReal<AngularDisplacement>());
     }
 
-    public static Rotation FromDirection(Real<Displacement> x, Real<Displacement> y)
+    public static Rotation Exp(Real<Displacement> x, Real<Displacement> y)
     {
         return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
     }
 
-    public static Rotation FromDirection(double x, double y)
+    public static Rotation Exp(double x, double y)
     {
         return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
     }
 
     public Rotation Rotated(Rotation other)
     {
-        return FromDirection(new Real2<Displacement>(Cos * other.Cos - Sin * other.Sin, Cos * other.Sin + Sin * other.Cos));
+        return Exp(new Real2<Displacement>(Cos * other.Cos - Sin * other.Sin, Cos * other.Sin + Sin * other.Cos));
     }
 
     #region Operators

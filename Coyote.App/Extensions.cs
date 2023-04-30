@@ -223,7 +223,7 @@ internal static class Extensions
 
     public static Rotation Exp(this Vector2 r2)
     {
-        return Rotation.FromDirection(r2.X, r2.Y);
+        return Rotation.Exp(r2.X, r2.Y);
     }
 
     public static T[] Bind<T>(this IEnumerable<T> e) => e.ToArray();

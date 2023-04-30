@@ -49,6 +49,22 @@ internal static class Inspector
     private static readonly ConcurrentDictionary<Type, ApplyDelegate> Applicators;
     private static readonly ConcurrentDictionary<Type, EditDelegate> Editors;
 
+    private sealed class ClipboardElement
+    {
+        public readonly Type Applicator;
+        public readonly FieldInfo Field;
+        public readonly object Value;
+
+        public ClipboardElement(Type applicator, FieldInfo field, object value)
+        {
+            Applicator = applicator;
+            Field = field;
+            Value = value;
+        }
+    }
+
+    private static ClipboardElement? _clipboard;
+
     static Inspector()
     {
         HeaderVisible = new Dictionary<string, bool>();
@@ -171,14 +187,32 @@ internal static class Inspector
                         throw new Exception($"No editor is defined for {storedType}");
                     }
 
-                    var newValue = editor(
-                        storedInstance,
-                        fieldInfo.Name.AddSpacesToSentence(true),
-                        attribute);
+                    object newValue;
+
+                    if (_clipboard != null && _clipboard.Applicator == componentType && _clipboard.Field == fieldInfo && ImGui.Button("Paste"))
+                    {
+                        newValue = _clipboard!.Value;
+                    }
+                    else
+                    {
+                        newValue = editor(
+                            storedInstance,
+                            fieldInfo.Name.AddSpacesToSentence(true),
+                            attribute);
+                    }
 
                     if (newValue != storedInstance)
                     {
                         changed = true;
+                    }
+
+                    if (ImGui.Button("Copy"))
+                    {
+                        _clipboard = new ClipboardElement(
+                            componentType,
+                            fieldInfo,
+                            newValue
+                        );
                     }
 
                     ImGui.Separator();
