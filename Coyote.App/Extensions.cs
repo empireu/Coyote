@@ -227,4 +227,7 @@ internal static class Extensions
     }
 
     public static T[] Bind<T>(this IEnumerable<T> e) => e.ToArray();
+
+    public static Vector2 Position(this Entity entity) => entity.Get<PositionComponent>().Position;
+    public static Vector2 Scale(this Entity entity) => entity.Get<ScaleComponent>().Scale;
 }

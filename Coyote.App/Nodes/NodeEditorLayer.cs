@@ -29,9 +29,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private const float RunOnceSize = 0.035f;
     private const float TerminalSize = 0.015f;
     private const float ConnectionSize = 0.008f;
-    private const float GridDragGranularity = 100f;
     private const float CamDragSpeed = 5f;
     private const float DragCamInterpolateSpeed = 50;
+
+    private const float GridDragGranularity = 50f;
+    private const float GridSnapDistanceX = 0.015f;
 
     private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
     private static readonly Vector4 SelectedTint = new(1.1f, 1.1f, 1.1f, 1.2f);
@@ -199,8 +201,25 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         {
             _dragCamera = false;
         }
+        else if (@event is { MouseButton: MouseButton.Middle, Down: false })
+        {
+            FocusNode();
+        }
 
         return true;
+    }
+
+    private void FocusNode()
+    {
+        SelectEntity();
+        _dragLock = false;
+
+        if (_selectedEntity != null)
+        {
+            var entity = Assert.NotNull(_selectedEntity);
+
+            _cameraController.FuturePosition2 = entity.Position() + entity.Scale() * new Vector2(1, -1) / 2;
+        }
     }
 
     private void FormConnection()
@@ -228,7 +247,6 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         var parentEntity = clipped.First();
 
         ref var parentComp = ref parentEntity.Get<NodeComponent>();
-        ref var childComp = ref childEntity.Get<NodeComponent>();
 
         var parentTerm =
             parentComp.Terminals.ChildTerminals.FirstOrDefault(t =>
@@ -276,12 +294,40 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                     _nodeBehaviors.Select(x => x.ToString()).ToArray(),
                     _nodeBehaviors.Length);
 
-                if (ImGui.Button("Place"))
+                if (ImGui.Button("Place Selected"))
                 {
                     Place();
                 }
 
-                if (ImGui.CollapsingHeader("Analysis"))
+                if (_selectedEntity != null)
+                {
+                    ImGui.Separator();
+
+                    if (ImGui.Button("Delete Node"))
+                    {
+                        _selectedEntity?.Destroy();
+                        _selectedEntity = null;
+                    }
+
+                    if (ImGui.Button("Unlink Parent"))
+                    {
+                        _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
+                    }
+                    
+                    ImGui.SameLine();
+
+                    if (ImGui.Button("Unlink Children"))
+                    {
+                        _selectedEntity?.UnlinkChildren();
+                    }
+                }
+
+                ImGui.Separator();
+
+                ImGui.Spacing();
+
+                ImGui.BeginGroup();
+                ImGui.Text("Project Analyzer:");
                 {
                     var messages = new List<NodeAnalysis.Message>();
                     var analysis = new NodeAnalysis(messages);
@@ -329,6 +375,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                         });
                     }
                 }
+
+                ImGui.EndGroup();
             }
 
             if (ImGui.Begin("Project"))
@@ -491,8 +539,47 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         if (_app.Input.IsKeyDown(Key.ShiftLeft))
         {
+            // Grid drag for more accurate placement:
+
             newPosition *= GridDragGranularity;
             newPosition = new Vector2(MathF.Truncate(newPosition.X) / GridDragGranularity, MathF.Truncate(newPosition.Y) / GridDragGranularity);
+        }
+
+        if (_app.Input.IsKeyDown(Key.ControlLeft))
+        {
+            // Align to closest left node:
+
+            var entities = new List<Entity>();
+
+            _world.GetEntities(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>(), entities);
+
+            entities.Remove(entity);
+
+            if (entities.Count > 0)
+            {
+                var actualPos = entity.Position();
+
+                while (entities.Count > 0)
+                {
+                    var closest = 
+                        entities.MinBy(e =>
+                            Vector2.DistanceSquared( // Closest distance between the left node's right corner and our left corner
+                                new Vector2(
+                                    e.Position().X + e.Scale().X, 
+                                    e.Position().Y
+                                ), 
+                                actualPos));
+
+                    newPosition = closest.Position() with { X = closest.Position().X + closest.Scale().X + GridSnapDistanceX };
+
+                    if (_world.Clip(newPosition).All(c => c == entity))
+                    {
+                        break;
+                    }
+
+                    entities.Remove(closest);
+                }
+            }
         }
 
         entity.Move(newPosition);

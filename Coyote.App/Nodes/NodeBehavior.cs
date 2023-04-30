@@ -811,6 +811,17 @@ public static class NodeExtensions
     }
 
     /// <summary>
+    ///     Destroys an entity and removes it from the world, un-linking its children and parent.
+    /// </summary>
+    /// <param name="entity"></param>
+    public static void Destroy(this Entity entity)
+    {
+        entity.UnlinkChildren();
+        entity.Get<NodeComponent>().Parent?.UnlinkFrom(entity);
+        entity.GetWorld().Destroy(entity);
+    }
+
+    /// <summary>
     ///     Checks if two nodes can link using the rules imposed by <see cref="NodeBehavior.CanLinkParent"/>, <see cref="NodeBehavior.CanLinkChild"/> and <see cref="NodeTerminal.AcceptsConnection"/>.
     /// </summary>
     /// <param name="parentEntity">The desired parent of <seealso cref="childEntity"/>.</param>
