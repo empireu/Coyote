@@ -465,6 +465,15 @@ public interface IDriveBehavior : INonParallelBehavior { }
 
 public sealed class MotionNode : NodeBehavior, IDriveBehavior
 {
+    /// <summary>
+    ///     The motion node will act as one of those while executing markers:
+    /// </summary>
+    public enum MotionNodeType
+    {
+        Sequence,
+        Parallel
+    }
+
     private const double WarnDxy = 0.01;
     private const double WarnDTheta = Math.PI / 64;
 
@@ -490,6 +499,9 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
 
         [JsonInclude]
         public List<MotionNodeTerminalBinding> Bindings { get; set; } = new();
+
+        [JsonInclude]
+        public MotionNodeType Type { get; set; } = MotionNodeType.Sequence;
 
         // GUI state:
         [JsonIgnore]
@@ -571,31 +583,67 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
 
         try
         {
-            // Show combo box using a string as persistent state and a potentially empty item list.
-            void LabelScan(string[] names, ref string selected, string comboLbl)
+            var projectName = state.MotionProject;
+            ImGuiExt.LabelScan(project.MotionProjects.Keys.ToArray(), ref projectName, "Project");
+            state.MotionProject = projectName;
+
+            var selectedType = state.Type;
+
+            ImGui.Text("Fundamental behavior:");
+            ImGuiExt.EnumScan(ref selectedType, "Type");
+
+            if (selectedType != state.Type && selectedType == MotionNodeType.Parallel)
             {
-                var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
+                // Make sure there are no nodes that violate Parallel rules.
+                // It is easiest just to unlink the nodes when we find NPBs.
 
-                if (idx == -1)
-                {
-                    idx = 0;
-                }
+                // TODO test this when we have NPBs (we cannot test this with a motion node)
 
-                ImGui.Combo(comboLbl, ref idx, names, names.Length);
-
-                if (names.Length != 0)
-                {
-                    idx = Math.Clamp(idx, 0, names.Length);
-                    selected = names[idx];
-                }
+                node
+                    .ChildrenRef.Instance
+                    .Select(x => x.Entity)
+                    .WithBehavior<INonParallelBehavior>()
+                    .Bind()
+                    .ForEach(c => entity.UnlinkFrom(c));
             }
 
-            var projectName = state.MotionProject;
-            LabelScan(project.MotionProjects.Keys.ToArray(), ref projectName, "Project");
-            state.MotionProject = projectName;
+            state.Type = selectedType;
+
+            ImGui.Separator();
 
             if (project.MotionProjects.TryGetValue(projectName, out var motionProject))
             {
+                ImGui.Text("Create Marker");
+                {
+                    ImGuiExt.LabelScan(motionProject.Markers.Select(x => x.Name).ToArray(), ref state.SelectedMarkerLabel, "Marker");
+
+                    var marker = state.SelectedMarkerLabel;
+
+                    if (motionProject.Markers.Any(x => x.Name.Equals(marker)))
+                    {
+                        if (ImGui.Button("Create"))
+                        {
+                            var terminalId = node.Terminals.ChildTerminals.Map(terminals =>
+                            {
+                                var idx = 0;
+                                var lookup = terminals.Select(x => x.Id).ToHashSet();
+
+                                while (lookup.Contains(idx))
+                                {
+                                    idx++;
+                                }
+
+                                return idx;
+                            });
+
+                            node.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, terminalId));
+                            state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, marker));
+
+                            changed = true;
+                        }
+                    }
+                }
+
                 if (ImGui.CollapsingHeader("Marker Bindings"))
                 {
                     ImGui.BeginGroup();
@@ -647,39 +695,6 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                     }
 
                     ImGui.EndGroup();
-
-                    ImGui.Separator();
-
-                    ImGui.Text("Create New");
-                    {
-                        LabelScan(motionProject.Markers.Select(x => x.Name).ToArray(), ref state.SelectedMarkerLabel, "Marker");
-
-                        var marker = state.SelectedMarkerLabel;
-
-                        if (motionProject.Markers.Any(x => x.Name.Equals(marker)))
-                        {
-                            if (ImGui.Button("Create"))
-                            {
-                                var terminalId = node.Terminals.ChildTerminals.Map(terminals =>
-                                {
-                                    var idx = 0;
-                                    var lookup = terminals.Select(x => x.Id).ToHashSet();
-
-                                    while (lookup.Contains(idx))
-                                    {
-                                        idx++;
-                                    }
-
-                                    return idx;
-                                });
-
-                                node.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, terminalId));
-                                state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, marker));
-
-                                changed = true;
-                            }
-                        }
-                    }
                 }
             }
             else
