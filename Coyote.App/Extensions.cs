@@ -4,12 +4,7 @@ using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
-using GameFramework.Extensions;
 using GameFramework.Renderer;
-using GameFramework.Renderer.Batch;
-using GameFramework.Renderer.VertexFormats;
-using GameFramework.Utilities.Extensions;
-using Vortice.Mathematics;
 
 namespace Coyote.App;
 
@@ -41,6 +36,9 @@ internal static class Extensions
 
     public delegate bool ClipConditionDelegate(Entity entity, RectangleF entityRectangle, bool initialCheck);
 
+    /// <summary>
+    ///     Scans the world for entities that intersect the specified <see cref="pickPosition"/>.
+    /// </summary>
     public static List<Entity> Clip(this World world, Vector2 pickPosition, AlignMode align = AlignMode.Center, SizeF? margin = null, ClipConditionDelegate? condition = null)
     {
         margin ??= SizeF.Empty;
@@ -227,7 +225,54 @@ internal static class Extensions
     }
 
     public static T[] Bind<T>(this IEnumerable<T> e) => e.ToArray();
+    public static T[] TakeBind<T>(this IEnumerable<T> e, int n = 1) => e.Take(n).Bind();
+    public static T? BindFirst<T>(this IEnumerable<T> e) => e.FirstOrDefault();
+
+    public static void IfPresent<T>(this IEnumerable<T> e, Action<T> action)
+    {
+        var elements = e.TakeBind();
+
+        if (elements.Length != 0)
+        {
+            action(elements[0]);
+        }
+    }
 
     public static Vector2 Position(this Entity entity) => entity.Get<PositionComponent>().Position;
     public static Vector2 Scale(this Entity entity) => entity.Get<ScaleComponent>().Scale;
+
+    public static IEnumerable<T> Append<T>(this IEnumerable<T> head, T tail)
+    {
+        foreach (var t in head)
+        {
+            yield return t;
+        }
+
+        yield return tail;
+    }
+
+    public static IEnumerable<T> Append<T>(this IEnumerable<T> head, IEnumerable<T> tail)
+    {
+        foreach (var t in head)
+        {
+            yield return t;
+        }
+
+        foreach (var t in tail)
+        {
+            yield return t;
+        }
+    }
+
+    public static IEnumerable<T> Prepend<T>(this IEnumerable<T> tail, T head)
+    {
+        yield return head;
+
+        foreach (var t in tail)
+        {
+            yield return t;
+        }
+    }
+
+    public static IEnumerable<T> Stream<T>(this T head) => new[] { head };
 }

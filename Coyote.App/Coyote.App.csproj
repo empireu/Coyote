@@ -14,7 +14,7 @@
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
-    <None Remove="Assets\Images\&#xD;&#xA;		  &#xD;&#xA;tationPoint.png" />
+    <None Remove="Assets\Images\RotationPoint.png" />
     <None Remove="Assets\Images\DeleteMarker.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
     <None Remove="Assets\Images\Marker.png" />
@@ -37,7 +37,6 @@
     <None Remove="Assets\Images\RunOnce.png" />
     <None Remove="Assets\Images\Slideshow0.png" />
     <None Remove="Assets\Images\VelocityMarker.png" />
-    <None Remove="tuke0aai.2w1~" />
   </ItemGroup>
 
   <ItemGroup>

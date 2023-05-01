@@ -113,7 +113,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private Vector2 _selectPoint;
 
-    private static RectangleF GetTerminalRect(Entity e, NodeTerminal terminal)
+    public static RectangleF GetTerminalRect(Entity e, NodeTerminal terminal)
     {
         var position = terminal.Type == NodeTerminalType.Parent 
             ? e.Get<NodeComponent>().Terminals.GetParentPosition(e, BorderSize) 
@@ -286,6 +286,20 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         try
         {
+            _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, _, check) =>
+            {
+                if (check)
+                {
+                    return true;
+                }
+
+                var terminals = entity.Get<NodeComponent>().Terminals;
+
+                return IntersectsTerminal(entity, terminals.ParentTerminal) ||
+                       terminals.ChildTerminals.Any(childTerm => IntersectsTerminal(entity, childTerm));
+
+            }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, _app.Project, BorderSize));
+
             if (ImGui.Begin("Nodes"))
             {
                 ImGui.Combo(

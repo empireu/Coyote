@@ -77,7 +77,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
     private readonly ImGuiLayer _imGuiLayer;
 
     private ImGuiRenderer ImGuiRenderer => _imGuiLayer.Renderer;
-
+    
     private readonly QuadBatch _editorBatch;
     private readonly QuadBatch _playerBatch;
 

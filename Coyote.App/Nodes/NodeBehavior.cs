@@ -1,18 +1,13 @@
-﻿using System;
-using System.Numerics;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using System.Numerics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Xml.Linq;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.App.Movement;
 using Coyote.Mathematics;
 using GameFramework.Renderer;
-using GameFramework.Scene;
 using GameFramework.Utilities;
+using GameFramework.Utilities.Extensions;
 using ImGuiNET;
 
 namespace Coyote.App.Nodes;
@@ -65,6 +60,11 @@ public class NodeTerminal
     /// <param name="actualEntity">The entity that owns this terminal.</param>
     /// <param name="remoteEntity">The entity that owns the remote terminal.</param>
     public virtual void FinishConnection(NodeTerminal other, Entity actualEntity, Entity remoteEntity) { }
+
+    public virtual void Hover(Entity entity, Vector2 mousePosition, Project project)
+    {
+
+    }
 }
 
 public class NodeConnectionSet
@@ -222,6 +222,8 @@ public sealed class NodeAnalysis
 
 public abstract class NodeBehavior
 {
+    private const float TerminalHoverRadius = 0.01f;
+
     /// <summary>
     ///     Unique name for this <see cref="NodeBehavior"/>. This is also used during serialization.
     /// </summary>
@@ -359,6 +361,21 @@ public abstract class NodeBehavior
     {
         return false;
     }
+    
+    public virtual void Hover(Entity entity, Vector2 mousePos, Project project, float borderSize)
+    {
+        var node = entity.Get<NodeComponent>();
+
+        node
+            .Terminals
+            .ParentTerminal
+            .Stream()
+            .Append(node.Terminals.ChildTerminals)
+            .Where(t => NodeEditorLayer
+                .GetTerminalRect(entity, t)
+                .Contains(mousePos.ToPointF()))
+            .IfPresent(terminal => terminal.Hover(entity, mousePos, project));
+    }
 
     /// <summary>
     ///     If true, <see cref="OnProjectUpdate"/> will be called when the project version changes.
@@ -465,6 +482,21 @@ public interface IDriveBehavior : INonParallelBehavior { }
 
 public sealed class MotionNode : NodeBehavior, IDriveBehavior
 {
+    public sealed class MarkerTerminal : NodeTerminal
+    {
+        public MarkerTerminal(int id) : base(NodeTerminalType.Children, id)
+        {
+
+        }
+
+        public override void Hover(Entity entity, Vector2 mousePosition, Project project)
+        {
+            var state = entity.Get<MotionNodeComponent>().State;
+            var binding = state.Bindings.First(b => b.TerminalId == Id);
+            ImGui.SetTooltip(binding.Marker);
+        }
+    }
+
     /// <summary>
     ///     The motion node will act as one of those while executing markers:
     /// </summary>
@@ -542,7 +574,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
 
         foreach (var binding in state.Bindings)
         {
-            component.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, binding.TerminalId));
+            component.Terminals.AddChildTerminal(new MarkerTerminal(binding.TerminalId));
         }
     }
 
@@ -636,7 +668,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                                 return idx;
                             });
 
-                            node.Terminals.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, terminalId));
+                            node.Terminals.AddChildTerminal(new MarkerTerminal(terminalId));
                             state.Bindings.Add(new MotionNodeTerminalBinding(terminalId, marker));
 
                             changed = true;

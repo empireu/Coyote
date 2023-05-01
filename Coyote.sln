@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33103.201
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coyote.App", "Coyote.App\Coyote.App.csproj", "{5A110387-42C6-4374-829F-694CB776E0E8}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{07DB8349-D00B-4F99-9BC2-FAE33FA606F4}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameFramework", "GraphicsFramework\GameFramework\GameFramework.csproj", "{82E89CC5-CD43-4C71-B718-ADB7D84F5276}"
@@ -17,9 +15,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameFramework.PostProcessin
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameFramework.Utilities", "GraphicsFramework\GameFramework.Utilities\GameFramework.Utilities.csproj", "{2DD3C5A5-BE77-4164-A578-1AD65C167CF6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coyote.Mathematics", "Coyote.Mathematics\Coyote.Mathematics.csproj", "{3DB1497A-0100-4F51-87B6-D417AC91C980}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coyote.Mathematics", "Coyote.Mathematics\Coyote.Mathematics.csproj", "{3DB1497A-0100-4F51-87B6-D417AC91C980}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coyote.Data", "Coyote.Data\Coyote.Data.csproj", "{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coyote.Data", "Coyote.Data\Coyote.Data.csproj", "{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coyote.App", "Coyote.App\Coyote.App.csproj", "{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,14 +29,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Debug|x64.Build.0 = Debug|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Release|x64.ActiveCfg = Release|Any CPU
-		{5A110387-42C6-4374-829F-694CB776E0E8}.Release|x64.Build.0 = Release|Any CPU
 		{82E89CC5-CD43-4C71-B718-ADB7D84F5276}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{82E89CC5-CD43-4C71-B718-ADB7D84F5276}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{82E89CC5-CD43-4C71-B718-ADB7D84F5276}.Debug|x64.ActiveCfg = Debug|x64
@@ -93,6 +85,14 @@ Global
 		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|x64.ActiveCfg = Release|Any CPU
 		{76AE2AC8-274C-4083-ACD7-0F993E80FDAB}.Release|x64.Build.0 = Release|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Debug|x64.Build.0 = Debug|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Release|x64.ActiveCfg = Release|Any CPU
+		{4B00B513-3FCE-4D34-89C8-BFBA43F205B9}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
