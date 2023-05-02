@@ -10,40 +10,71 @@
   <ItemGroup>
     <None Remove="Assets\Fonts\Roboto.font" />
     <None Remove="Assets\Images\AccelerationMarker.png" />
+    <None Remove="Assets\Images\AddMarker.png" />
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
-    <None Remove="Assets\Images\&#xD;&#xA;		  &#xD;&#xA;tationPoint.png" />
+    <None Remove="Assets\Images\Nodes\Call.png" />
+    <None Remove="Assets\Images\RotationPoint.png" />
+    <None Remove="Assets\Images\DeleteMarker.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
+    <None Remove="Assets\Images\Marker.png" />
     <None Remove="Assets\Images\MotionEditorTab.png" />
+    <None Remove="Assets\Images\NodeEditorTab.png" />
+    <None Remove="Assets\Images\Nodes\Action.png" />
+    <None Remove="Assets\Images\Nodes\Condition.png" />
+    <None Remove="Assets\Images\Nodes\InputTerminal.png" />
+    <None Remove="Assets\Images\Nodes\Inverter.png" />
+    <None Remove="Assets\Images\Nodes\Motion.png" />
+    <None Remove="Assets\Images\Nodes\OutputTerminal.png" />
+    <None Remove="Assets\Images\Nodes\Parallel.png" />
+    <None Remove="Assets\Images\Nodes\Selector.png" />
+    <None Remove="Assets\Images\Nodes\Sequence.png" />
+    <None Remove="Assets\Images\Nodes\Success.png" />
     <None Remove="Assets\Images\PositionMarker.png" />
     <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
+    <None Remove="Assets\Images\RunOnce.png" />
     <None Remove="Assets\Images\Slideshow0.png" />
     <None Remove="Assets\Images\VelocityMarker.png" />
-    <None Remove="tuke0aai.2w1~" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\Fonts\Roboto.font" />
     <EmbeddedResource Include="Assets\Images\AccelerationMarker.png" />
+    <EmbeddedResource Include="Assets\Images\AddMarker.png" />
     <EmbeddedResource Include="Assets\Images\AddRotationPoint.png" />
     <EmbeddedResource Include="Assets\Images\AddTranslationPoint.png" />
     <EmbeddedResource Include="Assets\Images\Arrow.png" />
+    <EmbeddedResource Include="Assets\Images\DeleteMarker.png" />
     <EmbeddedResource Include="Assets\Images\DeleteRotationPoint.png" />
     <EmbeddedResource Include="Assets\Images\DeleteTranslationPoint.png" />
+    <EmbeddedResource Include="Assets\Images\Marker.png" />
     <EmbeddedResource Include="Assets\Images\MotionEditorTab.png" />
+    <EmbeddedResource Include="Assets\Images\NodeEditorTab.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Action.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Condition.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Call.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\InputTerminal.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Inverter.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Motion.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\OutputTerminal.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Parallel.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Selector.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Sequence.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Success.png" />
     <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
     <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />
+    <EmbeddedResource Include="Assets\Images\RunOnce.png" />
     <EmbeddedResource Include="Assets\Images\Slideshow0.png" />
     <EmbeddedResource Include="Assets\Images\VelocityMarker.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Arch" Version="1.2.3" />
-    <PackageReference Include="ImGui.NET" Version="1.89.4" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0-preview.2.23128.3" />
+    <PackageReference Include="Arch" Version="1.2.5" />
+    <PackageReference Include="ImGui.NET" Version="1.89.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0-preview.3.23174.8" />
     <PackageReference Include="Serilog" Version="3.0.0-dev-01958" />
     <PackageReference Include="Serilog.Extensions.Hosting" Version="5.1.0-dev-00123" />
     <PackageReference Include="Serilog.Sinks.Console" Version="4.1.1-dev-00910" />

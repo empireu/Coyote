@@ -2,7 +2,7 @@
 using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
-using Coyote.Mathematics;
+using Coyote.App.Nodes;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
@@ -25,10 +25,17 @@ internal class App : GameApplication
 {
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
+    private const string KeyBindFile = "keybinds.json";
     private static readonly Vector2 TabSize = new(12, 12);
     private readonly IServiceProvider _serviceProvider;
-    
+
+    private const float DefaultWeight = 0.465f;
+    private const float DefaultSmoothing = 0.015f;
+    private const float ToastWeight = 0.45f;
+    private const float ToastSmoothing = 0.05f;
+
     public SdfFont Font { get; }
+
     public ToastManager ToastManager { get; }
 
     private readonly QuadBatch _toastBatch;
@@ -44,16 +51,36 @@ internal class App : GameApplication
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
+    private readonly InputManager _inputManager;
+
     private readonly OrthographicCameraController2D _fullCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
 
     private readonly Sprite _wallpaper;
 
     private readonly List<RegisteredLayer> _tabLayers = new();
 
-    private readonly Stopwatch _loadSw = new Stopwatch();
+    private readonly Stopwatch _loadSw = new();
 
-    public App(IServiceProvider serviceProvider)
+    private bool _showSettingsWindow;
+
+    // Better to switch them like this instead of creating a copy:
+
+    private void SetDefaultFont()
     {
+        Font.Options.SetWeight(DefaultWeight);
+        Font.Options.SetSmoothing(DefaultSmoothing);
+    }
+
+    private void SetToastFont()
+    {
+        Font.Options.SetWeight(ToastWeight);
+        Font.Options.SetSmoothing(ToastSmoothing);
+    }
+
+    public App(IServiceProvider serviceProvider, NodeBehaviorRegistry behaviors)
+    {
+        Device.SyncToVerticalBlank = true;
+
         _serviceProvider = serviceProvider;
 
         ClearColor = RgbaFloat.Black;
@@ -65,10 +92,14 @@ internal class App : GameApplication
             Directory.CreateDirectory(ProjectDirectory);
         }
 
+        _inputManager = new InputManager(this);
+        _inputManager.Load(KeyBindFile);
+        _inputManager.OnChanged += InputManagerOnOnChanged;
+
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
 
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
-        Font.Options.SetWeight(0.46f);
+        SetDefaultFont();
 
         ToastManager = new ToastManager(Font);
         _toastBatch = new QuadBatch(this);
@@ -76,9 +107,44 @@ internal class App : GameApplication
 
         _wallpaper = Resources.AssetManager.GetSpriteForTexture(Asset("Images.Slideshow0.png"));
         
+        RegisterNodes(behaviors);
+
         RegisterTab("+T", "MotionEditorTab", () => Layers.ConstructLayer<MotionEditorLayer>());
+        RegisterTab("+N", "NodeEditorTab", () => Layers.ConstructLayer<NodeEditorLayer>());
 
         ResizeCamera();
+    }
+
+    private void InputManagerOnOnChanged()
+    {
+        _inputManager.Save(KeyBindFile);
+    }
+
+    private void RegisterNodes(NodeBehaviorRegistry reg)
+    {
+        LeafNode Leaf(string name)
+        {
+            return reg.Register(new LeafNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+
+        ProxyNode Proxy(string name)
+        {
+            return reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+        
+        DecoratorNode Decorator(string name)
+        {
+            return reg.Register(new DecoratorNode(Resources.AssetManager.GetSpriteForTexture(Asset($"Images.Nodes.{name}.png")).Texture, name.AddSpacesToSentence(true)));
+        }
+
+        Proxy("Sequence");
+        Proxy("Selector").Also(x => x.BackgroundColor = new Vector4(0.6f, 0.1f, 0.2f, 0.8f));
+
+        Decorator("Success");
+
+        reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
+        reg.Register(new ParallelNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Parallel.png")).Texture, "Parallel"));
+        reg.Register(new CallNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Call.png")).Texture, "Call"));
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)
@@ -155,8 +221,15 @@ internal class App : GameApplication
 
         if (ImGui.BeginMainMenuBar())
         {
+            if (ImGui.Button("Settings"))
+            {
+                _showSettingsWindow = true;
+            }
+
             if (ImGui.Button("Save"))
             {
+                //todo implement this, the current implementation is useless
+
                 Project.Save();
 
                 ToastInfo("Saved");
@@ -245,6 +318,18 @@ internal class App : GameApplication
         }
 
         ImGui.EndMainMenuBar();
+
+        if (_showSettingsWindow)
+        {
+            if (ImGui.Begin("Settings", ref _showSettingsWindow))
+            {
+                ImGui.Text("Keys");
+
+                _inputManager.ImGuiSubmit();
+            }
+
+            ImGui.End();
+        }
     }
 
     public void ToastInfo(string message)
@@ -259,7 +344,9 @@ internal class App : GameApplication
 
     private void SubmitProjectLoad()
     {
-        if (ImGui.Begin("Project Manager"))
+        const string imId = "App";
+
+        if (ImGuiExt.Begin("Project Manager", imId))
         {
             if(ImGui.BeginTabBar("Create or Load"))
             {
@@ -312,13 +399,9 @@ internal class App : GameApplication
     {
         Assert.IsTrue(_project == null);
 
-        _project =  new Project
-        {
-            FileName = name,
-            MotionProjects = new Dictionary<string, MotionProject>(),
-        };
-
-        _project.SetChanged();
+        _project = Project
+            .CreateEmpty(name)
+            .Also(p => p.SetChanged());
     }
 
     public static EmbeddedResourceKey Asset(string name)
@@ -338,12 +421,16 @@ internal class App : GameApplication
 
     protected override void AfterRender(FrameInfo frameInfo)
     {
+        SetToastFont();
+
         _toastBatch.Clear();
         _toastBatch.Effects = QuadBatchEffects.Transformed(_fullCamera.Camera.CameraMatrix);
 
         ToastManager.Render(_toastBatch, 0.05f, -Vector2.UnitY * 0.35f, 0.925f);
 
         _toastBatch.Submit();
+
+        SetDefaultFont();
 
         base.AfterRender(frameInfo);
     }

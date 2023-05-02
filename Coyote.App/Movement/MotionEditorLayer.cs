@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
+using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -30,7 +31,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         TranslateAdd,
         TranslateDelete,
         RotateAdd,
-        RotateRemove
+        RotateDelete,
+        MarkerAdd,
+        MarkerDelete
     }
 
     private static readonly Dictionary<ToolType, string> ToolDescriptions = new()
@@ -38,7 +41,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         { ToolType.TranslateAdd, "Add Translation Points" },
         { ToolType.TranslateDelete, "Delete Translation Points" },
         { ToolType.RotateAdd, "Add Rotation Points" },
-        { ToolType.RotateRemove, "Delete Rotation Points" }
+        { ToolType.RotateDelete, "Delete Rotation Points" },
+        { ToolType.MarkerAdd, "Add Markers" },
+        { ToolType.MarkerDelete, "Delete Markers" }
     };
 
     private static readonly Dictionary<ToolType, IResourceKey> ToolTextures = new()
@@ -46,7 +51,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         { ToolType.TranslateAdd, App.Asset("Images.AddTranslationPoint.png") },
         { ToolType.TranslateDelete, App.Asset("Images.DeleteTranslationPoint.png") },
         { ToolType.RotateAdd, App.Asset("Images.AddRotationPoint.png") },
-        { ToolType.RotateRemove, App.Asset("Images.DeleteRotationPoint.png") }
+        { ToolType.RotateDelete, App.Asset("Images.DeleteRotationPoint.png") },
+        { ToolType.MarkerAdd, App.Asset("Images.AddMarker.png") },
+        { ToolType.MarkerDelete, App.Asset("Images.DeleteMarker.png") }
     };
 
     private const float FieldSize = 3.66f;
@@ -63,11 +70,14 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
     private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
     private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
 
+    private static readonly Vector4 PendingMarkerColor = new(0.8f, 0.1f, 0.1f, 1.0f);
+    private static readonly Vector4 HitMarkerColor = new(0.1f, 0.9f, 0f, 1.0f);
+
     private readonly App _app;
     private readonly ImGuiLayer _imGuiLayer;
 
     private ImGuiRenderer ImGuiRenderer => _imGuiLayer.Renderer;
-
+    
     private readonly QuadBatch _editorBatch;
     private readonly QuadBatch _playerBatch;
 
@@ -163,10 +173,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         RegisterHandler<MouseEvent>(OnMouseEvent);
     }
 
-    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(
-        _app.Input.MousePosition,
-        _app.Window.Width,
-        _app.Window.Height);
+    private Vector2 MouseWorld => _cameraController.Camera.MouseToWorld2D(_app.Input.MousePosition, _app.Window.Width, _app.Window.Height);
 
     private Vector2 _selectPoint;
 
@@ -243,7 +250,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     _path.CreateRotationPoint(MouseWorld);
                 }
                 break;
-            case ToolType.RotateRemove:
+            case ToolType.RotateDelete:
                 {
                     SelectEntity();
 
@@ -255,14 +262,55 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     _selectedEntity = null;
                     break;
                 }
+            case ToolType.MarkerAdd:
+                if (_path.CanCreateMarker)
+                {
+                    EnsureUniqueMarkerName(_path.CreateMarker(MouseWorld));
+                }
+                break;
+            case ToolType.MarkerDelete:
+            {
+                SelectEntity();
+
+                if (_selectedEntity.HasValue && _selectedEntity.Value.IsAlive() && _path.IsMarker(_selectedEntity.Value))
+                {
+                    _path.DestroyMarker(_selectedEntity.Value);
+                }
+
+                _selectedEntity = null;
+                break;
+            }
             default:
                 throw new ArgumentOutOfRangeException();
         }
     }
 
+    private void EnsureUniqueMarkerName(Entity marker)
+    {
+        if (!marker.Has<MarkerComponent>())
+        {
+            return;
+        }
+
+        ref var component = ref marker.Get<MarkerComponent>();
+        var name = component.Name;
+
+        if (name.StartsWith("Marker ") && int.TryParse(name.Replace("Marker ", ""), out _))
+        {
+            name = "Marker";
+        }
+
+        var duplicates = 0;
+        while (_path.MarkerPoints.Any(x => x != marker && x.Get<MarkerComponent>().Name.Equals(name)))
+        {
+            name = $"{component.Name} {++duplicates}";
+        }
+
+        component.Name = name;
+    }
+
     private bool HasUnsavedChanges => !_app.Project.MotionProjects.ContainsKey(_motionProjectName) ||
                                       _app.Project.MotionProjects[_motionProjectName].Version != _path.Version;
-
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
         if (_disposed)
@@ -274,8 +322,22 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         {
             return;
         }
+        
+        var hoveredMarkersEntities = _world.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
 
-        if (ImGui.Begin("Tools"))
+        if (hoveredMarkersEntities.Length > 0)
+        {
+            var marker = hoveredMarkersEntities.First().Get<MarkerComponent>();
+            var hit = _simulator.MarkerEvents.Any(x => x.Marker.Parameter == marker.Parameter);
+
+            ImGui.BeginTooltip();
+            ImGui.TextColored(hit ? HitMarkerColor : PendingMarkerColor, marker.Name);
+            ImGui.EndTooltip();
+        }
+
+        const string imId = "MotionEditorLayer";
+
+        if (ImGuiExt.Begin("Tools", imId))
         {
             ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
             ImGui.BeginGroup();
@@ -285,7 +347,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             {
                 var value = types[index];
                 ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(0.3f, 0, 0, 0.8f) : new Vector4(0, 0, 0, 0f));
-             
+
                 if (ImGui.ImageButton(
                         ToolDescriptions[value],
                         _imGuiLayer.Renderer.GetOrCreateImGuiBinding(
@@ -340,6 +402,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                 {
                     _world.Clear();
                     _path.Clear();
+                    _selectedEntity = null;
                 }
 
                 _clearTimer.Restart();
@@ -348,7 +411,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         ImGui.End();
 
-        if (ImGui.Begin("Render"))
+        if (ImGuiExt.Begin("Render", imId))
         {
             if (ImGui.Checkbox("Show Translation Points", ref _renderPositionPoints))
             {
@@ -403,7 +466,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         ImGui.End();
 
-        if (ImGui.Begin("Project"))
+        if (ImGuiExt.Begin("Project", imId))
         {
             if (ImGui.BeginTabBar("Motion Projects"))
             {
@@ -453,7 +516,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         ImGui.End();
 
-        if (ImGui.Begin("Inspector"))
+        if (ImGuiExt.Begin("Inspector", imId))
         {
             if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
             {
@@ -461,7 +524,10 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             }
             else
             {
-                Inspector.SubmitEditor(_selectedEntity.Value);
+                if (Inspector.SubmitEditor(_selectedEntity.Value))
+                {
+                    OnUserChange();
+                }
             }
         }
 
@@ -469,7 +535,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         if (_showPlayer)
         {
-            if (ImGui.Begin("Player", ref _showPlayer))
+            if (ImGuiExt.Begin("Player", imId, ref _showPlayer))
             {
                 var wndSize = ImGui.GetWindowSize();
 
@@ -530,12 +596,29 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                 {
                     ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
 
+                    if (_simulator.TotalTime > 0)
+                    {
+                        var playTime = _simulator.PlayTime;
+
+                        if (ImGui.SliderFloat("Scrub Timeline", ref playTime, 0f, _simulator.TotalTime))
+                        {
+                            // Prevent ImGui rounding causing the simulator to reset:
+                            _simulator.PlayTime = Math.Clamp(playTime, 0f, _simulator.TotalTime);
+                        }
+                    }
+
                     if (ImGui.Button("Normal"))
                     {
                         _simulator.Speed = 1;
                     }
 
                     ImGui.SameLine();
+
+                    if (ImGui.Button("Pause"))
+                    {
+                        _simulator.Speed = 0;
+                    }
+
                     if (ImGui.Button("0.75"))
                     {
                         _simulator.Speed = 0.75f;
@@ -558,6 +641,20 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     {
                         _simulator.Speed = 0.1f;
                     }
+                }
+
+                if (ImGui.CollapsingHeader("Marker Events"))
+                {
+                    ImGui.BeginGroup();
+
+                    foreach (var @event in _simulator.MarkerEvents)
+                    {
+                        ImGui.Text(@event.Marker.Label);
+                        ImGui.Text($"T+{@event.HitTime.Value:F4}s");
+                        ImGui.Separator();
+                    }
+
+                    ImGui.EndGroup();
                 }
 
                 if (ImGui.CollapsingHeader("Point Density"))
@@ -600,11 +697,20 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     {
                         _simulator.DParameterRotation = dParameterRotation / factor;
                     }
+
+                    ImGui.Text($"Points: {_simulator.Points}");
                 }
             }
 
             ImGui.End();
         }
+    }
+
+    private void OnUserChange()
+    {
+        var entity = Assert.NotNull(_selectedEntity);
+        Assert.IsTrue(entity.IsAlive());
+        EnsureUniqueMarkerName(entity);
     }
 
     private void SaveProject()
@@ -633,6 +739,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         };
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
+        _app.Project.SetChanged(motionProject);
 
         _app.Project.Save();
     }
@@ -642,6 +749,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         var motionProject = _app.Project.MotionProjects[motionProjectName];
 
         _world.Clear();
+        _selectedEntity = null;
 
         motionProject.Load(_path);
 
@@ -760,11 +868,14 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
     private void UpdateCamera(FrameInfo frameInfo)
     {
-        foreach (var inputDownKey in _app.Input.DownKeys)
+        if (!_imGuiLayer.Captured)
         {
-            _cameraController.ProcessKey(inputDownKey,
-                MoveSpeed * frameInfo.DeltaTime,
-                0);
+            foreach (var inputDownKey in _app.Input.DownKeys)
+            {
+                _cameraController.ProcessKey(inputDownKey,
+                    MoveSpeed * frameInfo.DeltaTime,
+                    0);
+            }
         }
 
         _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
@@ -849,6 +960,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         RenderEditor();
 
         _editorProcessor.Render();
+    }
+
+    public override string ToString()
+    {
+        return $"Motion | {_motionProjectName}";
     }
 
     public void Dispose()

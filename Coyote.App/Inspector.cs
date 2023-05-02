@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Reflection;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Nodes;
 using GameFramework.Utilities.Extensions;
 using GameFramework.Utilities;
 using ImGuiNET;
@@ -48,6 +49,22 @@ internal static class Inspector
     private static readonly ConcurrentDictionary<Type, ApplyDelegate> Applicators;
     private static readonly ConcurrentDictionary<Type, EditDelegate> Editors;
 
+    private sealed class ClipboardElement
+    {
+        public readonly Type Applicator;
+        public readonly FieldInfo Field;
+        public readonly object Value;
+
+        public ClipboardElement(Type applicator, FieldInfo field, object value)
+        {
+            Applicator = applicator;
+            Field = field;
+            Value = value;
+        }
+    }
+
+    private static ClipboardElement? _clipboard;
+
     static Inspector()
     {
         HeaderVisible = new Dictionary<string, bool>();
@@ -61,6 +78,8 @@ internal static class Inspector
         Applicators = new ConcurrentDictionary<Type, ApplyDelegate>();
 
         Applicators.TryAdd(typeof(PositionComponent), ApplyPositionComponent);
+        Applicators.TryAdd(typeof(NodeComponent), ApplyNodeComponent);
+        Applicators.TryAdd(typeof(MarkerComponent), ApplyMarkerComponent);
     }
 
     private static void ApplyPositionComponent(object newValue, Entity entity)
@@ -68,6 +87,20 @@ internal static class Inspector
         var component = Assert.Is<PositionComponent>(newValue);
 
         entity.Move(component.Position);
+    }
+
+    private static void ApplyNodeComponent(object newValue, Entity entity)
+    {
+        var component = Assert.Is<NodeComponent>(newValue);
+
+        entity.Set(component);
+    }
+
+    private static void ApplyMarkerComponent(object newValue, Entity entity)
+    {
+        var component = Assert.Is<MarkerComponent>(newValue);
+
+        entity.Set(component);
     }
 
     private static string StringEditor(object instance, string name, EditorAttribute baseAttribute)
@@ -110,9 +143,11 @@ internal static class Inspector
         return value;
     }
 
-    public static void SubmitEditor(Entity entity)
+    public static bool SubmitEditor(Entity entity)
     {
         var components = entity.GetAllComponents();
+
+        var changed = false;
 
         foreach (var component in components)
         {
@@ -152,10 +187,33 @@ internal static class Inspector
                         throw new Exception($"No editor is defined for {storedType}");
                     }
 
-                    var newValue = editor(
-                        storedInstance,
-                        fieldInfo.Name.AddSpacesToSentence(true),
-                        attribute);
+                    object newValue;
+
+                    if (_clipboard != null && _clipboard.Applicator == componentType && _clipboard.Field == fieldInfo && ImGui.Button("Paste"))
+                    {
+                        newValue = _clipboard!.Value;
+                    }
+                    else
+                    {
+                        newValue = editor(
+                            storedInstance,
+                            fieldInfo.Name.AddSpacesToSentence(true),
+                            attribute);
+                    }
+
+                    if (newValue != storedInstance)
+                    {
+                        changed = true;
+                    }
+
+                    if (ImGui.Button("Copy"))
+                    {
+                        _clipboard = new ClipboardElement(
+                            componentType,
+                            fieldInfo,
+                            newValue
+                        );
+                    }
 
                     ImGui.Separator();
 
@@ -172,5 +230,7 @@ internal static class Inspector
 
             HeaderVisible[componentName] = visible;
         }
+
+        return changed;
     }
 }

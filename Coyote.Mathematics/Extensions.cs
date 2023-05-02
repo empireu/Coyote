@@ -65,7 +65,7 @@ public static class Extensions
 
     public static Rotation ToRotation(this Real2<Displacement> direction)
     {
-        return Rotation.FromDirection(direction);
+        return Rotation.Exp(direction);
     }
 
     public static Rotation ToRotation(this Real2<Velocity> direction)
