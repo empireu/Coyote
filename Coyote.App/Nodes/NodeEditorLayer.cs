@@ -282,191 +282,184 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             return;
         }
 
-        ImGui.PushID("Node Editor");
-
-        try
+        _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, _, check) =>
         {
-            _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, _, check) =>
+            if (check)
             {
-                if (check)
-                {
-                    return true;
-                }
+                return true;
+            }
 
-                var terminals = entity.Get<NodeComponent>().Terminals;
+            var terminals = entity.Get<NodeComponent>().Terminals;
 
-                return IntersectsTerminal(entity, terminals.ParentTerminal) ||
-                       terminals.ChildTerminals.Any(childTerm => IntersectsTerminal(entity, childTerm));
+            return IntersectsTerminal(entity, terminals.ParentTerminal) || terminals.ChildTerminals
+                .Any(childTerm => IntersectsTerminal(entity, childTerm));
 
-            }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, _app.Project, BorderSize));
+        }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, _app.Project, BorderSize));
 
-            if (ImGui.Begin("Nodes"))
+        const string imId = "NodeEditorLayer";
+
+        if (ImGuiExt.Begin("Nodes", imId))
+        {
+            ImGui.Combo(
+                "Behavior",
+                ref _selectedBehaviorIndex,
+                _nodeBehaviors.Select(x => x.ToString()).ToArray(),
+                _nodeBehaviors.Length);
+
+            if (ImGui.Button("Place Selected"))
             {
-                ImGui.Combo(
-                    "Behavior",
-                    ref _selectedBehaviorIndex,
-                    _nodeBehaviors.Select(x => x.ToString()).ToArray(),
-                    _nodeBehaviors.Length);
+                Place();
+            }
 
-                if (ImGui.Button("Place Selected"))
-                {
-                    Place();
-                }
-
-                if (_selectedEntity != null)
-                {
-                    ImGui.Separator();
-
-                    if (ImGui.Button("Delete Node"))
-                    {
-                        _selectedEntity?.Destroy();
-                        _selectedEntity = null;
-                    }
-
-                    if (ImGui.Button("Unlink Parent"))
-                    {
-                        _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
-                    }
-                    
-                    ImGui.SameLine();
-
-                    if (ImGui.Button("Unlink Children"))
-                    {
-                        _selectedEntity?.UnlinkChildren();
-                    }
-                }
-
+            if (_selectedEntity != null)
+            {
                 ImGui.Separator();
 
-                ImGui.Spacing();
-
-                ImGui.BeginGroup();
-                ImGui.Text("Project Analyzer:");
+                if (ImGui.Button("Delete Node"))
                 {
-                    var messages = new List<NodeAnalysis.Message>();
-                    var analysis = new NodeAnalysis(messages);
+                    _selectedEntity?.Destroy();
+                    _selectedEntity = null;
+                }
 
-                    Entity? highlight = null;
-                    
-                    nint id = 1;
+                if (ImGui.Button("Unlink Parent"))
+                {
+                    _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
+                }
 
-                    _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent component) =>
+                ImGui.SameLine();
+
+                if (ImGui.Button("Unlink Children"))
+                {
+                    _selectedEntity?.UnlinkChildren();
+                }
+            }
+
+            ImGui.Separator();
+
+            ImGui.Spacing();
+
+            ImGui.BeginGroup();
+            ImGui.Text("Project Analyzer:");
+            {
+                var messages = new List<NodeAnalysis.Message>();
+                var analysis = new NodeAnalysis(messages);
+
+                Entity? highlight = null;
+
+                nint id = 1;
+
+                _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent component) =>
+                {
+                    component.Behavior.Analyze(entity, analysis, _app.Project);
+
+                    foreach (var message in messages)
                     {
-                        component.Behavior.Analyze(entity, analysis, _app.Project);
+                        ImGui.TextColored(NodeAnalysis.MessageColor(message.Type), message.Text);
+                    }
 
-                        foreach (var message in messages)
+                    if (messages.Count > 0)
+                    {
+                        ImGui.PushID(id++);
+
+                        if (ImGui.Button("Highlight"))
                         {
-                            ImGui.TextColored(NodeAnalysis.MessageColor(message.Type), message.Text);
+                            highlight = entity;
                         }
 
-                        if (messages.Count > 0)
-                        {
-                            ImGui.PushID(id++);
+                        ImGui.PopID();
 
-                            if (ImGui.Button("Highlight"))
-                            {
-                                highlight = entity;
-                            }
-                            
-                            ImGui.PopID();
+                        ImGui.Separator();
+                    }
 
-                            ImGui.Separator();
-                        }
+                    messages.Clear();
+                });
 
-                        messages.Clear();
+                if (highlight.HasValue)
+                {
+                    _selectedEntity = highlight.Value;
+
+                    _cameraController.FuturePosition2 = _selectedEntity.Value.Map(entity =>
+                    {
+                        var position = entity.Get<PositionComponent>().Position;
+                        var scale = entity.Get<ScaleComponent>().Scale;
+
+                        return position + scale / 2;
                     });
-
-                    if (highlight.HasValue)
-                    {
-                        _selectedEntity = highlight.Value;
-                       
-                        _cameraController.FuturePosition2 = _selectedEntity.Value.Map(entity =>
-                        {
-                            var position = entity.Get<PositionComponent>().Position;
-                            var scale = entity.Get<ScaleComponent>().Scale;
-
-                            return position + scale / 2;
-                        });
-                    }
-                }
-
-                ImGui.EndGroup();
-            }
-
-            if (ImGui.Begin("Project"))
-            {
-                if (ImGui.BeginTabBar("Motion Projects"))
-                {
-                    if (ImGui.BeginTabItem("Save"))
-                    {
-                        ImGui.InputText("Name", ref _nodeProjectName, 100);
-
-                        if (ImGui.Button("OK"))
-                        {
-                            if (!string.IsNullOrEmpty(_nodeProjectName))
-                            {
-                                var overwrote = _app.Project.NodeProjects.ContainsKey(_nodeProjectName);
-                                SaveProject();
-                                _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_nodeProjectName}");
-                            }
-                            else
-                            {
-                                _app.ToastError("Invalid project name!");
-                            }
-                        }
-
-                        ImGui.EndTabItem();
-                    }
-
-                    if (ImGui.BeginTabItem("Open"))
-                    {
-                        var items = _app.Project.NodeProjects.Keys.ToArray();
-
-                        ImGui.Combo("Projects", ref _selectedProject, items, items.Length);
-
-                        if (ImGui.Button("OK") && _selectedProject >= 0 && _selectedProject < items.Length)
-                        {
-                            _nodeProjectName = items[_selectedProject];
-                            LoadProject(_nodeProjectName);
-                            _app.ToastInfo($"Loaded project {_nodeProjectName}");
-                        }
-
-                        ImGui.EndTabItem();
-                    }
-                }
-
-                ImGui.EndTabBar();
-            }
-
-            ImGui.End();
-
-            ImGui.End();
-
-            if (ImGui.Begin("Inspector"))
-            {
-                if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
-                {
-                    ImGui.Text("Nothing to show");
-                }
-                else
-                {
-                    var entity = _selectedEntity.Value;
-
-                    Inspector.SubmitEditor(entity);
-
-                    if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project))
-                    {
-                        //todo
-                    }
                 }
             }
 
-            ImGui.End();
+            ImGui.EndGroup();
         }
-        finally
+
+        ImGui.End();
+
+        if (ImGuiExt.Begin("Project", imId))
         {
-            ImGui.PopID();
+            if (ImGui.BeginTabBar("Motion Projects"))
+            {
+                if (ImGui.BeginTabItem("Save"))
+                {
+                    ImGui.InputText("Name", ref _nodeProjectName, 100);
+
+                    if (ImGui.Button("OK"))
+                    {
+                        if (!string.IsNullOrEmpty(_nodeProjectName))
+                        {
+                            var overwrote = _app.Project.NodeProjects.ContainsKey(_nodeProjectName);
+                            SaveProject();
+                            _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_nodeProjectName}");
+                        }
+                        else
+                        {
+                            _app.ToastError("Invalid project name!");
+                        }
+                    }
+
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Open"))
+                {
+                    var items = _app.Project.NodeProjects.Keys.ToArray();
+
+                    ImGui.Combo("Projects", ref _selectedProject, items, items.Length);
+
+                    if (ImGui.Button("OK") && _selectedProject >= 0 && _selectedProject < items.Length)
+                    {
+                        _nodeProjectName = items[_selectedProject];
+                        LoadProject(_nodeProjectName);
+                        _app.ToastInfo($"Loaded project {_nodeProjectName}");
+                    }
+
+                    ImGui.EndTabItem();
+                }
+            }
+
+            ImGui.EndTabBar();
         }
+
+        ImGui.End();
+
+        if (ImGuiExt.Begin("Inspector", imId))
+        {
+            if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
+            {
+                ImGui.Text("Nothing to show");
+            }
+            else
+            {
+                var entity = _selectedEntity.Value;
+
+                Inspector.SubmitEditor(entity);
+
+                if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project))
+                {
+                    //todo
+                }
+            }
+        }
+
+        ImGui.End();
     }
 
     private void SaveProject()

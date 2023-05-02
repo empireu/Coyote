@@ -309,7 +309,9 @@ internal class App : GameApplication
 
     private void SubmitProjectLoad()
     {
-        if (ImGui.Begin("Project Manager"))
+        const string imId = "App";
+
+        if (ImGuiExt.Begin("Project Manager", imId))
         {
             if(ImGui.BeginTabBar("Create or Load"))
             {

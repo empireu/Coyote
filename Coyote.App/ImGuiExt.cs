@@ -35,4 +35,14 @@ internal static class ImGuiExt
 
         return actual;
     }
+
+    public static bool Begin(string title, string id)
+    {
+        return ImGui.Begin($"{title}##{id}");
+    }
+
+    public static bool Begin(string title, string id, ref bool pOpen)
+    {
+        return ImGui.Begin($"{title}##{id}", ref pOpen);
+    }
 }

@@ -322,394 +322,387 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         {
             return;
         }
-     
-        ImGui.PushID("Motion Editor");
+        
+        var hoveredMarkersEntities = _world.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
 
-        try
+        if (hoveredMarkersEntities.Length > 0)
         {
-            var hoveredMarkersEntities = _world.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
+            var marker = hoveredMarkersEntities.First().Get<MarkerComponent>();
+            var hit = _simulator.MarkerEvents.Any(x => x.Marker.Parameter == marker.Parameter);
 
-            if (hoveredMarkersEntities.Length > 0)
+            ImGui.BeginTooltip();
+            ImGui.TextColored(hit ? HitMarkerColor : PendingMarkerColor, marker.Name);
+            ImGui.EndTooltip();
+        }
+
+        const string imId = "MotionEditorLayer";
+
+        if (ImGuiExt.Begin("Tools", imId))
+        {
+            ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
+            ImGui.BeginGroup();
+
+            var types = Enum.GetValues<ToolType>();
+            for (var index = 0; index < types.Length; index++)
             {
-                var marker = hoveredMarkersEntities.First().Get<MarkerComponent>();
-                var hit = _simulator.MarkerEvents.Any(x => x.Marker.Parameter == marker.Parameter);
+                var value = types[index];
+                ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(0.3f, 0, 0, 0.8f) : new Vector4(0, 0, 0, 0f));
 
-                ImGui.BeginTooltip();
-                ImGui.TextColored(hit ? HitMarkerColor : PendingMarkerColor, marker.Name);
-                ImGui.EndTooltip();
-            }
-
-            if (ImGui.Begin("Tools"))
-            {
-                ImGui.TextColored(new Vector4(1, 1, 1, 1), "Path Tools");
-                ImGui.BeginGroup();
-
-                var types = Enum.GetValues<ToolType>();
-                for (var index = 0; index < types.Length; index++)
+                if (ImGui.ImageButton(
+                        ToolDescriptions[value],
+                        _imGuiLayer.Renderer.GetOrCreateImGuiBinding(
+                            _app.Resources.Factory,
+                            _app.Resources.AssetManager.GetView(ToolTextures[value])),
+                        new Vector2(32, 32), Vector2.Zero, new Vector2(1f, -1f)))
                 {
-                    var value = types[index];
-                    ImGui.PushStyleColor(ImGuiCol.Button, _selectedTool == value ? new Vector4(0.3f, 0, 0, 0.8f) : new Vector4(0, 0, 0, 0f));
-
-                    if (ImGui.ImageButton(
-                            ToolDescriptions[value],
-                            _imGuiLayer.Renderer.GetOrCreateImGuiBinding(
-                                _app.Resources.Factory,
-                                _app.Resources.AssetManager.GetView(ToolTextures[value])),
-                            new Vector2(32, 32), Vector2.Zero, new Vector2(1f, -1f)))
-                    {
-                        _selectedTool = value;
-
-                        ImGui.PopStyleColor();
-
-                        break;
-                    }
+                    _selectedTool = value;
 
                     ImGui.PopStyleColor();
 
-                    if (index != types.Length - 1)
-                    {
-                        ImGui.SameLine();
-                    }
+                    break;
                 }
 
-                ImGui.Text(ToolDescriptions[_selectedTool]);
+                ImGui.PopStyleColor();
 
-                ImGui.EndGroup();
-                ImGui.Separator();
-
-                ImGui.TextColored(new Vector4(1, 1, 1, 1), "Review");
-                ImGui.BeginGroup();
-
-                if (ImGui.Button("Player"))
+                if (index != types.Length - 1)
                 {
-                    if (!_showPlayer)
-                    {
-                        _app.ToastInfo("Opening simulation!");
-                    }
-
-                    _showPlayer = true;
-                }
-
-                ImGui.EndGroup();
-
-                ImGui.Separator();
-
-                if (ImGui.Button("Clear"))
-                {
-                    if (_clearTimer.Elapsed.TotalSeconds > ClearForceThreshold && HasUnsavedChanges)
-                    {
-                        _app.ToastInfo("You have unsaved changes! Click \"Clear\" faster to discard!");
-                    }
-                    else
-                    {
-                        _world.Clear();
-                        _path.Clear();
-                        _selectedEntity = null;
-                    }
-
-                    _clearTimer.Restart();
+                    ImGui.SameLine();
                 }
             }
 
-            ImGui.End();
+            ImGui.Text(ToolDescriptions[_selectedTool]);
 
-            if (ImGui.Begin("Render"))
+            ImGui.EndGroup();
+            ImGui.Separator();
+
+            ImGui.TextColored(new Vector4(1, 1, 1, 1), "Review");
+            ImGui.BeginGroup();
+
+            if (ImGui.Button("Player"))
             {
-                if (ImGui.Checkbox("Show Translation Points", ref _renderPositionPoints))
+                if (!_showPlayer)
                 {
-                    _selectedEntity = null;
-
-                    foreach (var pathTranslationPoint in _path.TranslationPoints)
-                    {
-                        pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderPositionPoints;
-                    }
+                    _app.ToastInfo("Opening simulation!");
                 }
 
-                if (ImGui.Checkbox("Show Rotation Points", ref _renderRotationPoints))
-                {
-                    _selectedEntity = null;
-
-                    foreach (var pathTranslationPoint in _path.RotationPoints)
-                    {
-                        pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderRotationPoints;
-                    }
-                }
-
-                if (ImGui.Checkbox("Show Translation Velocities", ref _renderTranslationVelocityPoints))
-                {
-                    _selectedEntity = null;
-
-                    foreach (var pathTranslationPoint in _path.TranslationPoints)
-                    {
-                        pathTranslationPoint.Get<TranslationPointComponent>().VelocityMarker.Get<SpriteComponent>().Disabled = !_renderTranslationVelocityPoints;
-                    }
-                }
-
-                if (ImGui.Checkbox("Show Translation Accelerations", ref _renderTranslationAccelerationPoints))
-                {
-                    _selectedEntity = null;
-
-                    foreach (var pathTranslationPoint in _path.TranslationPoints)
-                    {
-                        pathTranslationPoint.Get<TranslationPointComponent>().AccelerationMarker.Get<SpriteComponent>().Disabled = !_renderTranslationAccelerationPoints;
-                    }
-                }
-
-                if (ImGui.Checkbox("Show Rotation Tangents", ref _renderRotationTangents))
-                {
-                    _selectedEntity = null;
-
-                    foreach (var pathTranslationPoint in _path.RotationPoints)
-                    {
-                        pathTranslationPoint.Get<RotationPointComponent>().HeadingMarker.Get<SpriteComponent>().Disabled = !_renderRotationTangents;
-                    }
-                }
+                _showPlayer = true;
             }
 
-            ImGui.End();
+            ImGui.EndGroup();
 
-            if (ImGui.Begin("Project"))
+            ImGui.Separator();
+
+            if (ImGui.Button("Clear"))
             {
-                if (ImGui.BeginTabBar("Motion Projects"))
+                if (_clearTimer.Elapsed.TotalSeconds > ClearForceThreshold && HasUnsavedChanges)
                 {
-                    if (ImGui.BeginTabItem("Save"))
-                    {
-                        ImGui.InputText("Name", ref _motionProjectName, 100);
-
-                        if (ImGui.Button("OK"))
-                        {
-                            if (!string.IsNullOrEmpty(_motionProjectName))
-                            {
-                                var overwrote = _app.Project.MotionProjects.ContainsKey(_motionProjectName);
-
-                                SaveProject();
-
-                                _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_motionProjectName}");
-                            }
-                            else
-                            {
-                                _app.ToastError("Invalid project name!");
-                            }
-                        }
-
-                        ImGui.EndTabItem();
-                    }
-
-                    if (ImGui.BeginTabItem("Open"))
-                    {
-                        var items = _app.Project.MotionProjects.Keys.ToArray();
-
-                        ImGui.Combo("Projects", ref _selectedProject, items, items.Length);
-
-                        if (ImGui.Button("OK") && _selectedProject >= 0 && _selectedProject < items.Length)
-                        {
-                            _motionProjectName = items[_selectedProject];
-                            LoadProject(_motionProjectName);
-
-                            _app.ToastInfo($"Loaded project {_motionProjectName}");
-                        }
-
-                        ImGui.EndTabItem();
-                    }
-                }
-
-                ImGui.EndTabBar();
-            }
-
-            ImGui.End();
-
-            if (ImGui.Begin("Inspector"))
-            {
-                if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
-                {
-                    ImGui.Text("Nothing to show");
+                    _app.ToastInfo("You have unsaved changes! Click \"Clear\" faster to discard!");
                 }
                 else
                 {
-                    if (Inspector.SubmitEditor(_selectedEntity.Value))
+                    _world.Clear();
+                    _path.Clear();
+                    _selectedEntity = null;
+                }
+
+                _clearTimer.Restart();
+            }
+        }
+
+        ImGui.End();
+
+        if (ImGuiExt.Begin("Render", imId))
+        {
+            if (ImGui.Checkbox("Show Translation Points", ref _renderPositionPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderPositionPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Rotation Points", ref _renderRotationPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.RotationPoints)
+                {
+                    pathTranslationPoint.Get<SpriteComponent>().Disabled = !_renderRotationPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Translation Velocities", ref _renderTranslationVelocityPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<TranslationPointComponent>().VelocityMarker.Get<SpriteComponent>().Disabled = !_renderTranslationVelocityPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Translation Accelerations", ref _renderTranslationAccelerationPoints))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.TranslationPoints)
+                {
+                    pathTranslationPoint.Get<TranslationPointComponent>().AccelerationMarker.Get<SpriteComponent>().Disabled = !_renderTranslationAccelerationPoints;
+                }
+            }
+
+            if (ImGui.Checkbox("Show Rotation Tangents", ref _renderRotationTangents))
+            {
+                _selectedEntity = null;
+
+                foreach (var pathTranslationPoint in _path.RotationPoints)
+                {
+                    pathTranslationPoint.Get<RotationPointComponent>().HeadingMarker.Get<SpriteComponent>().Disabled = !_renderRotationTangents;
+                }
+            }
+        }
+
+        ImGui.End();
+
+        if (ImGuiExt.Begin("Project", imId))
+        {
+            if (ImGui.BeginTabBar("Motion Projects"))
+            {
+                if (ImGui.BeginTabItem("Save"))
+                {
+                    ImGui.InputText("Name", ref _motionProjectName, 100);
+
+                    if (ImGui.Button("OK"))
                     {
-                        OnUserChange();
+                        if (!string.IsNullOrEmpty(_motionProjectName))
+                        {
+                            var overwrote = _app.Project.MotionProjects.ContainsKey(_motionProjectName);
+
+                            SaveProject();
+
+                            _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_motionProjectName}");
+                        }
+                        else
+                        {
+                            _app.ToastError("Invalid project name!");
+                        }
                     }
+
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Open"))
+                {
+                    var items = _app.Project.MotionProjects.Keys.ToArray();
+
+                    ImGui.Combo("Projects", ref _selectedProject, items, items.Length);
+
+                    if (ImGui.Button("OK") && _selectedProject >= 0 && _selectedProject < items.Length)
+                    {
+                        _motionProjectName = items[_selectedProject];
+                        LoadProject(_motionProjectName);
+
+                        _app.ToastInfo($"Loaded project {_motionProjectName}");
+                    }
+
+                    ImGui.EndTabItem();
+                }
+            }
+
+            ImGui.EndTabBar();
+        }
+
+        ImGui.End();
+
+        if (ImGuiExt.Begin("Inspector", imId))
+        {
+            if (_selectedEntity == null || !_selectedEntity.Value.IsAlive())
+            {
+                ImGui.Text("Nothing to show");
+            }
+            else
+            {
+                if (Inspector.SubmitEditor(_selectedEntity.Value))
+                {
+                    OnUserChange();
+                }
+            }
+        }
+
+        ImGui.End();
+
+        if (_showPlayer)
+        {
+            if (ImGuiExt.Begin("Player", imId, ref _showPlayer))
+            {
+                var wndSize = ImGui.GetWindowSize();
+
+                var min = new Vector2(Math.Min(wndSize.X, wndSize.Y));
+
+                var imageSize = (min * 0.95f).ToPoint();
+
+                if (imageSize != _playerSize)
+                {
+                    _playerSize = imageSize;
+                    UpdatePlayerPipeline();
+                }
+
+                RenderPlayer();
+
+                // Fixes inverted Y coordinate by inverting Y in the texture coordinate.
+                ImGui.Image(_playerBinding, imageSize.ToVector2(), Vector2.Zero, new Vector2(1f, -1f));
+
+                var lastPoint = _simulator.Last;
+
+                if (ImGui.Button("Re-generate"))
+                {
+                    _simulator.InvalidateTrajectory();
+                }
+
+                if (ImGui.CollapsingHeader("Motion Constraints"))
+                {
+                    ImGui.SliderFloat("Lin Velocity", ref _simulator.MaxLinearVelocity, 0.1f, 5f);
+                    ImGui.SliderFloat("Lin Acceleration", ref _simulator.MaxLinearAcceleration, 0.1f, 5f);
+                    ImGui.SliderFloat("Centripetal Acceleration²", ref _simulator.MaxCentripetalAcceleration, 0.1f, 5f);
+                    ImGui.SliderFloat("Ang Velocity", ref _simulator.MaxAngularVelocity, 10, 720);
+                    ImGui.SliderFloat("Ang Acceleration", ref _simulator.MaxAngularAcceleration, 10, 720);
+                }
+
+                if (ImGui.CollapsingHeader("Kinematics"))
+                {
+                    ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
+
+                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
+                    ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
+                    ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
+                    ImGui.Separator();
+
+                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
+                    ImGui.Separator();
+
+                    ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
+                    ImGui.Separator();
+                }
+
+                if (ImGui.CollapsingHeader("Playback"))
+                {
+                    ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
+
+                    if (_simulator.TotalTime > 0)
+                    {
+                        var playTime = _simulator.PlayTime;
+
+                        if (ImGui.SliderFloat("Scrub Timeline", ref playTime, 0f, _simulator.TotalTime))
+                        {
+                            // Prevent ImGui rounding causing the simulator to reset:
+                            _simulator.PlayTime = Math.Clamp(playTime, 0f, _simulator.TotalTime);
+                        }
+                    }
+
+                    if (ImGui.Button("Normal"))
+                    {
+                        _simulator.Speed = 1;
+                    }
+
+                    ImGui.SameLine();
+
+                    if (ImGui.Button("Pause"))
+                    {
+                        _simulator.Speed = 0;
+                    }
+
+                    if (ImGui.Button("0.75"))
+                    {
+                        _simulator.Speed = 0.75f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.5"))
+                    {
+                        _simulator.Speed = 0.5f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.25"))
+                    {
+                        _simulator.Speed = 0.25f;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("0.1"))
+                    {
+                        _simulator.Speed = 0.1f;
+                    }
+                }
+
+                if (ImGui.CollapsingHeader("Marker Events"))
+                {
+                    ImGui.BeginGroup();
+
+                    foreach (var @event in _simulator.MarkerEvents)
+                    {
+                        ImGui.Text(@event.Marker.Label);
+                        ImGui.Text($"T+{@event.HitTime.Value:F4}s");
+                        ImGui.Separator();
+                    }
+
+                    ImGui.EndGroup();
+                }
+
+                if (ImGui.CollapsingHeader("Point Density"))
+                {
+                    const int factor = 1000;
+
+                    var dx = _simulator.Dx * factor;
+                    var dy = _simulator.Dy * factor;
+                    var dAngleTranslation = _simulator.DAngleTranslation * factor;
+                    var dParameterTranslation = _simulator.DParameterTranslation * factor;
+                    var dAngleRotation = _simulator.DAngleRotation * factor;
+                    var dParameterRotation = _simulator.DParameterRotation * factor;
+
+                    if (ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
+                    {
+                        _simulator.Dx = dx / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
+                    {
+                        _simulator.Dy = dy / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DAngleT {factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    {
+                        _simulator.DAngleTranslation = dAngleTranslation / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DParamT {factor}", ref dParameterTranslation, 0.001f, 10))
+                    {
+                        _simulator.DParameterTranslation = dParameterTranslation / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DAngleR {factor}", ref dAngleRotation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    {
+                        _simulator.DAngleRotation = dAngleRotation / factor;
+                    }
+
+                    if (ImGui.SliderFloat($"DParamR {factor}", ref dParameterRotation, 0.001f, 10))
+                    {
+                        _simulator.DParameterRotation = dParameterRotation / factor;
+                    }
+
+                    ImGui.Text($"Points: {_simulator.Points}");
                 }
             }
 
             ImGui.End();
-
-            if (_showPlayer)
-            {
-                if (ImGui.Begin("Player", ref _showPlayer))
-                {
-                    var wndSize = ImGui.GetWindowSize();
-
-                    var min = new Vector2(Math.Min(wndSize.X, wndSize.Y));
-
-                    var imageSize = (min * 0.95f).ToPoint();
-
-                    if (imageSize != _playerSize)
-                    {
-                        _playerSize = imageSize;
-                        UpdatePlayerPipeline();
-                    }
-
-                    RenderPlayer();
-
-                    // Fixes inverted Y coordinate by inverting Y in the texture coordinate.
-                    ImGui.Image(_playerBinding, imageSize.ToVector2(), Vector2.Zero, new Vector2(1f, -1f));
-
-                    var lastPoint = _simulator.Last;
-
-                    if (ImGui.Button("Re-generate"))
-                    {
-                        _simulator.InvalidateTrajectory();
-                    }
-
-                    if (ImGui.CollapsingHeader("Motion Constraints"))
-                    {
-                        ImGui.SliderFloat("Lin Velocity", ref _simulator.MaxLinearVelocity, 0.1f, 5f);
-                        ImGui.SliderFloat("Lin Acceleration", ref _simulator.MaxLinearAcceleration, 0.1f, 5f);
-                        ImGui.SliderFloat("Centripetal Acceleration²", ref _simulator.MaxCentripetalAcceleration, 0.1f, 5f);
-                        ImGui.SliderFloat("Ang Velocity", ref _simulator.MaxAngularVelocity, 10, 720);
-                        ImGui.SliderFloat("Ang Acceleration", ref _simulator.MaxAngularAcceleration, 10, 720);
-                    }
-
-                    if (ImGui.CollapsingHeader("Kinematics"))
-                    {
-                        ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
-
-                        ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
-                        ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
-                        ImGui.Separator();
-
-                        ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
-                        ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
-                        ImGui.Separator();
-
-                        ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
-                        ImGui.Separator();
-
-                        ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
-                        ImGui.Separator();
-
-                        ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
-                        ImGui.Separator();
-                    }
-
-                    if (ImGui.CollapsingHeader("Playback"))
-                    {
-                        ImGui.SliderFloat("Playback Speed", ref _simulator.Speed, 0f, 10f);
-
-                        if (_simulator.TotalTime > 0)
-                        {
-                            var playTime = _simulator.PlayTime;
-
-                            if (ImGui.SliderFloat("Scrub Timeline", ref playTime, 0f, _simulator.TotalTime))
-                            {
-                                // Prevent ImGui rounding causing the simulator to reset:
-                                _simulator.PlayTime = Math.Clamp(playTime, 0f, _simulator.TotalTime);
-                            }
-                        }
-
-                        if (ImGui.Button("Normal"))
-                        {
-                            _simulator.Speed = 1;
-                        }
-
-                        ImGui.SameLine();
-
-                        if (ImGui.Button("Pause"))
-                        {
-                            _simulator.Speed = 0;
-                        }
-
-                        if (ImGui.Button("0.75"))
-                        {
-                            _simulator.Speed = 0.75f;
-                        }
-
-                        ImGui.SameLine();
-                        if (ImGui.Button("0.5"))
-                        {
-                            _simulator.Speed = 0.5f;
-                        }
-
-                        ImGui.SameLine();
-                        if (ImGui.Button("0.25"))
-                        {
-                            _simulator.Speed = 0.25f;
-                        }
-
-                        ImGui.SameLine();
-                        if (ImGui.Button("0.1"))
-                        {
-                            _simulator.Speed = 0.1f;
-                        }
-                    }
-
-                    if (ImGui.CollapsingHeader("Marker Events"))
-                    {
-                        ImGui.BeginGroup();
-
-                        foreach (var @event in _simulator.MarkerEvents)
-                        {
-                            ImGui.Text(@event.Marker.Label);
-                            ImGui.Text($"T+{@event.HitTime.Value:F4}s");
-                            ImGui.Separator();
-                        }
-
-                        ImGui.EndGroup();
-                    }
-
-                    if (ImGui.CollapsingHeader("Point Density"))
-                    {
-                        const int factor = 1000;
-
-                        var dx = _simulator.Dx * factor;
-                        var dy = _simulator.Dy * factor;
-                        var dAngleTranslation = _simulator.DAngleTranslation * factor;
-                        var dParameterTranslation = _simulator.DParameterTranslation * factor;
-                        var dAngleRotation = _simulator.DAngleRotation * factor;
-                        var dParameterRotation = _simulator.DParameterRotation * factor;
-
-                        if (ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
-                        {
-                            _simulator.Dx = dx / factor;
-                        }
-
-                        if (ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
-                        {
-                            _simulator.Dy = dy / factor;
-                        }
-
-                        if (ImGui.SliderFloat($"DAngleT {factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
-                        {
-                            _simulator.DAngleTranslation = dAngleTranslation / factor;
-                        }
-
-                        if (ImGui.SliderFloat($"DParamT {factor}", ref dParameterTranslation, 0.001f, 10))
-                        {
-                            _simulator.DParameterTranslation = dParameterTranslation / factor;
-                        }
-
-                        if (ImGui.SliderFloat($"DAngleR {factor}", ref dAngleRotation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
-                        {
-                            _simulator.DAngleRotation = dAngleRotation / factor;
-                        }
-
-                        if (ImGui.SliderFloat($"DParamR {factor}", ref dParameterRotation, 0.001f, 10))
-                        {
-                            _simulator.DParameterRotation = dParameterRotation / factor;
-                        }
-
-                        ImGui.Text($"Points: {_simulator.Points}");
-                    }
-                }
-
-                ImGui.End();
-            }
-        }
-        finally
-        {
-            ImGui.PopID();
         }
     }
 
