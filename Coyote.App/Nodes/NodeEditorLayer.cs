@@ -15,6 +15,7 @@ using GameFramework.Renderer;
 using GameFramework.Utilities;
 using GameFramework.Utilities.Extensions;
 using ImGuiNET;
+using SixLabors.ImageSharp.Metadata;
 
 namespace Coyote.App.Nodes;
 
@@ -34,6 +35,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private const float GridDragGranularity = 50f;
     private const float GridSnapDistanceX = 0.015f;
+    private const float AutoFormatGapX = GridSnapDistanceX;
+    private const float AutoFormatGapY = 0.1f;
 
     private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
     private static readonly Vector4 SelectedTint = new(1.1f, 1.1f, 1.1f, 1.2f);
@@ -316,7 +319,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 _nodeBehaviors.Select(x => x.ToString()).ToArray(),
                 _nodeBehaviors.Length);
 
-            if (ImGui.Button("Place Selected"))
+            if (ImGui.Button("Place"))
             {
                 Place();
                 AnalyzeOnChange();
@@ -326,7 +329,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             {
                 ImGui.Separator();
 
-                if (ImGui.Button("Delete Node"))
+                if (ImGui.Button("Delete"))
                 {
                     _selectedEntity?.Also(e => _transientMessages.Remove(e));
                     _selectedEntity?.Destroy();
@@ -334,7 +337,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                     AnalyzeOnChange();
                 }
 
-                if (ImGui.Button("Unlink Parent"))
+                ImGui.SameLine();
+                if (ImGui.Button("-Parent"))
                 {
                     _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
                     AnalyzeOnChange();
@@ -342,7 +346,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("Unlink Children"))
+                if (ImGui.Button("-Children"))
                 {
                     _selectedEntity?.UnlinkChildren();
                     AnalyzeOnChange();
@@ -640,7 +644,30 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             }
         }
 
+        var deltaPos = newPosition - entity.Position();
         entity.Move(newPosition);
+
+        if (_app.Input.IsKeyDown(Key.AltLeft))
+        {
+            if (entity.Children().Count > 0)
+            {
+                void Traverse(Entity e)
+                {
+                    e.Move(e.Position() + deltaPos);
+                    e.ChildrenEnt().ForEach(Traverse);
+                }
+
+                entity.ChildrenEnt().ForEach(Traverse);
+            }
+            else
+            {
+                entity.Get<NodeComponent>()
+                    .Parent
+                    ?.ChildrenEnt()
+                    .Where(c => c != entity)
+                    .ForEach(sibling => sibling.Move(sibling.Position() + deltaPos));
+            }
+        }
     }
 
     private void RenderConnectionPreview()
