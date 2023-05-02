@@ -14,6 +14,7 @@
     <None Remove="Assets\Images\AddRotationPoint.png" />
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
+    <None Remove="Assets\Images\Nodes\Call.png" />
     <None Remove="Assets\Images\RotationPoint.png" />
     <None Remove="Assets\Images\DeleteMarker.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
@@ -22,7 +23,6 @@
     <None Remove="Assets\Images\NodeEditorTab.png" />
     <None Remove="Assets\Images\Nodes\Action.png" />
     <None Remove="Assets\Images\Nodes\Condition.png" />
-    <None Remove="Assets\Images\Nodes\ExternalCall.png" />
     <None Remove="Assets\Images\Nodes\InputTerminal.png" />
     <None Remove="Assets\Images\Nodes\Inverter.png" />
     <None Remove="Assets\Images\Nodes\Motion.png" />
@@ -54,7 +54,7 @@
     <EmbeddedResource Include="Assets\Images\NodeEditorTab.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Action.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Condition.png" />
-    <EmbeddedResource Include="Assets\Images\Nodes\ExternalCall.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Call.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\InputTerminal.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Inverter.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Motion.png" />

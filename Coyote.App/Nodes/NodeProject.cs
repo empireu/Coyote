@@ -84,7 +84,14 @@ public class NodeProject
 
     public void Load(World world, IEnumerable<NodeBehavior> behaviors)
     {
+        if (world.Size != 0)
+        {
+            throw new InvalidOperationException("Cannot load nodes in non-fresh world");
+        }
+
         var behaviorMap = behaviors.ToDictionary(b => b.Name, b => b);
+
+        var savedDataMap = new Dictionary<Entity, string>();
 
         Entity Traverse(JsonNode node)
         {
@@ -94,6 +101,9 @@ public class NodeProject
             }
 
             var entity = behavior.CreateEntity(world, node.Position);
+
+            savedDataMap.Add(entity, node.SavedData);
+            
             ref var parentComp = ref entity.Get<NodeComponent>();
 
             parentComp.Name = node.Name;
@@ -116,5 +126,10 @@ public class NodeProject
         {
             Traverse(node);
         });
+
+        world.Query(new QueryDescription().WithAll<NodeComponent>(), ((in Entity entity) =>
+        {
+            entity.Behavior().AfterWorldLoad(entity, savedDataMap[entity]);
+        }));
     }
 }

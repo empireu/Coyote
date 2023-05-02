@@ -1,8 +1,10 @@
 ﻿using System.Drawing;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
+using Coyote.App.Nodes;
 using Coyote.Mathematics;
 using GameFramework.Renderer;
 
@@ -275,4 +277,81 @@ internal static class Extensions
     }
 
     public static IEnumerable<T> Stream<T>(this T head) => new[] { head };
+    
+    public static List<Entity> ToArray(this Query query)
+    {
+        var results = new List<Entity>(128);
+
+        foreach (ref var chunk in query.GetChunkIterator())
+        {
+            foreach (var entity in chunk)
+            {
+                results.Add(chunk.Entity(entity));
+            }
+        }
+
+        return results;
+    }
+
+    public static bool Any(this Query query, Predicate<Entity> match)
+    {
+        foreach (ref var chunk in query.GetChunkIterator())
+        {
+            foreach (var id in chunk)
+            {
+                var entity = chunk.Entity(id);
+
+                if (match(entity))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public delegate bool EntityConsumerDelegate(Entity entity);
+
+    public static void Scan(this Query query, EntityConsumerDelegate consumer)
+    {
+        foreach (ref var chunk in query.GetChunkIterator())
+        {
+            foreach (var id in chunk)
+            {
+                var entity = chunk.Entity(id);
+
+                if (!consumer(entity))
+                {
+                    return;
+                }
+            }
+        }
+    }
+
+    public static Entity? FirstOrNull(this Query query, Predicate<Entity> match)
+    {
+        foreach (ref var chunk in query.GetChunkIterator())
+        {
+            foreach (var id in chunk)
+            {
+                var entity = chunk.Entity(id);
+
+                if (match(entity))
+                {
+                    return entity;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static Entity First(this Query query, Predicate<Entity> match)
+    {
+        return query.FirstOrNull(match) ?? throw new Exception("Could not find entity that matches the predicate");
+    }
+
+    public static List<NodeChild> Children(this Entity entity) => entity.Get<NodeComponent>().ChildrenRef.Instance;
+    public static IEnumerable<Entity> ChildrenEnt(this Entity entity) => entity.Children().Select(x => x.Entity);
 }

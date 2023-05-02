@@ -175,6 +175,10 @@ public struct NodeComponent
     public NodeConnectionSet Terminals;
 }
 
+public struct EntityAddedListenerComponent { }
+public struct EntitiesChangedListenerComponent { }
+public struct EntityDeletingListenerComponent { }
+
 public sealed class NodeAnalysis
 {
     public List<Message> Messages { get; }
@@ -223,8 +227,6 @@ public sealed class NodeAnalysis
 
 public abstract class NodeBehavior
 {
-    private const float TerminalHoverRadius = 0.01f;
-
     /// <summary>
     ///     Unique name for this <see cref="NodeBehavior"/>. This is also used during serialization.
     /// </summary>
@@ -348,22 +350,27 @@ public abstract class NodeBehavior
     /// </summary>
     public virtual void AfterLoad(Entity entity) { }
 
+    /// <summary>
+    ///     Called after the project has been fully loaded.
+    /// </summary>
+    public virtual void AfterWorldLoad(Entity entity, string savedData) { }
+
     #endregion
 
-    public virtual void Analyze(Entity entity, NodeAnalysis analysis, Project project) { }
+    public virtual void Analyze(Entity entity, NodeAnalysis analysis, INodeEditor editor) { }
 
     /// <summary>
     ///     Submits an <see cref="ImGui"/> inspector interface. The call happens inside a window block, so windows should not be created here.
     /// </summary>
     /// <param name="entity">The entity being edited.</param>
-    /// <param name="project">The current project.</param>
+    /// <param name="editor">The current editor.</param>
     /// <returns>True, if the project was mutated.</returns>
-    public virtual bool SubmitInspector(Entity entity, Project project)
+    public virtual bool SubmitInspector(Entity entity, INodeEditor editor)
     {
         return false;
     }
     
-    public virtual void Hover(Entity entity, Vector2 mousePos, Project project, float borderSize)
+    public virtual void Hover(Entity entity, Vector2 mousePos, INodeEditor editor, float borderSize)
     {
         var node = entity.Get<NodeComponent>();
 
@@ -375,20 +382,22 @@ public abstract class NodeBehavior
             .Where(t => NodeEditorLayer
                 .GetTerminalRect(entity, t)
                 .Contains(mousePos.ToPointF()))
-            .IfPresent(terminal => terminal.Hover(entity, mousePos, project));
+            .IfPresent(terminal => terminal.Hover(entity, mousePos, editor.CoyoteProject));
     }
 
     /// <summary>
-    ///     If true, <see cref="OnProjectUpdate"/> will be called when the project version changes.
+    ///     If true, <see cref="OnCoyoteProjectUpdated"/> will be called when the project version changes.
     /// </summary>
     public virtual bool ListenForProjectUpdate => false;
 
     /// <summary>
     ///     Called when <see cref="ListenForProjectUpdate"/> is true and the project version has changed.
     /// </summary>
-    /// <param name="entity"></param>
-    /// <param name="project"></param>
-    public virtual void OnProjectUpdate(Entity entity, Project project) { }
+    public virtual void OnCoyoteProjectUpdated(Entity entity, INodeEditor editor) { }
+
+    public virtual void OnEntitiesChanged(Entity entity, IEnumerable<Entity> changedEntities) { }
+
+    public virtual void OnEntityDeleting(Entity entity, Entity deleting) { }
 
     public override string ToString()
     {
@@ -417,7 +426,7 @@ public class ProxyNode : NodeBehavior
         connections.AddChildTerminal(new NodeTerminal(NodeTerminalType.Children, 0));
     }
 
-    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    public override void Analyze(Entity entity, NodeAnalysis analysis, INodeEditor editor)
     {
         if (entity.Children().Count == 0)
         {
@@ -454,7 +463,7 @@ public class DecoratorNode : NodeBehavior
         connections.AddChildTerminal(new DecoratorTerminal(0));
     }
 
-    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    public override void Analyze(Entity entity, NodeAnalysis analysis, INodeEditor editor)
     {
         if (entity.Children().Count == 0)
         {
@@ -603,7 +612,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         node.Terminals.RemoveChildTerminal(terminalResults.First());
     }
 
-    public override bool SubmitInspector(Entity entity, Project project)
+    public override bool SubmitInspector(Entity entity, INodeEditor editor)
     {
         ref var node = ref entity.Get<NodeComponent>();
         ref var state = ref entity.Get<MotionNodeComponent>().State;
@@ -617,7 +626,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         try
         {
             var projectName = state.MotionProject;
-            ImGuiExt.LabelScan(project.MotionProjects.Keys.ToArray(), ref projectName, "Project");
+            ImGuiExt.LabelScan(editor.CoyoteProject.MotionProjects.Keys.ToArray(), ref projectName, "Project");
             state.MotionProject = projectName;
 
             var selectedType = state.Type;
@@ -644,7 +653,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
 
             ImGui.Separator();
 
-            if (project.MotionProjects.TryGetValue(projectName, out var motionProject))
+            if (editor.CoyoteProject.MotionProjects.TryGetValue(projectName, out var motionProject))
             {
                 ImGui.Text("Create Marker");
                 {
@@ -746,11 +755,11 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         return changed;
     }
 
-    public override void OnProjectUpdate(Entity entity, Project project)
+    public override void OnCoyoteProjectUpdated(Entity entity, INodeEditor editor)
     {
         ref var state = ref entity.Get<MotionNodeComponent>().State;
 
-        if (!project.MotionProjects.TryGetValue(state.MotionProject, out var motionProject))
+        if (!editor.CoyoteProject.MotionProjects.TryGetValue(state.MotionProject, out var motionProject))
         {
             // Project no longer exists, destroy bindings.
 
@@ -761,7 +770,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         }
         else
         {
-            // Destroy any bindings whose markers might have gotten deleted.
+            // Destroy any bindings whose markers might have gotten deleting.
 
             state
                 .Bindings
@@ -771,10 +780,11 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         }
     }
 
-    public override void Analyze(Entity entity, NodeAnalysis analysis, Project project)
+    public override void Analyze(Entity entity, NodeAnalysis analysis, INodeEditor editor)
     {
         var node = entity.Get<NodeComponent>();
         var state = entity.Get<MotionNodeComponent>().State;
+        var project = editor.CoyoteProject;
 
         if (!project.MotionProjects.ContainsKey(state.MotionProject))
         {
@@ -895,13 +905,215 @@ public sealed class ParallelNode : ProxyNode
     }
 }
 
+public sealed class CallNode : NodeBehavior
+{
+    private struct CallNodeComponent
+    {
+        public Entity? CallTarget;
+    }
+
+    public CallNode(TextureSampler icon, string name) : base(icon, new Vector4(0.4f, 0.2f, 0.9f, 0.7f), name)
+    {
+
+    }
+
+    public override string Save(Entity entity)
+    {
+        return entity.Get<CallNodeComponent>().CallTarget?.Get<NodeComponent>().Name ?? string.Empty;
+    }
+
+    public override void AfterWorldLoad(Entity entity, string savedData)
+    {
+        entity.Get<CallNodeComponent>().CallTarget = entity
+            .GetWorld()
+            .Query(new QueryDescription().WithAll<NodeComponent>())
+            .First(e => e.Node().Name.Equals(savedData));
+
+    }
+
+    public override void AttachComponents(Entity entity)
+    {
+        entity.Add(new CallNodeComponent(), new EntityDeletingListenerComponent(), new EntitiesChangedListenerComponent());
+    }
+
+    public override bool SubmitInspector(Entity entity, INodeEditor editor)
+    {
+        ref var callTarget = ref entity.Get<CallNodeComponent>().CallTarget;
+
+        var rootNodes = new HashSet<string>();
+
+        var ambiguous = false;
+
+        entity.GetWorld().Query(new QueryDescription().WithAll<NodeComponent>()).Scan(e =>
+        {
+            if (e == entity)
+            {
+                return true;
+            }
+
+            var node = e.Node();
+
+            if (node.Parent != null)
+            {
+                return true;
+            }
+
+            if (string.IsNullOrWhiteSpace(node.Name))
+            {
+                return true;
+            }
+
+            if (!rootNodes.Add(node.Name))
+            {
+                ambiguous = true;
+                return false;
+            }
+
+            return true;
+        });
+
+        if (rootNodes.Count == 0)
+        {
+            callTarget = null;
+            ImGui.Text("No targets are available.");
+            return false;
+        }
+
+        if (ambiguous)
+        {
+            callTarget = null;
+            ImGui.Text("Invalid root set");
+            return false;
+        }
+
+        var name = callTarget?.Get<NodeComponent>().Name ?? rootNodes.First();
+
+        if (!callTarget.HasValue || ImGuiExt.LabelScan(rootNodes.ToArray(), ref name, "Target"))
+        {
+            callTarget = entity
+                .GetWorld()
+                .Query(new QueryDescription().WithAll<NodeComponent>())
+                .First(e => e.Node().Name.Equals(name));
+
+            return true;
+        }
+
+        if (ImGui.Button("Focus Target"))
+        {
+            editor.FocusCamera(callTarget.Value);
+        }
+
+        return false;
+    }
+
+    public override void Hover(Entity entity, Vector2 mousePos, INodeEditor editor, float borderSize)
+    {
+        entity.Get<CallNodeComponent>().CallTarget?.Also(target =>
+        {
+            ImGui.SetTooltip($"Target: {target.Get<NodeComponent>().Name}");
+        });
+    }
+
+    public override void OnEntityDeleting(Entity entity, Entity deleting)
+    {
+        // Reset target if it was deleted:
+
+        ref var target = ref entity.Get<CallNodeComponent>().CallTarget;
+
+        if (target == deleting)
+        {
+            target = null;
+        }
+    }
+
+    public override void OnEntitiesChanged(Entity entity, IEnumerable<Entity> changedEntities)
+    {
+        // Reset target when the current target gets an empty name:
+
+        ref var callTarget = ref entity.Get<CallNodeComponent>().CallTarget;
+
+        if (callTarget == null)
+        {
+            return;
+        }
+
+        foreach (var changedEntity in changedEntities)
+        {
+            if (changedEntity == callTarget && string.IsNullOrWhiteSpace(changedEntity.NodeDeRef().Name))
+            {
+                callTarget = null;
+                return;
+            }
+        }
+    }
+
+    public override void Analyze(Entity entity, NodeAnalysis analysis, INodeEditor editor)
+    {
+        var callTarget = entity.Get<CallNodeComponent>().CallTarget;
+
+        if (callTarget == null)
+        {
+            analysis.Error("Invalid call target");
+        }
+        else
+        {
+            if (callTarget == entity)
+            {
+                // That is weird, our queries rule out the entity itself.
+
+                analysis.Error("Internal error: Self calling node");
+            }
+            else
+            {
+                // Check recursive calls:
+                if (DetectCallCycle(new HashSet<Entity> { entity }, callTarget.Value))
+                {
+                    // Possible but not guaranteed because they may have some exit condition in there.
+                    analysis.Warn("Possible recursive call");
+                }
+            }
+        }
+    }
+
+    private static bool DetectCallCycle(HashSet<Entity> callNodes, Entity entity)
+    {
+        if (callNodes.Contains(entity))
+        {
+            return true;
+        }
+
+        if (entity.Has<CallNodeComponent>())
+        {
+            Assert.IsTrue(entity.Children().Count == 0);
+
+            var callTarget = entity.Get<CallNodeComponent>().CallTarget;
+
+            if (callTarget == null)
+            {
+                return false;
+            }
+
+            callNodes.Add(entity);
+
+            return DetectCallCycle(callNodes, callTarget.Value);
+        }
+
+        if (entity.ChildrenEnt().Any(c => DetectCallCycle(callNodes, c)))
+        {
+            return true;
+        }
+
+        return false;
+    }
+}
+
 #endregion
 
 public static class NodeExtensions
 {
+    public static ref NodeComponent Node(this ref Entity entity) => ref entity.Get<NodeComponent>();
+    public static NodeComponent NodeDeRef(this Entity entity) => entity.Get<NodeComponent>();
     public static NodeBehavior Behavior(this Entity entity) => entity.Get<NodeComponent>().Behavior;
-    public static List<NodeChild> Children(this Entity entity) => entity.Get<NodeComponent>().ChildrenRef.Instance;
-    public static IEnumerable<Entity> ChildrenEnt(this Entity entity) => entity.Children().Select(x => x.Entity);
 
     /// <summary>
     ///     Un-links all the children of this node using <see cref="UnlinkFrom"/> and clears the children collection.

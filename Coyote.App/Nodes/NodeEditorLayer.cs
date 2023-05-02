@@ -18,7 +18,7 @@ using ImGuiNET;
 
 namespace Coyote.App.Nodes;
 
-internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
+internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEditor
 {
     private const float ZoomSpeed = 35;
     private const float MinZoom = 2.0f;
@@ -108,11 +108,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         {
             if (comp.Behavior.ListenForProjectUpdate)
             {
-                comp.Behavior.OnProjectUpdate(e, _app.Project);
+                comp.Behavior.OnCoyoteProjectUpdated(e, this);
             }
         });
 
-        AnalyzeOnChange();
+        Analyze();
     }
 
     private Vector2 _selectPoint;
@@ -195,7 +195,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             if (_dragParent)
             {
                 FormConnection();
-                AnalyzeOnChange();
+                Analyze();
             }
         }
         else if (@event is { MouseButton: MouseButton.Right, Down: true })
@@ -268,6 +268,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         }
         
         parentEntity.LinkTo(childEntity, parentTerm);
+        SendEntitiesChanged(parentEntity, childEntity);
     }
 
     protected override void OnAdded()
@@ -304,7 +305,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             return IntersectsTerminal(entity, terminals.ParentTerminal) || terminals.ChildTerminals
                 .Any(childTerm => IntersectsTerminal(entity, childTerm));
 
-        }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, _app.Project, BorderSize));
+        }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, this, BorderSize));
 
         const string imId = "NodeEditorLayer";
 
@@ -319,7 +320,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             if (ImGui.Button("Place"))
             {
                 Place();
-                AnalyzeOnChange();
+                Analyze();
             }
 
             if (_selectedEntity != null)
@@ -329,24 +330,30 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 if (ImGui.Button("Delete"))
                 {
                     _selectedEntity?.Also(e => _transientMessages.Remove(e));
+                    _selectedEntity?.Also(SendEntityDeleting);
                     _selectedEntity?.Destroy();
                     _selectedEntity = null;
-                    AnalyzeOnChange();
+                    Analyze();
                 }
 
                 ImGui.SameLine();
                 if (ImGui.Button("-Parent"))
                 {
                     _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
-                    AnalyzeOnChange();
+                    _selectedEntity?.Also(e => SendEntitiesChanged(e));
+                    Analyze();
                 }
 
                 ImGui.SameLine();
 
                 if (ImGui.Button("-Children"))
                 {
+                    var children = _selectedEntity?.ChildrenEnt().ToArray() ?? Array.Empty<Entity>();
+
                     _selectedEntity?.UnlinkChildren();
-                    AnalyzeOnChange();
+                    _selectedEntity?.Also(e => SendEntitiesChanged(children.Prepend(e).ToArray()));
+
+                    Analyze();
                 }
             }
 
@@ -468,12 +475,14 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                 if (Inspector.SubmitEditor(entity))
                 {
-                    AnalyzeOnChange();
+                    Analyze();
+                    SendEntitiesChanged(entity);
                 }
 
-                if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project))
+                if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, this))
                 {
-                    AnalyzeOnChange();
+                    Analyze();
+                    SendEntitiesChanged(entity);
                 }
             }
         }
@@ -481,10 +490,26 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         ImGui.End();
     }
 
-    private void AnalyzeOnChange()
+    private void SendEntitiesChanged(params Entity[] changed)
+    {
+        _world.Query(new QueryDescription().WithAll<NodeComponent, EntitiesChangedListenerComponent>(), (in Entity entity, ref NodeComponent node) =>
+        {
+            node.Behavior.OnEntitiesChanged(entity, changed);
+        });
+    }
+
+    private void SendEntityDeleting(Entity deleting)
+    {
+        _world.Query(new QueryDescription().WithAll<NodeComponent, EntityDeletingListenerComponent>(), (in Entity entity, ref NodeComponent node) =>
+        {
+            node.Behavior.OnEntityDeleting(entity, deleting);
+        });
+    }
+
+    private void Analyze()
     {
         var nodeNames = new HashSet<string>();
-      
+        
         _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent node) =>
         {
             var analysis = GetAnalysis(entity);
@@ -506,7 +531,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             }
 
             // Custom analysis:
-            node.Behavior.Analyze(entity, analysis, _app.Project);
+            node.Behavior.Analyze(entity, analysis, this);
         });
     }
 
@@ -528,7 +553,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
         nodeProject.Load(_world, _nodeBehaviors);
 
-        AnalyzeOnChange();
+        Analyze();
     }
 
     private void Place()
@@ -840,6 +865,18 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     {
         return $"Nodes | {_nodeProjectName}";
     }
+
+    public void FocusCamera(Vector2 txWorldTarget)
+    {
+        _cameraController.FuturePosition2 = txWorldTarget;
+    }
+
+    public void FocusCamera(Entity entity)
+    {
+        _cameraController.FuturePosition2 = entity.Position() + entity.Scale() / 2 * new Vector2(1, -1);
+    }
+
+    public Project CoyoteProject => _app.Project;
 
     public void Dispose()
     {

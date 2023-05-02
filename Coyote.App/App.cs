@@ -142,6 +142,7 @@ internal class App : GameApplication
 
         reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
         reg.Register(new ParallelNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Parallel.png")).Texture, "Parallel"));
+        reg.Register(new CallNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Call.png")).Texture, "Call"));
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)
