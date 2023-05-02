@@ -27,10 +27,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private const float BorderSize = 0.01f;
     private const float NodeIconSize = 0.1f;
     private const float RunOnceSize = 0.035f;
-    private const float TerminalSize = 0.03f;
+    private const float TerminalSize = 0.025f;
     private const float ConnectionSize = 0.008f;
     private const float CamDragSpeed = 5f;
     private const float DragCamInterpolateSpeed = 50;
+
+    private const float TerminalHighlightSize = TerminalSize * 1.2f;
 
     private const float GridDragGranularity = 50f;
     private const float GridSnapDistanceX = 0.015f;
@@ -68,6 +70,13 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private readonly Sprite _runOnceSprite;
     private readonly Sprite _parentTerminalSprite;
     private readonly Sprite _childTerminalSprite;
+
+    private enum TerminalEffect
+    {
+        Disable,
+    }
+
+    private readonly Dictionary<NodeTerminal, TerminalEffect> _terminalEffects = new();
 
     private readonly Dictionary<Entity, List<NodeAnalysis.Message>> _transientMessages = new();
 
@@ -173,8 +182,32 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             if (IntersectsParentTerminal(_selectedEntity.Value))
             {
                 _dragParent = true;
+                CreateTerminalEffects();
             }
         }
+    }
+
+    private void CreateTerminalEffects()
+    {
+        _terminalEffects.Clear();
+        
+        var sourceEntity = Assert.NotNull(_selectedEntity);
+
+        _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent node) =>
+        {
+            if (entity == sourceEntity)
+            {
+                return;
+            }
+
+            foreach (var terminal in node.Terminals.ChildTerminals)
+            {
+                if (!entity.CanLinkTo(sourceEntity, terminal))
+                {
+                    _terminalEffects.Add(terminal, TerminalEffect.Disable);
+                }
+            }
+        });
     }
 
     private bool OnMouseEvent(MouseEvent @event)
@@ -229,6 +262,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
     private void FormConnection()
     {
+        _terminalEffects.Clear();
+
         Assert.IsTrue(_dragParent);
 
         _dragParent = false;
@@ -833,17 +868,42 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private void RenderNodeTerminals(in Entity e, ref PositionComponent positionComponent, ref ScaleComponent scaleComponent, ref NodeComponent nodeComponent)
     {
         var set = nodeComponent.Terminals;
+        var mouseWorld = MouseWorld.ToPointF();
 
-        void SubmitTerminal(Vector2 position, NodeTerminal terminal)
+        void SubmitTerminal(Vector2 position, NodeTerminal terminal, Entity eDeRef)
         {
-            _editorBatch.TexturedQuad(position, Vector2.One * TerminalSize, terminal.Type == NodeTerminalType.Children ? _childTerminalSprite.Texture : _parentTerminalSprite.Texture);
+            var size = TerminalSize;
+
+            if (
+                GetTerminalRect(eDeRef, terminal).Contains(mouseWorld) 
+                && (!_dragParent || terminal.Type == NodeTerminalType.Children) /* Do not highlight if we are dragging a connection and this terminal is a parent terminal.*/
+                && (_dragParent || terminal.Type == NodeTerminalType.Parent)/* Do not highlight child terminals if we are not dragging a parent terminal (you cannot interact with them) */
+            )
+            {
+                size = TerminalHighlightSize;
+            }
+
+            _editorBatch.TexturedQuad(
+                position, 
+                Vector2.One * size, 
+                terminal.Type == NodeTerminalType.Children ? _childTerminalSprite.Texture : _parentTerminalSprite.Texture);
         }
 
-        SubmitTerminal(set.GetParentPosition(e, BorderSize), set.ParentTerminal);
-        
-        foreach (var terminal in set.ChildTerminals)
+        SubmitTerminal(set.GetParentPosition(e, BorderSize), set.ParentTerminal, e);
+
+        for (var index = 0; index < set.ChildTerminals.Count; index++)
         {
-            SubmitTerminal(set.GetChildPosition(terminal, e, BorderSize), terminal);
+            var terminal = set.ChildTerminals[index];
+
+            if (_terminalEffects.TryGetValue(terminal, out var effect))
+            {
+                if (effect == TerminalEffect.Disable)
+                {
+                    continue;
+                }
+            }
+
+            SubmitTerminal(set.GetChildPosition(terminal, e, BorderSize), terminal, e);
         }
     }
 
