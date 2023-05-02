@@ -114,7 +114,7 @@ public class NodeProject
 
             foreach (var nodeChild in node.Children)
             {
-                entity.LinkTo(Traverse(nodeChild.Node), parentComp.Terminals.GetTerminal(nodeChild.TerminalId));
+                entity.LinkTo(Traverse(nodeChild.Node), parentComp.Terminals.GetChildTerminal(nodeChild.TerminalId));
             }
 
             behavior.AfterLoad(entity);

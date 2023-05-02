@@ -4,7 +4,10 @@ namespace Coyote.App;
 
 internal static class ImGuiExt
 {
-    public static bool LabelScan(string[] names, ref string selected, string comboLbl)
+    /// <summary>
+    ///     Wraps <see cref="ImGui.Combo(string, ref int, string[], int)"/> for use with string arrays and string indices.
+    /// </summary>
+    public static bool StringComboBox(string[] names, ref string selected, string comboLbl)
     {
         var idx = names.Length == 0 ? -1 : Array.IndexOf(names, selected);
 
@@ -24,20 +27,21 @@ internal static class ImGuiExt
         return result;
     }
 
-    public static bool EnumScan<TEnum>(ref TEnum selected, string comboLbl) where TEnum : struct, Enum
+    /// <summary>
+    ///     Wraps <see cref="StringComboBox"/> for use with enums.
+    /// </summary>
+    /// <typeparam name="TEnum"></typeparam>
+    /// <param name="selected"></param>
+    /// <param name="comboLbl"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public static bool EnumComboBox<TEnum>(ref TEnum selected, string comboLbl) where TEnum : struct, Enum
     {
         var selectedName = Enum.GetName(selected) ?? throw new Exception("Failed to get enum name");
-        var result = LabelScan(Enum.GetNames<TEnum>(), ref selectedName, comboLbl);
+        var result = StringComboBox(Enum.GetNames<TEnum>(), ref selectedName, comboLbl);
         selected = Enum.Parse<TEnum>(selectedName);
 
         return result;
-    }
-
-    public static TEnum EnumScan<TEnum>(TEnum actual, string comboLbl) where TEnum : struct, Enum
-    {
-        EnumScan(ref actual, comboLbl);
-
-        return actual;
     }
 
     public static bool Begin(string title, string id)

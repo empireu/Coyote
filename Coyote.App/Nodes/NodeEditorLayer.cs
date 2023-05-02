@@ -345,7 +345,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             return IntersectsTerminal(entity, terminals.ParentTerminal) || terminals.ChildTerminals
                 .Any(childTerm => IntersectsTerminal(entity, childTerm));
 
-        }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, this, BorderSize));
+        }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, this));
 
         const string imId = "NodeEditorLayer";
 

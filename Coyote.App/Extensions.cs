@@ -1,6 +1,5 @@
 ﻿using System.Drawing;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
@@ -91,11 +90,6 @@ internal static class Extensions
         component.UpdateCallback?.Invoke(entity, oldPosition);
     }
 
-    public static Vector2 Xy(this Vector3 v)
-    {
-        return new Vector2(v.X, v.Y);
-    }
-
     /// <summary>
     ///     Iterates over the items.
     /// </summary>
@@ -128,19 +122,6 @@ internal static class Extensions
     }
 
     /// <summary>
-    ///     Iterates over the list of items.  This calls <see cref="ForEach{TList,TItem}"/>
-    ///     Afterwards, the list is cleared.
-    /// </summary>
-    /// <param name="list"></param>
-    /// <param name="body">The function to invoke. If false is returned, iteration will end there.</param>
-    /// <returns>The original list.</returns>
-    public static void RemoveAll<TItem>(this IList<TItem> list, Func<TItem, bool> body)
-    {
-        list.ForEach(body);
-        list.Clear();
-    }
-
-    /// <summary>
     ///     Iterates over the list of items.
     ///     Afterwards, the list is cleared.
     /// </summary>
@@ -153,12 +134,27 @@ internal static class Extensions
         list.Clear();
     }
 
+    /// <summary>
+    ///     Runs the specified operation <see cref="action"/> on the object <see cref="obj"/> and returns <see cref="obj"/>.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="obj"></param>
+    /// <param name="action"></param>
+    /// <returns></returns>
     public static T Also<T>(this T obj, Action<T> action)
     {
         action(obj);
         return obj;
     }
 
+    /// <summary>
+    ///     Maps the value <see cref="t1"/> to <see cref="T2"/> using the specified transform <see cref="function"/> and returns the result.
+    /// </summary>
+    /// <typeparam name="T1"></typeparam>
+    /// <typeparam name="T2"></typeparam>
+    /// <param name="t1"></param>
+    /// <param name="function"></param>
+    /// <returns></returns>
     public static T2 Map<T1, T2>(this T1 t1, Func<T1, T2> function)
     {
         return function(t1);
@@ -226,10 +222,24 @@ internal static class Extensions
         return Rotation.Exp(r2.X, r2.Y);
     }
 
+    /// <summary>
+    ///     Gets an array with all the elements in <see cref="e"/>.
+    /// </summary>
     public static T[] Bind<T>(this IEnumerable<T> e) => e.ToArray();
+
+    /// <summary>
+    ///     Gets an array with the first <see cref="n"/> elements in <see cref="e"/>. It will return an empty array if <see cref="e"/> has no elements.
+    /// </summary>
     public static T[] TakeBind<T>(this IEnumerable<T> e, int n = 1) => e.Take(n).Bind();
+
+    /// <summary>
+    ///     Gets the first element in <see cref="e"/> or null, if <see cref="e"/> has no elements.
+    /// </summary>
     public static T? BindFirst<T>(this IEnumerable<T> e) => e.FirstOrDefault();
 
+    /// <summary>
+    ///     Executes the operation <see cref="action"/> on the first element in <see cref="e"/>, if <see cref="e"/> is not empty.
+    /// </summary>
     public static void IfPresent<T>(this IEnumerable<T> e, Action<T> action)
     {
         var elements = e.TakeBind();
@@ -240,9 +250,29 @@ internal static class Extensions
         }
     }
 
+    /// <summary>
+    ///     Short-hand for fetching the <see cref="PositionComponent"/>'s position.
+    /// </summary>
     public static Vector2 Position(this Entity entity) => entity.Get<PositionComponent>().Position;
+
+    /// <summary>
+    ///     Short-hand for getting a reference to the <see cref="PositionComponent"/>'s position.
+    /// </summary>
+    public static ref Vector2 PositionRef(in this Entity entity) => ref entity.Get<PositionComponent>().Position;
+
+    /// <summary>
+    ///     Short-hand for fetching the <see cref="ScaleComponent"/>'s scale.
+    /// </summary>
     public static Vector2 Scale(this Entity entity) => entity.Get<ScaleComponent>().Scale;
 
+    /// <summary>
+    ///     Short-hand for getting a reference to the <see cref="ScaleComponent"/>'s scale.
+    /// </summary>
+    public static ref Vector2 ScaleRef(in this Entity entity) => ref entity.Get<ScaleComponent>().Scale;
+
+    /// <summary>
+    ///     Appends the element <see cref="tail"/> to the end of the enumerable <see cref="head"/>.
+    /// </summary>
     public static IEnumerable<T> Append<T>(this IEnumerable<T> head, T tail)
     {
         foreach (var t in head)
@@ -253,6 +283,9 @@ internal static class Extensions
         yield return tail;
     }
 
+    /// <summary>
+    ///     Appends the enumerable <see cref="tail"/> to the end of the enumerable <see cref="head"/>. This is equivalent to <code>head.Concat(tail)</code>
+    /// </summary>
     public static IEnumerable<T> Append<T>(this IEnumerable<T> head, IEnumerable<T> tail)
     {
         foreach (var t in head)
@@ -266,6 +299,9 @@ internal static class Extensions
         }
     }
 
+    /// <summary>
+    ///     Pre-pends the element <see cref="head"/> to the start of the enumerable <see cref="tail"/>.
+    /// </summary>
     public static IEnumerable<T> Prepend<T>(this IEnumerable<T> tail, T head)
     {
         yield return head;
@@ -276,8 +312,14 @@ internal static class Extensions
         }
     }
 
+    /// <summary>
+    ///     Creates an enumeration with the element <see cref="head"/>.
+    /// </summary>
     public static IEnumerable<T> Stream<T>(this T head) => new[] { head };
     
+    /// <summary>
+    ///     Searches the <see cref="World"/> using the specified <see cref="query"/> and returns all results.
+    /// </summary>
     public static List<Entity> ToArray(this Query query)
     {
         var results = new List<Entity>(128);
@@ -293,6 +335,9 @@ internal static class Extensions
         return results;
     }
 
+    /// <summary>
+    ///     Checks if the <see cref="World"/> contains any entities that <see cref="match"/> the query.
+    /// </summary>
     public static bool Any(this Query query, Predicate<Entity> match)
     {
         foreach (ref var chunk in query.GetChunkIterator())

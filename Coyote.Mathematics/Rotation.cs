@@ -2,6 +2,8 @@
 
 namespace Coyote.Mathematics;
 
+// todo rewrite these classes
+
 /// <summary>
 ///     Describes an angle of rotation.
 /// </summary>

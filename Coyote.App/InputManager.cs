@@ -141,7 +141,7 @@ internal class InputManager
         {
             var key = bindField.BaseBind.Key;
             
-            if (ImGuiExt.EnumScan(ref key, bindField.BaseBind.Name))
+            if (ImGuiExt.EnumComboBox(ref key, bindField.BaseBind.Name))
             {
                 UpdateField(bindField, key);
 
