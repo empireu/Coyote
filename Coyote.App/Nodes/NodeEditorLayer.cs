@@ -15,7 +15,6 @@ using GameFramework.Renderer;
 using GameFramework.Utilities;
 using GameFramework.Utilities.Extensions;
 using ImGuiNET;
-using SixLabors.ImageSharp.Metadata;
 
 namespace Coyote.App.Nodes;
 
@@ -35,9 +34,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private const float GridDragGranularity = 50f;
     private const float GridSnapDistanceX = 0.015f;
-    private const float AutoFormatGapX = GridSnapDistanceX;
-    private const float AutoFormatGapY = 0.1f;
-
+  
     private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
     private static readonly Vector4 SelectedTint = new(1.1f, 1.1f, 1.1f, 1.2f);
     private static readonly RgbaFloat PreviewConnection = new(0.5f, 0.5f, 0.1f, 0.5f);
@@ -599,7 +596,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         var entity = _selectedEntity.Value;
         var newPosition = MouseWorld + _selectPoint;
 
-        if (_app.Input.IsKeyDown(Key.ShiftLeft))
+        if (NodeEditorBinds.GridSnap)
         {
             // Grid drag for more accurate placement:
 
@@ -607,7 +604,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             newPosition = new Vector2(MathF.Truncate(newPosition.X) / GridDragGranularity, MathF.Truncate(newPosition.Y) / GridDragGranularity);
         }
 
-        if (_app.Input.IsKeyDown(Key.ControlLeft))
+        if (NodeEditorBinds.AlignSnap)
         {
             // Align to closest left node:
 
@@ -645,9 +642,10 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         }
 
         var deltaPos = newPosition - entity.Position();
+      
         entity.Move(newPosition);
 
-        if (_app.Input.IsKeyDown(Key.AltLeft))
+        if (NodeEditorBinds.MultiDrag)
         {
             if (entity.Children().Count > 0)
             {
@@ -857,4 +855,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         _world.Dispose();
         _imGui.Submit -= ImGuiOnSubmit;
     }
+}
+
+[InputAccessor]
+public static class NodeEditorBinds
+{
+    public static KeyBind GridSnap = new("Grid Snap", Key.ShiftLeft);
+    public static KeyBind AlignSnap = new("Align To Neighbor", Key.ControlLeft);
+    public static KeyBind MultiDrag = new("Multi Drag", Key.AltLeft);
 }

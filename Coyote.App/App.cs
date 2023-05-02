@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
-using System.Xml.Linq;
 using Coyote.App.Movement;
 using Coyote.App.Nodes;
 using GameFramework;
@@ -26,6 +25,7 @@ internal class App : GameApplication
 {
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
+    private const string KeyBindFile = "keybinds.json";
     private static readonly Vector2 TabSize = new(12, 12);
     private readonly IServiceProvider _serviceProvider;
 
@@ -51,6 +51,8 @@ internal class App : GameApplication
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
+    private readonly InputManager _inputManager;
+
     private readonly OrthographicCameraController2D _fullCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
 
     private readonly Sprite _wallpaper;
@@ -58,6 +60,8 @@ internal class App : GameApplication
     private readonly List<RegisteredLayer> _tabLayers = new();
 
     private readonly Stopwatch _loadSw = new();
+
+    private bool _showSettingsWindow;
 
     // Better to switch them like this instead of creating a copy:
 
@@ -86,6 +90,10 @@ internal class App : GameApplication
             Directory.CreateDirectory(ProjectDirectory);
         }
 
+        _inputManager = new InputManager(this);
+        _inputManager.Load(KeyBindFile);
+        _inputManager.OnChanged += InputManagerOnOnChanged;
+
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
 
         Font = Resources.AssetManager.GetOrAddFont(Asset("Fonts.Roboto.font"));
@@ -103,6 +111,11 @@ internal class App : GameApplication
         RegisterTab("+N", "NodeEditorTab", () => Layers.ConstructLayer<NodeEditorLayer>());
 
         ResizeCamera();
+    }
+
+    private void InputManagerOnOnChanged()
+    {
+        _inputManager.Save(KeyBindFile);
     }
 
     private void RegisterNodes(NodeBehaviorRegistry reg)
@@ -205,8 +218,15 @@ internal class App : GameApplication
 
         if (ImGui.BeginMainMenuBar())
         {
+            if (ImGui.Button("Settings"))
+            {
+                _showSettingsWindow = true;
+            }
+
             if (ImGui.Button("Save"))
             {
+                //todo implement this, the current implementation is useless
+
                 Project.Save();
 
                 ToastInfo("Saved");
@@ -295,6 +315,18 @@ internal class App : GameApplication
         }
 
         ImGui.EndMainMenuBar();
+
+        if (_showSettingsWindow)
+        {
+            if (ImGui.Begin("Settings", ref _showSettingsWindow))
+            {
+                ImGui.Text("Keys");
+
+                _inputManager.ImGuiSubmit();
+            }
+
+            ImGui.End();
+        }
     }
 
     public void ToastInfo(string message)
