@@ -27,7 +27,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private const float BorderSize = 0.01f;
     private const float NodeIconSize = 0.1f;
     private const float RunOnceSize = 0.035f;
-    private const float TerminalSize = 0.015f;
+    private const float TerminalSize = 0.03f;
     private const float ConnectionSize = 0.008f;
     private const float CamDragSpeed = 5f;
     private const float DragCamInterpolateSpeed = 50;
@@ -251,6 +251,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         var parentEntity = clipped.First();
 
+        if (parentEntity.ChildrenEnt().Any(c => c == childEntity))
+        {
+            return;
+        }
+
         ref var parentComp = ref parentEntity.Get<NodeComponent>();
 
         var parentTerm =
@@ -266,7 +271,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         {
             return;
         }
-        
+
         parentEntity.LinkTo(childEntity, parentTerm);
         SendEntitiesChanged(parentEntity, childEntity);
     }
