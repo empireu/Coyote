@@ -63,7 +63,7 @@ public readonly struct Pose
     /// </summary>
     /// <param name="displacement">The displacement to use.</param>
     /// <param name="tangent">The direction vector of the pose.</param>
-    public Pose(Real2<Displacement> displacement, Real2<Displacement> tangent) : this(new Translation(displacement), Rotation.FromDirection(tangent))
+    public Pose(Real2<Displacement> displacement, Real2<Displacement> tangent) : this(new Translation(displacement), Rotation.Exp(tangent))
     {
 
     }
@@ -186,7 +186,7 @@ public readonly struct Pose
         }
 
         var translation = new Translation(dx * s - dy * c, dx * c + dy * s);
-        var rotation = Rotation.FromDirection(new Real2<Displacement>(cosTheta, sinTheta));
+        var rotation = Rotation.Exp(new Real2<Displacement>(cosTheta, sinTheta));
 
         var transform = new Transformation(translation, rotation);
 
@@ -213,7 +213,7 @@ public readonly struct Pose
         }
 
         var translationPart =
-            transform.Translation.Rotated(Rotation.FromDirection(halfThetaByTanOfHalfDTheta, -halfDTheta))
+            transform.Translation.Rotated(Rotation.Exp(halfThetaByTanOfHalfDTheta, -halfDTheta))
             * Math.Sqrt(halfThetaByTanOfHalfDTheta * halfThetaByTanOfHalfDTheta + halfDTheta * halfDTheta);
 
         return new Twist(translationPart.X, translationPart.Y, dTheta);

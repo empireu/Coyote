@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Arch.Core.Extensions;
 using Coyote.Mathematics;
 using GameFramework.Utilities;
 
@@ -10,7 +11,7 @@ internal sealed class Simulator : IDisposable
     /// <summary>
     ///     Controls how often the trajectory is updated when editing.
     /// </summary>
-    private const double EditTimeRefreshThreshold = 0.5;
+    private const double EditTimeRefreshThreshold = 1.0;
 
     private readonly App _app;
     private readonly PathEditor _editor;
@@ -23,16 +24,12 @@ internal sealed class Simulator : IDisposable
         _app = app;
         _editor = editor;
 
-        _editor.OnTranslationChanged += OnTranslationChanged;
-        _editor.OnRotationChanged += OnRotationChanged;
+        _editor.OnTranslationChanged += OnPathChanged;
+        _editor.OnRotationChanged += OnPathChanged;
+        _editor.OnMarkerChanged += OnPathChanged;
     }
 
-    private void OnTranslationChanged()
-    {
-        InvalidateTrajectory();
-    }
-
-    private void OnRotationChanged()
+    private void OnPathChanged()
     {
         InvalidateTrajectory();
     }
@@ -43,7 +40,7 @@ internal sealed class Simulator : IDisposable
         _editTime.Restart();
     }
 
-    public float PlayTime { get; private set; }
+    public float PlayTime;
     public TrajectoryPoint Last { get; private set; }
     public float TotalTime { get; private set; }
     public float TotalLength { get; private set; }
@@ -54,6 +51,7 @@ internal sealed class Simulator : IDisposable
     public double MaxProfileAcceleration { get; private set; }
     public double MaxProfileAngularVelocity { get; private set; }
     public double MaxProfileAngularAcceleration { get; private set; }
+    public int Points { get; private set; }
 
     public float Dx = 0.001f;
     public float Dy = 0.001f;
@@ -67,6 +65,35 @@ internal sealed class Simulator : IDisposable
     public float MaxCentripetalAcceleration = 0.5f;
     public float MaxAngularVelocity = 180f;
     public float MaxAngularAcceleration = 140f;
+
+    public readonly struct Marker
+    {
+        public Real<Percentage> Parameter { get; }
+        public string Label { get; }
+
+        public Marker(Real<Percentage> parameter, string label)
+        {
+            Parameter = parameter;
+            Label = label;
+        }
+    }
+
+    public readonly struct MarkerEvent
+    {
+        public MarkerEvent(Marker marker, Real<Time> hitTime)
+        {
+            Marker = marker;
+            HitTime = hitTime;
+        }
+
+        public Marker Marker { get; }
+        public Real<Time> HitTime { get; }
+    }
+
+    private readonly List<MarkerEvent> _markerEvents = new();
+    public IEnumerable<MarkerEvent> MarkerEvents => _markerEvents;
+
+    private readonly List<Marker> _markers = new();
 
     public bool Update(float dt, out Pose pose)
     {
@@ -85,6 +112,9 @@ internal sealed class Simulator : IDisposable
 
                 return false;
             }
+
+            _markerEvents.Clear();
+            _markers.Clear();
 
             PlayTime = 0;
 
@@ -143,31 +173,46 @@ internal sealed class Simulator : IDisposable
                     new Real<CentripetalAcceleration>(MaxCentripetalAcceleration)), out trajectoryPoints);
             });
 
+            foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
+            {
+                var component = markerEntity.Get<MarkerComponent>();
+              
+                _markers.Add(new Marker(component.Parameter, component.Name));
+            }
+
+
             Assert.NotNull(ref trajectoryPoints);
 
             MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
             MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
             MaxProfileAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
             MaxProfileAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
-
+            Points = trajectoryPoints.Length;
+            
             TotalTime = (float)Trajectory!.TimeRange.End;
             TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;
 
             _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
         }
 
+        Last = Trajectory.Evaluate(PlayTime.ToReal<Time>().Clamped(0, Trajectory.TimeRange.End));
+        pose = Last.CurvePose.Pose;
+        pose -= new Rotation(Math.PI / 2); // Graphic points upwards with identity transform
+
+        foreach (var marker in _markers.Where(x => !_markerEvents.Any(e => e.Marker.Parameter.Equals(x.Parameter))).Where(x => Last.CurvePose.Parameter >= x.Parameter))
+        {
+            _markerEvents.Add(new MarkerEvent(marker, PlayTime.ToReal<Time>()));
+
+            break;
+        }
+        
+        PlayTime += dt * Speed;
+
         if (PlayTime > Trajectory.TimeRange.End)
         {
             PlayTime = 0;
-            pose = Pose.Zero;
-            return false;
+            _markerEvents.Clear();
         }
-
-        Last = Trajectory.Evaluate(PlayTime.ToReal<Time>());
-        pose = Last.CurvePose.Pose;
-        pose -= new Rotation(Math.PI / 2);
-
-        PlayTime += dt * Speed;
 
         return true;
     }

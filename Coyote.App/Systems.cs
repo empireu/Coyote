@@ -13,7 +13,19 @@ internal static class Systems
         {
             if (!spriteComponent.Disabled)
             {
-                batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, spriteComponent.Sprite.Texture);
+                if (spriteComponent.Transform.HasValue)
+                {
+                    var transform = spriteComponent.Transform.Value;
+                    batch.TexturedQuad(
+                        positionComponent.Position + transform.Translation, 
+                        scaleComponent.Scale,
+                        transform.Rotation, 
+                        spriteComponent.Sprite.Texture);
+                }
+                else
+                {
+                    batch.TexturedQuad(positionComponent.Position, scaleComponent.Scale, spriteComponent.Sprite.Texture);
+                }
             }
         });
 
