@@ -79,6 +79,8 @@ internal class App : GameApplication
 
     public App(IServiceProvider serviceProvider, NodeBehaviorRegistry behaviors)
     {
+        Device.SyncToVerticalBlank = true;
+
         _serviceProvider = serviceProvider;
 
         ClearColor = RgbaFloat.Black;
