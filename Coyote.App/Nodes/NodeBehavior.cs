@@ -176,7 +176,7 @@ public struct NodeComponent
 
 public sealed class NodeAnalysis
 {
-    private readonly List<Message> _messages;
+    public List<Message> Messages { get; }
 
     public static Vector4 MessageColor(MessageType type)
     {
@@ -208,12 +208,12 @@ public sealed class NodeAnalysis
 
     public NodeAnalysis(List<Message> messages)
     {
-        _messages = messages;
+        Messages = messages;
     }
 
     public NodeAnalysis With(Message message)
     {
-        _messages.Add(message);
+        Messages.Add(message);
         return this;
     }
     public NodeAnalysis Warn(string text) => With(new Message(MessageType.Warning, text));

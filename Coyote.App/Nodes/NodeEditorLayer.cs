@@ -69,6 +69,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
     private readonly Sprite _parentTerminalSprite;
     private readonly Sprite _childTerminalSprite;
 
+    private readonly Dictionary<Entity, List<NodeAnalysis.Message>> _transientMessages = new();
+
     private string _nodeProjectName = "My Project";
     private int _selectedProject;
 
@@ -109,6 +111,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 comp.Behavior.OnProjectUpdate(e, _app.Project);
             }
         });
+
+        AnalyzeOnChange();
     }
 
     private Vector2 _selectPoint;
@@ -191,6 +195,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             if (_dragParent)
             {
                 FormConnection();
+                AnalyzeOnChange();
             }
         }
         else if (@event is { MouseButton: MouseButton.Right, Down: true })
@@ -270,6 +275,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
         RegisterHandler<MouseEvent>(OnMouseEvent);
     }
 
+    private NodeAnalysis GetAnalysis(Entity e)
+    {
+        return new NodeAnalysis(_transientMessages.GetOrAdd(e, _ => new List<NodeAnalysis.Message>()));
+    }
+
     private void ImGuiOnSubmit(ImGuiRenderer obj)
     {
         if (_disposed)
@@ -309,6 +319,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             if (ImGui.Button("Place Selected"))
             {
                 Place();
+                AnalyzeOnChange();
             }
 
             if (_selectedEntity != null)
@@ -317,13 +328,16 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                 if (ImGui.Button("Delete Node"))
                 {
+                    _selectedEntity?.Also(e => _transientMessages.Remove(e));
                     _selectedEntity?.Destroy();
                     _selectedEntity = null;
+                    AnalyzeOnChange();
                 }
 
                 if (ImGui.Button("Unlink Parent"))
                 {
                     _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
+                    AnalyzeOnChange();
                 }
 
                 ImGui.SameLine();
@@ -331,6 +345,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
                 if (ImGui.Button("Unlink Children"))
                 {
                     _selectedEntity?.UnlinkChildren();
+                    AnalyzeOnChange();
                 }
             }
 
@@ -341,16 +356,18 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             ImGui.BeginGroup();
             ImGui.Text("Project Analyzer:");
             {
-                var messages = new List<NodeAnalysis.Message>();
-                var analysis = new NodeAnalysis(messages);
-
                 Entity? highlight = null;
 
                 nint id = 1;
 
-                _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent component) =>
+                foreach (var entity in _transientMessages.Keys)
                 {
-                    component.Behavior.Analyze(entity, analysis, _app.Project);
+                    if (!entity.IsAlive())
+                    {
+                        Assert.Fail("Lingering entity in lookup");
+                    }
+
+                    var messages = _transientMessages[entity];
 
                     foreach (var message in messages)
                     {
@@ -370,9 +387,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
                         ImGui.Separator();
                     }
-
-                    messages.Clear();
-                });
+                }
 
                 if (highlight.HasValue)
                 {
@@ -450,16 +465,48 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
             {
                 var entity = _selectedEntity.Value;
 
-                Inspector.SubmitEditor(entity);
+                if (Inspector.SubmitEditor(entity))
+                {
+                    AnalyzeOnChange();
+                }
 
                 if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, _app.Project))
                 {
-                    //todo
+                    AnalyzeOnChange();
                 }
             }
         }
 
         ImGui.End();
+    }
+
+    private void AnalyzeOnChange()
+    {
+        var nodeNames = new HashSet<string>();
+      
+        _world.Query(new QueryDescription().WithAll<NodeComponent>(), (in Entity entity, ref NodeComponent node) =>
+        {
+            var analysis = GetAnalysis(entity);
+            analysis.Messages.Clear();
+
+            if (node.Parent == null)
+            {
+                // Analyze duplicate root names. Also warn on empty names.
+
+                if (!nodeNames.Add(node.Name))
+                {
+                    analysis.Error("Ambiguous root name");
+                }
+
+                if (string.IsNullOrWhiteSpace(node.Name))
+                {
+                    analysis.Warn("Empty root name");
+                }
+            }
+
+            // Custom analysis:
+            node.Behavior.Analyze(entity, analysis, _app.Project);
+        });
     }
 
     private void SaveProject()
@@ -471,12 +518,16 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable
 
     private void LoadProject(string nodeProjectName)
     {
+        _transientMessages.Clear();
+
         var nodeProject = _app.Project.NodeProjects[nodeProjectName];
 
         _world.Clear();
         _selectedEntity = null;
 
         nodeProject.Load(_world, _nodeBehaviors);
+
+        AnalyzeOnChange();
     }
 
     private void Place()
