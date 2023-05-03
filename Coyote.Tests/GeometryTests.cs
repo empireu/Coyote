@@ -1,9 +1,12 @@
-﻿using Coyote.Mathematics;
+﻿using System.Diagnostics;
+using Coyote.Mathematics;
 
 namespace Coyote.Tests;
 
 public class GeometryTests
 {
+    private const double Eps = 10e-12;
+
     [Test]
     public void TestVector2d()
     {
@@ -27,5 +30,16 @@ public class GeometryTests
         Assert.That(new Vector2d(5, 6).LengthSqr, Is.EqualTo(5 * 5 + 6 * 6));
         Assert.That(new Vector2d(50, 20).Normalized().Length, Is.EqualTo(1));
         Assert.That(new Vector2d(50, 20).Normalized() * new Vector2d(50, 20).Length, Is.EqualTo(new Vector2d(50, 20)));
+    }
+
+    [Test]
+    public void TestRotation2d()
+    {
+        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(Math.PI), Is.EqualTo(Rotation2d.Exp(Math.PI * 2)));
+        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(-Math.PI), Is.EqualTo(Rotation2d.Exp(0)));
+        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(Math.PI).Inverse, Is.EqualTo(Rotation2d.Exp(0)));
+        Assert.IsTrue((Rotation2d.Exp(Math.PI) * Vector2d.UnitX).ApproxEqs(-Vector2d.UnitX, Eps));
+        Assert.IsTrue((Rotation2d.Exp(Math.PI * 2) * Vector2d.UnitX).ApproxEqs(Vector2d.UnitX, Eps));
+        Assert.IsTrue((Rotation2d.Exp(Math.PI * 8) * Vector2d.UnitX).ApproxEqs(Vector2d.UnitX, Eps));
     }
 }

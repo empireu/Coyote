@@ -48,6 +48,12 @@ public readonly struct Vector2d
                Y.Equals(other.Y);
     }
 
+    public bool ApproxEqs(Vector2d other, double eps = 10e-6)
+    {
+        return X.ApproxEquals(other.X, eps) && 
+               Y.ApproxEquals(other.Y, eps);
+    }
+
     public override int GetHashCode()
     {
         return HashCode.Combine(X, Y);
@@ -151,4 +157,108 @@ public sealed class Vector2dDual
 
     public static Vector2dDual Const(double x, double y, int n = 1) => new(Dual.Const(x, n), Dual.Const(y, n));
     public static Vector2dDual Var(double x, double y, int n = 1) => new(Dual.Var(x, n), Dual.Var(y, n));
+}
+
+public readonly struct Rotation2d
+{
+    public double Re { get; }
+    public double Im { get; }
+
+    public Rotation2d(double re, double im)
+    {
+        Re = re;
+        Im = im;
+    }
+
+    public static Rotation2d Exp(double angleIncr) => new(Math.Cos(angleIncr), Math.Sin(angleIncr));
+
+    public static Rotation2d Dir(Vector2d direction)
+    {
+        direction = direction.Normalized();
+
+        return new Rotation2d(direction.X, direction.Y);
+    }
+
+    public double Log() => Math.Atan2(Im, Re);
+    public Rotation2d Scaled(double k) => Exp(Log() * k);
+    public Rotation2d Inverse => new(Re, -Im);
+    public Vector2d Direction => new(Re, Im);
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Rotation2d other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Rotation2d other)
+    {
+        return other.Re.Equals(Re) && 
+               other.Im.Equals(Im);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Re, Im);
+    }
+
+    public override string ToString()
+    {
+        // Would this cause any trouble? :
+
+        return $"Angle={Angles.ToDegrees(Log())} deg";
+    }
+
+    public static bool operator ==(Rotation2d a, Rotation2d b) => a.Equals(b);
+    public static bool operator !=(Rotation2d a, Rotation2d b) => !a.Equals(b);
+    public static Rotation2d operator *(Rotation2d a, Rotation2d b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
+    public static Vector2d operator *(Rotation2d a, Vector2d r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
+}
+
+public sealed class Rotation2dDual
+{
+    public Dual Re { get; }
+    public Dual Im { get; }
+
+    public Rotation2dDual(Dual re, Dual im)
+    {
+        Re = re;
+        Im = im;
+    }
+
+    public static Rotation2dDual Exp(Dual angleIncr) => new(Dual.Cos(angleIncr), Dual.Sin(angleIncr));
+
+    public Rotation2d Value => new(Re.Value, Im.Value);
+
+    public Rotation2dDual Inverse => new(Re, -Im);
+    public Vector2dDual Direction => new(Re, Im);
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Rotation2dDual other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Rotation2dDual other)
+    {
+        return other.Re.Equals(Re) &&
+               other.Im.Equals(Im);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Re, Im);
+    }
+
+    public static bool operator ==(Rotation2dDual a, Rotation2dDual b) => a.Equals(b);
+    public static bool operator !=(Rotation2dDual a, Rotation2dDual b) => !a.Equals(b);
+    public static Rotation2dDual operator *(Rotation2dDual a, Rotation2dDual b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
+    public static Vector2dDual operator *(Rotation2dDual a, Vector2dDual r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
 }
