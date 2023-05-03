@@ -4,6 +4,8 @@ namespace Coyote.Tests;
 
 public class DualTests
 {
+    #region Mathematical Tests
+
     private const double Eps = 10e-12;
 
     private static void RangeScan(Action<double> action, double start = 0d, double end = 10d, int steps = 10000)
@@ -209,5 +211,19 @@ public class DualTests
                AreEqual(hermite[2], ddy);
            }, derivatives: 2, start: 0, end: 1, steps: 10);
         }, 6, -100, 100, 5);
+    }
+
+    #endregion
+
+    [Test]
+    public void EqualityHashTest()
+    {
+        Assert.That(Dual.Const(1), Is.EqualTo(Dual.Of(1)));
+        Assert.That(Dual.Const(1, 5), Is.EqualTo(Dual.Of(1, 0, 0, 0, 0)));
+        Assert.That(Dual.Var(1, 5), Is.Not.EqualTo(Dual.Of(1, 0, 0, 0, 0)));
+        Assert.That(Dual.Var(5, 5), Is.EqualTo(Dual.Of(5, 1, 0, 0, 0)));
+      
+        Assert.That(Dual.Var(5, 5).GetHashCode(), Is.EqualTo(Dual.Of(5, 1, 0, 0, 0).GetHashCode()));
+        Assert.That(Dual.Var(5, 5).GetHashCode(), Is.Not.EqualTo(Dual.Of(5, 0, 0, 0, 0).GetHashCode()));
     }
 }

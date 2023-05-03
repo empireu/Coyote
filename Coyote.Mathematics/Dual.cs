@@ -33,6 +33,11 @@ public sealed class Dual
         }
     }
 
+    public static Dual Of(params double[] values)
+    {
+        return new Dual(values.ToArray());
+    }
+
     /// <summary>
     ///     Gets the values at the start of the <see cref="Dual"/>, ignoring the last <see cref="n"/> values.
     /// </summary>
