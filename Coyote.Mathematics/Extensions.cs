@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using GameFramework.Utilities;
 
 namespace Coyote.Mathematics;
 
@@ -136,4 +137,12 @@ public static class Extensions
     {
         return new RealVector<TUnit>(new Real<TUnit>(d));
     }
+
+    public static double Squared(this double d) => d * d;
+    public static double Abs(this double d) => Math.Abs(d);
+    public static double MinWith(this double d, double b) => Math.Min(d, b);
+    public static double MaxWith(this double d, double b) => Math.Max(d, b);
+    public static double Clamped(this double d, double min, double max) => Math.Clamp(d, min, max);
+
+    public static double Mapped(this double d, double srcMin, double srcMax, double dstMin, double dstMax) => MathUtilities.MapRange(d, srcMin, srcMax, dstMin, dstMax);
 }

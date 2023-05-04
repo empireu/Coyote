@@ -239,7 +239,7 @@ public readonly struct Pose
             twist.DTheta * t.Value));
     }
 
-    public static Pose Lerp(Pose a, Pose b, Real<Percentage> t)
+    public static Pose Lerp(Pose a, Pose b, double t)
     {
         t = t.Clamped(0, 1);
 

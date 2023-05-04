@@ -77,6 +77,14 @@ public readonly struct Vector2d
 
     public static implicit operator Vector2(Vector2d v) => new((float)v.X, (float)v.Y);
     public static implicit operator Vector2d(Vector2 v) => new(v.X, v.Y);
+
+    public static Vector2d Lerp(Vector2d a, Vector2d b, double t)
+    {
+        return new Vector2d(
+            MathExt.Lerp(a.X, b.X, t),
+            MathExt.Lerp(a.Y, b.Y, t)
+        );
+    }
 }
 
 public sealed class Vector2dDual
@@ -567,7 +575,6 @@ public readonly struct Pose2d
     public static Pose2d operator +(Pose2d p, Twist2dIncr incr) => p * Exp(incr);
     public static Twist2dIncr operator -(Pose2d a, Pose2d b) => (a / b).Log();
 }
-
 
 public sealed class Pose2dDual
 {

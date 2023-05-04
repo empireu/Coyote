@@ -183,8 +183,8 @@ internal sealed class Simulator : IDisposable
 
             Assert.NotNull(ref trajectoryPoints);
 
-            MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSquared()).Velocity.Length();
-            MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSquared()).Acceleration.Length();
+            MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSqr).Velocity.Length;
+            MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSqr).Acceleration.Length;
             MaxProfileAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
             MaxProfileAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
             Points = trajectoryPoints.Length;
