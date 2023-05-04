@@ -29,7 +29,7 @@ internal struct RotationComponent
 internal struct SpriteComponent
 {
     public Sprite Sprite;
-    public Pose? Transform;
+    public Pose2d? Transform;
     public bool Disabled;
 }
 

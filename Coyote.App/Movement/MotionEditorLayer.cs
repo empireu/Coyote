@@ -832,7 +832,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         if (_simulator.Update(_dt, out var pose))
         {
             _playerBatch.Clear();
-            _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
+            _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, (float)pose.Rotation.Log(), _robotSprite.Texture);
             _playerBatch.Submit(framebuffer: framebuffer);
 
             void Arrow(Vector2 start, Vector2 end, RgbaFloat tint)

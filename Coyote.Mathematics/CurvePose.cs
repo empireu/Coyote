@@ -8,7 +8,7 @@ namespace Coyote.Mathematics;
 public readonly struct CurvePose
 {
     [JsonInclude]
-    public Pose Pose { get; }
+    public Pose2d Pose { get; }
 
     [JsonInclude]
     public double Curvature { get; }
@@ -17,7 +17,7 @@ public readonly struct CurvePose
     public double Parameter { get; }
 
     [JsonConstructor]
-    public CurvePose(Pose pose, double curvature, double parameter)
+    public CurvePose(Pose2d pose, double curvature, double parameter)
     {
         Pose = pose;
         Curvature = curvature;

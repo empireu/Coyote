@@ -235,14 +235,14 @@ public sealed class QuinticSpline : IPositionSpline, IVelocitySpline, IAccelerat
         return optimizedClosest.Clamped(0, 1);
     }
 
-    public Pose EvaluatePose(double progress)
+    public Pose2d EvaluatePose(double progress)
     {
         if (Dimensions != 2)
         {
             throw new Exception($"Cannot evaluate pose in {Dimensions}D spline");
         }
 
-        return new Pose(EvaluateTranslation(progress).ToReal2(), Rotation.Exp(EvaluateVelocity(progress).ToReal2()));
+        return new Pose2d(EvaluateTranslation(progress).ToReal2(), Rotation2d.Dir(EvaluateVelocity(progress).ToReal2()));
     }
 
     #region Interface
@@ -652,11 +652,11 @@ public static class Splines
         double t0, 
         double t1,
         double tThreshold,
-        Twist admissible,
+        Twist2dIncr admissible,
         int maxIterations,
         Func<double, double, bool>? splitCondition = null) where TSpline : ICurvePoseSpline
     {
-        if (admissible.Dx <= 0 || admissible.Dy <= 0 || admissible.DTheta <= 0)
+        if (admissible.TrIncr.X <= 0 || admissible.TrIncr.Y <= 0 || admissible.RotIncr <= 0)
         {
             throw new ArgumentException($"The {nameof(admissible)} twist is invalid.");
         }
@@ -676,9 +676,13 @@ public static class Splines
             var start = spline.EvaluateCurvePose(current.T0);
             var end = spline.EvaluateCurvePose(current.T1);
 
-            var twist = start.Pose.Log(end.Pose);
+            var twist = (start.Pose / end.Pose).Log();
 
-            if (current.T1 - t > tThreshold || (splitCondition != null && splitCondition(current.T0, current.T1)) || Math.Abs(twist.Dx) > admissible.Dx || Math.Abs(twist.Dy) > admissible.Dy || Math.Abs(twist.DTheta) > admissible.DTheta)
+            if (current.T1 - t > tThreshold || 
+                (splitCondition != null && splitCondition(current.T0, current.T1)) || 
+                Math.Abs(twist.TrIncr.X) > admissible.TrIncr.X || 
+                Math.Abs(twist.TrIncr.Y) > admissible.TrIncr.Y || 
+                Math.Abs(twist.RotIncr) > admissible.RotIncr)
             {
                 stack.Push(new GetPointsFrame((current.T0 + current.T1) / 2, current.T1));
                 stack.Push(new GetPointsFrame(current.T0, (current.T0 + current.T1) / 2));

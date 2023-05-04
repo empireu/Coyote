@@ -96,8 +96,8 @@ public static class TrajectoryGenerator
             var previous = points[i - 1];
             ref var current = ref points[i];
 
-            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length;
-            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Angle, previous.CurvePose.Pose.Rotation.Angle).Abs();
+            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Length;
+            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Log(), previous.CurvePose.Pose.Rotation.Log()).Abs();
 
             if (current.Displacement.Equals(previous.Displacement))
             {
@@ -107,7 +107,7 @@ public static class TrajectoryGenerator
             // Numerically evaluate curvature (will be different to path curvature if the rotation directions are not tangent to the path)
             // We need this to compute the rotation constraints for holonomic paths.
             current.RotationCurvature = 
-                (current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation) / 
+                (current.CurvePose.Pose.Rotation.Log() - previous.CurvePose.Pose.Rotation.Log()) / 
                 (current.Displacement - previous.Displacement);
         }
     }
@@ -673,7 +673,7 @@ public static class TrajectoryGenerator
         for (var i = 0; i < points.Length; i++)
         {
             csv.Add(csvProfileTime, points[i].Time);
-            csv.Add(csvAngle, points[i].CurvePose.Pose.Rotation.Angle);
+            csv.Add(csvAngle, points[i].CurvePose.Pose.Rotation.Log());
             csv.Add(csvAngularVelocity, points[i].AngularVelocity);
             csv.Add(csvAngularAcceleration, points[i].AngularAcceleration);
             csv.Add(csvPathCurvature, points[i].CurvePose.Curvature);
@@ -727,7 +727,7 @@ public class Trajectory
             // Computes 0-1 progress in this segment:
             var progress = t.Mapped(A.Time, B.Time, 0, 1);
 
-            var pose = Pose.Lerp(A.CurvePose.Pose, B.CurvePose.Pose, progress);
+            var pose = Pose2d.Lerp(A.CurvePose.Pose, B.CurvePose.Pose, progress);
 
             return new TrajectoryPoint
             {

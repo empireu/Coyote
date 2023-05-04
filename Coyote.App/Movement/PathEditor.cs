@@ -183,14 +183,14 @@ public sealed class PathEditor : IDisposable
 
     public bool CanCreateMarker => TranslationSpline.Segments.Count > 0;
 
-    private Pose GetMarkerSpriteTransform(double parameter)
+    private Pose2d GetMarkerSpriteTransform(double parameter)
     {
-        var rotation = TranslationSpline
+        var rotation = Rotation2d.Dir(TranslationSpline
             .EvaluateVelocity(parameter)
             .ToVector2()
-            .Exp();
+        );
 
-        return new Pose(new Translation(0, MarkerYOffset).Rotated(rotation), rotation);
+        return new Pose2d(rotation * new Vector2d(0, MarkerYOffset), rotation);
     }
 
     private void ProjectMarker(Entity marker)
@@ -575,8 +575,10 @@ public sealed class PathEditor : IDisposable
             entity1.Get<RotationPointComponent>().Parameter.CompareTo(entity2.Get<RotationPointComponent>().Parameter));
 
         var builder = new QuinticSplineMappedBuilder(1);
+        
+        // todo refactor this trash
 
-        var previousAngle = Rotation.Zero;
+        var previousAngle = Rotation2d.Zero;
 
         for (var index = 0; index < _rotationPoints.Count; index++)
         {
@@ -594,10 +596,10 @@ public sealed class PathEditor : IDisposable
                     continue;
                 }
 
-                angle = previousAngle + Angles.DeltaAngle(angle, previousAngle);
+                angle = (previousAngle * Rotation2d.Exp(Angles.DeltaAngle(angle, previousAngle.Log()))).Log();
             }
 
-            previousAngle = (Rotation)angle;
+            previousAngle = Rotation2d.Exp(angle);
 
             builder.Add(parameter, angle.ToRealVector());
         }

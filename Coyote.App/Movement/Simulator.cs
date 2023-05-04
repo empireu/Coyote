@@ -95,11 +95,11 @@ internal sealed class Simulator : IDisposable
 
     private readonly List<Marker> _markers = new();
 
-    public bool Update(float dt, out Pose pose)
+    public bool Update(float dt, out Pose2d pose)
     {
         if (_editor.ArcLength == 0)
         {
-           pose = Pose.Zero;
+            pose = default;
 
            return false;
         }
@@ -108,7 +108,7 @@ internal sealed class Simulator : IDisposable
         {
             if (_editTime.Elapsed.TotalSeconds < EditTimeRefreshThreshold)
             {
-                pose = Pose.Zero;
+                pose = default;
 
                 return false;
             }
@@ -127,7 +127,7 @@ internal sealed class Simulator : IDisposable
                     0,
                     1,
                     DParameterTranslation,
-                    new Twist(Dx, Dy, DAngleTranslation),
+                    new Twist2dIncr(Dx, Dy, DAngleTranslation),
                     int.MaxValue,
                     _editor.RotationSpline.IsEmpty
                         ? null
@@ -156,7 +156,7 @@ internal sealed class Simulator : IDisposable
                     var point = span[i];
 
                     span[i] = new CurvePose(
-                        new Pose(point.Pose.Translation, _editor.RotationSpline.Evaluate(point.Parameter)[0]),
+                        new Pose2d(point.Pose.Translation, Rotation2d.Exp(_editor.RotationSpline.Evaluate(point.Parameter)[0])),
                         point.Curvature, 
                         point.Parameter);
                 }
@@ -196,8 +196,7 @@ internal sealed class Simulator : IDisposable
         }
 
         Last = Trajectory.Evaluate(((double)PlayTime).Clamped(0, Trajectory.TimeRange.End));
-        pose = Last.CurvePose.Pose;
-        pose -= new Rotation(Math.PI / 2); // Graphic points upwards with identity transform
+        pose = new Pose2d(Last.CurvePose.Pose.Translation, Last.CurvePose.Pose.Rotation / Rotation2d.Exp(Math.PI / 2));
 
         foreach (var marker in _markers.Where(x => !_markerEvents.Any(e => e.Marker.Parameter.Equals(x.Parameter))).Where(x => Last.CurvePose.Parameter >= x.Parameter))
         {

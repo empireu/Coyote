@@ -854,11 +854,11 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                     var motionProjectPrevious = project
                         .MotionProjects[sequence.MaxBy(x => x.Position().X).Get<MotionNodeComponent>().State.MotionProject];
 
-                    static Pose GetPose(MotionProject p, Index indexer)
+                    static Pose2d GetPose(MotionProject p, Index indexer)
                     {
-                        return new Pose(
-                            new Translation(p.TranslationPoints[indexer].Position),
-                            Rotation.Exp(
+                        return new Pose2d(
+                            new Vector2d(p.TranslationPoints[indexer].Position.X, p.TranslationPoints[indexer].Position.Y),
+                            Rotation2d.Dir(
                                 (p.RotationPoints.Length >= 2
                                     ? p.RotationPoints[indexer].Heading
                                     : p.TranslationPoints[indexer].Velocity)
@@ -869,11 +869,11 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                     var actualPosActual = GetPose(motionProjectActual, 0);
                     var targetPosActual = GetPose(motionProjectPrevious, ^1);
 
-                    var actualErrorActual = targetPosActual.Log(actualPosActual);
+                    var actualErrorActual = (targetPosActual / actualPosActual).Log();
 
-                    if (actualErrorActual.Dx.Abs() > WarnDxy || 
-                        actualErrorActual.Dy.Abs() > WarnDxy ||
-                        actualErrorActual.DTheta.Abs() > WarnDTheta)
+                    if (actualErrorActual.TrIncr.X.Abs() > WarnDxy || 
+                        actualErrorActual.TrIncr.Y.Abs() > WarnDxy ||
+                        actualErrorActual.RotIncr.Abs() > WarnDTheta)
                     {
                         analysis.Warn("Motion continuity between current and previous node is broken, which may lead to unexpected results");
                     }

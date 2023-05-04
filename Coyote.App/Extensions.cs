@@ -217,11 +217,6 @@ internal static class Extensions
         return new Vector2(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y));
     }
 
-    public static Rotation Exp(this Vector2 r2)
-    {
-        return Rotation.Exp(r2.X, r2.Y);
-    }
-
     /// <summary>
     ///     Gets an array with all the elements in <see cref="e"/>.
     /// </summary>

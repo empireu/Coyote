@@ -574,6 +574,9 @@ public readonly struct Pose2d
     public static Pose2d operator /(Pose2d a, Pose2d b) => b.Inverse * a;
     public static Pose2d operator +(Pose2d p, Twist2dIncr incr) => p * Exp(incr);
     public static Twist2dIncr operator -(Pose2d a, Pose2d b) => (a / b).Log();
+
+    public static Pose2d Lerp(Pose2d a, Pose2d b, double t) => new(
+        Vector2d.Lerp(a.Translation, b.Translation, t), Rotation2d.Interpolate(a.Rotation, b.Rotation, t));
 }
 
 public sealed class Pose2dDual
