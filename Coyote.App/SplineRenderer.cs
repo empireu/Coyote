@@ -9,7 +9,7 @@ public sealed class SplineRenderer : IDisposable
 {
     private static readonly RgbaFloat LineColor = new(0.9f, 1f, 1f, 0.9f);
     private const float LineThickness = 0.015f;
-    private static readonly Twist AdmissibleTwist = new(0.1, 0.1, Math.PI / 16);
+    private static readonly Twist2dIncr AdmissibleTwist = new(0.1, 0.1, Math.PI / 16);
     private const int MaxIterations = 8192;
 
     private readonly List<CurvePose> _points = new();
@@ -26,9 +26,9 @@ public sealed class SplineRenderer : IDisposable
         Splines.GetPoints(
             _points,
             spline,
-            Real<Percentage>.Zero,
-            Real<Percentage>.One,
-            new Real<Percentage>(0.01),
+            0,
+            1,
+            0.01,
             AdmissibleTwist,
             MaxIterations);
     }

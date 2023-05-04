@@ -111,7 +111,7 @@ public sealed class MotionProject
             ref var component = ref entity.Get<RotationPointComponent>();
 
             component.HeadingMarker.Get<PositionComponent>().Position = point.Heading;
-            component.Parameter = point.Parameter.ToReal<Percentage>();
+            component.Parameter = point.Parameter;
         }
 
         editor.RebuildRotationSpline();
@@ -122,7 +122,7 @@ public sealed class MotionProject
 
             ref var component = ref entity.Get<MarkerComponent>();
 
-            component.Parameter = marker.Parameter.ToReal<Percentage>();
+            component.Parameter = marker.Parameter;
             component.Name = marker.Name;
         }
 
@@ -160,7 +160,7 @@ public sealed class MotionProject
             {
                 Position = entity.Get<PositionComponent>().Position,
                 Heading = entity.Get<RotationPointComponent>().HeadingMarker.Get<PositionComponent>().Position,
-                Parameter = (float)entity.Get<RotationPointComponent>().Parameter.Value
+                Parameter = (float)entity.Get<RotationPointComponent>().Parameter
             };
         }
 
@@ -173,7 +173,7 @@ public sealed class MotionProject
             project.Markers[i] = new JsonMarker
             {
                 Position = entity.Get<PositionComponent>().Position,
-                Parameter = (float)entity.Get<MarkerComponent>().Parameter.Value,
+                Parameter = (float)entity.Get<MarkerComponent>().Parameter,
                 Name = entity.Get<MarkerComponent>().Name
             };
         }

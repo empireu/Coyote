@@ -1,4 +1,5 @@
-﻿using Arch.Core;
+﻿using System.Numerics;
+using Arch.Core;
 using Arch.Core.Extensions;
 using GameFramework.Extensions;
 using GameFramework.Renderer.Batch;
@@ -17,9 +18,9 @@ internal static class Systems
                 {
                     var transform = spriteComponent.Transform.Value;
                     batch.TexturedQuad(
-                        positionComponent.Position + transform.Translation, 
+                        positionComponent.Position + ((Vector2)transform.Translation), 
                         scaleComponent.Scale,
-                        transform.Rotation, 
+                        (float)transform.Rotation.Log(), 
                         spriteComponent.Sprite.Texture);
                 }
                 else

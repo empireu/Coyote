@@ -10,25 +10,25 @@ namespace Coyote.Mathematics;
 public struct TrajectoryPoint
 {
     public CurvePose CurvePose;
-    public Real<Curvature> RotationCurvature;
-    public Real<Displacement> Displacement;
-    public Real<AngularDisplacement> AngularDisplacement;
-    public Real<Time> Time;
+    public double RotationCurvature;
+    public double Displacement;
+    public double AngularDisplacement;
+    public double Time;
 
-    public Real2<Velocity> Velocity;
-    public Real2<Acceleration> Acceleration;
-    public Real<AngularVelocity> AngularVelocity;
-    public Real<AngularAcceleration> AngularAcceleration;
+    public Vector2d Velocity;
+    public Vector2d Acceleration;
+    public double AngularVelocity;
+    public double AngularAcceleration;
 }
 
 public sealed class BaseTrajectoryConstraints
 {
     public BaseTrajectoryConstraints(
-        Real<Velocity> linearVelocity,
-        Real<Acceleration> linearAcceleration,
-        Real<AngularVelocity> angularVelocity,
-        Real<AngularAcceleration> angularAcceleration,
-        Real<CentripetalAcceleration> centripetalAcceleration)
+        double linearVelocity,
+        double linearAcceleration,
+        double angularVelocity,
+        double angularAcceleration,
+        double centripetalAcceleration)
     {
         if (linearVelocity <= 0)
         {
@@ -63,24 +63,24 @@ public sealed class BaseTrajectoryConstraints
     }
 
     [JsonInclude]
-    public Real<Velocity> LinearVelocity { get; }
+    public double LinearVelocity { get; }
     [JsonInclude]
-    public Real<Acceleration> LinearAcceleration { get; }
+    public double LinearAcceleration { get; }
     [JsonInclude]
-    public Real<AngularVelocity> AngularVelocity { get; }
+    public double AngularVelocity { get; }
     [JsonInclude]
-    public Real<AngularAcceleration> AngularAcceleration { get; }
+    public double AngularAcceleration { get; }
     [JsonInclude]
-    public Real<CentripetalAcceleration> CentripetalAcceleration { get; }
+    public double CentripetalAcceleration { get; }
 }
 
 public static class TrajectoryGenerator
 {
     private struct Intermediary
     {
-        public Real<Displacement> LinearDisplacement;
-        public Real<Velocity> LinearVelocity;
-        public Real<Curvature> RotationCurvature;
+        public double LinearDisplacement;
+        public double LinearVelocity;
+        public double RotationCurvature;
     }
 
     /// <summary>
@@ -88,59 +88,56 @@ public static class TrajectoryGenerator
     /// </summary>
     private static void AssignPathPoints(TrajectoryPoint[] points)
     {
-        points[0].Displacement = Real<Displacement>.Zero;
-        points[0].AngularDisplacement = Real<AngularDisplacement>.Zero;
+        points[0].Displacement = 0d;
+        points[0].AngularDisplacement = 0d;
 
         for (var i = 1; i < points.Length; i++)
         {
             var previous = points[i - 1];
             ref var current = ref points[i];
 
-            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length();
-            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Angle, previous.CurvePose.Pose.Rotation.Angle).Angle.Abs();
+            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Length;
+            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Log(), previous.CurvePose.Pose.Rotation.Log()).Abs();
 
-            if (current.Displacement == previous.Displacement)
+            if (current.Displacement.Equals(previous.Displacement))
             {
                 throw new Exception("Path points with zero displacement are not allowed");
             }
 
             // Numerically evaluate curvature (will be different to path curvature if the rotation directions are not tangent to the path)
             // We need this to compute the rotation constraints for holonomic paths.
-            current.RotationCurvature = MathExt.ComputeCurvature(
-                current.CurvePose.Pose.Rotation - previous.CurvePose.Pose.Rotation,
-                current.Displacement - previous.Displacement);
+            current.RotationCurvature = 
+                (current.CurvePose.Pose.Rotation.Log() - previous.CurvePose.Pose.Rotation.Log()) / 
+                (current.Displacement - previous.Displacement);
         }
     }
 
     /// <summary>
     ///     Computes the time required to move from point A a specified <see cref="displacement"/>.
     /// </summary>
-    /// <typeparam name="TDisplacement">The displacement unit to use.</typeparam>
-    /// <typeparam name="TVelocity">The velocity unit to use.</typeparam>
-    /// <typeparam name="TAcceleration">The acceleration unit to use.</typeparam>
     /// <param name="displacement">The distance between the two points.</param>
     /// <param name="initialVelocity">The velocity at the first point.</param>
     /// <param name="finalVelocity">the velocity at the destination.</param>
     /// <param name="minAcceleration">The de-acceleration.</param>
     /// <param name="maxAcceleration">The acceleration.</param>
     /// <returns>The time needed to perform this movement.</returns>
-    private static Real<Time> ComputeMovementTime<TDisplacement, TVelocity, TAcceleration>(
-        Real<TDisplacement> displacement,
-        Real<TVelocity> initialVelocity,
-        Real<TVelocity> finalVelocity,
-        Real<TAcceleration> minAcceleration,
-        Real<TAcceleration> maxAcceleration)
+    private static double ComputeMovementTime(
+        double displacement,
+        double initialVelocity,
+        double finalVelocity,
+        double minAcceleration,
+        double maxAcceleration)
     {
         Assert.IsTrue(minAcceleration < 0);
         Assert.IsTrue(maxAcceleration > 0);
 
-        if (displacement == Real<TDisplacement>.Zero)
+        if (displacement == 0)
         {
-            if (initialVelocity == finalVelocity)
+            if (initialVelocity.Equals(finalVelocity))
             {
                 // It is probably fine, since time 0 is acceptable.
 
-                return Real<Time>.Zero;
+                return 0;
             }
 
             Assert.Fail("Generation failed");
@@ -150,23 +147,23 @@ public static class TrajectoryGenerator
 
         if (acceleration.Abs() > 0)
         {
-            return ((finalVelocity - initialVelocity) / acceleration).Value.ToReal<Time>();
+            return (finalVelocity - initialVelocity) / acceleration;
         }
 
         var sum = initialVelocity + finalVelocity;
 
-        if (sum == Real<TVelocity>.Zero)
+        if (sum == 0)
         {
             Assert.Fail("Velocity sum zero");
         }
 
-        return (2 * displacement / sum).ToReal<Time>();
+        return 2 * displacement / sum;
     }
 
     private static void ComputeVelocityAcceleration(TrajectoryPoint[] points)
     {
-        points[0].Velocity = Real2<Velocity>.Zero;
-        points[0].AngularVelocity = Real<AngularVelocity>.Zero;
+        points[0].Velocity = Vector2d.Zero;
+        points[0].AngularVelocity = 0d;
 
         for (var i = 1; i < points.Length; i++)
         {
@@ -174,14 +171,14 @@ public static class TrajectoryGenerator
             ref var current = ref points[i];
 
             var dPos = current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation;
-            var dTheta = current.AngularDisplacement - previous.AngularDisplacement;
+            var dAngle = current.AngularDisplacement - previous.AngularDisplacement;
             var dt = current.Time - previous.Time;
 
-            current.Velocity = new Real2<Velocity>(dPos / dt);
-            current.AngularVelocity = new Real<AngularVelocity>(dTheta / dt);
+            current.Velocity = new Vector2d((dPos / dt).X, (dPos / dt).Y);
+            current.AngularVelocity = dAngle / dt;
 
-            current.Acceleration = new Real2<Acceleration>((current.Velocity - previous.Velocity) / dt);
-            current.AngularAcceleration = new Real<AngularAcceleration>((current.AngularVelocity - previous.AngularVelocity) / dt);
+            current.Acceleration = (current.Velocity - previous.Velocity) / dt;
+            current.AngularAcceleration = (current.AngularVelocity - previous.AngularVelocity) / dt;
         }
     }
 
@@ -194,15 +191,13 @@ public static class TrajectoryGenerator
         // Angular Velocity:
         for (var i = 0; i < poses.Length; i++)
         {
-            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                (constraints.AngularVelocity / profile[i].RotationCurvature.Abs()).Value.ToReal<Velocity>());
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith((constraints.AngularVelocity / profile[i].RotationCurvature.Abs()));
         }
 
         // Centripetal Acceleration:
         for (var i = 0; i < poses.Length; i++)
         { 
-            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(
-                Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)).ToReal<Velocity>());
+            profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)));
         }
 
         var awMax = constraints.AngularAcceleration;
@@ -396,20 +391,16 @@ public static class TrajectoryGenerator
             return thresh;
         }
 
-        profile[0].LinearVelocity = Real<Velocity>.Zero;
+        profile[0].LinearVelocity = 0;
         for (var i = 1; i < poses.Length; i++)
         {
-            profile[i - 1].LinearVelocity = Math.Min(
-                profile[i - 1].LinearVelocity,
-                Bounds(i - 1, i)).ToReal<Velocity>();
+            profile[i - 1].LinearVelocity = Math.Min(profile[i - 1].LinearVelocity, Bounds(i - 1, i));
         }
 
-        profile[^1].LinearVelocity = Real<Velocity>.Zero;
+        profile[^1].LinearVelocity = 0;
         for (var i = poses.Length - 2; i >= 0; i--)
         {
-            profile[i + 1].LinearVelocity = Math.Min(
-                profile[i + 1].LinearVelocity,
-                Bounds(i + 1, i)).ToReal<Velocity>();
+            profile[i + 1].LinearVelocity = Math.Min(profile[i + 1].LinearVelocity, Bounds(i + 1, i));
         }
 
         #endregion
@@ -644,18 +635,18 @@ public static class TrajectoryGenerator
                 Assert.Fail();
             }
 
-            pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity.ToReal<Velocity>());
+            pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity);
         }
 
         // Forward pass:
-        profile[0].LinearVelocity = Real<Velocity>.Zero;
+        profile[0].LinearVelocity = 0;
         for (var i = 1; i < profile.Length; i++)
         {
             CombinedPass(i - 1, i);
         }
 
         // Backward pass:
-        profile[^1].LinearVelocity = Real<Velocity>.Zero;
+        profile[^1].LinearVelocity = 0;
         for (var i = profile.Length - 2; i >= 0; i--)
         {
             CombinedPass(i + 1, i);
@@ -682,7 +673,7 @@ public static class TrajectoryGenerator
         for (var i = 0; i < points.Length; i++)
         {
             csv.Add(csvProfileTime, points[i].Time);
-            csv.Add(csvAngle, points[i].CurvePose.Pose.Rotation.Angle);
+            csv.Add(csvAngle, points[i].CurvePose.Pose.Rotation.Log());
             csv.Add(csvAngularVelocity, points[i].AngularVelocity);
             csv.Add(csvAngularAcceleration, points[i].AngularAcceleration);
             csv.Add(csvPathCurvature, points[i].CurvePose.Curvature);
@@ -726,7 +717,7 @@ public class Trajectory
         /// </summary>
         /// <param name="t">The absolute time. It must be between the times specified in <see cref="A"/> and <see cref="B"/>.</param>
         /// <returns>An interpolated trajectory state.</returns>
-        public TrajectoryPoint Evaluate(Real<Time> t)
+        public TrajectoryPoint Evaluate(double t)
         {
             if (t < A.Time || t > B.Time)
             {
@@ -734,25 +725,26 @@ public class Trajectory
             }
 
             // Computes 0-1 progress in this segment:
-            var progress = t.MappedTo<Percentage>(A.Time, B.Time, 0, 1);
+            var progress = t.Mapped(A.Time, B.Time, 0, 1);
 
-            var pose = Pose.Lerp(A.CurvePose.Pose, B.CurvePose.Pose, progress);
+            var pose = Pose2d.Lerp(A.CurvePose.Pose, B.CurvePose.Pose, progress);
 
             return new TrajectoryPoint
             {
                 CurvePose = new CurvePose(
                     pose,
-                    Real<Curvature>.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress),
-                    Real<Percentage>.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress)),
-                RotationCurvature = Real<Curvature>.Lerp(A.RotationCurvature, B.RotationCurvature, progress),
-                Displacement = Real<Displacement>.Lerp(A.Displacement, B.Displacement, progress),
-                AngularDisplacement = Real<AngularDisplacement>.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
-                Time = Real<Time>.Lerp(A.Time, B.Time, progress),
+                    MathExt.Lerp(A.CurvePose.Curvature, B.CurvePose.Curvature, progress),
+                    MathExt.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress)),
+                RotationCurvature = MathExt.Lerp(A.RotationCurvature, B.RotationCurvature, progress),
+                Displacement = MathExt.Lerp(A.Displacement, B.Displacement, progress),
+                AngularDisplacement = MathExt.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
+                // Equal to the actual t
+                Time = MathExt.Lerp(A.Time, B.Time, progress),
 
-                Velocity = Real2<Velocity>.Lerp(A.Velocity, B.Velocity, progress),
-                Acceleration = Real2<Acceleration>.Lerp(A.Acceleration, B.Acceleration, progress),
-                AngularVelocity = Real<AngularVelocity>.Lerp(A.AngularVelocity, B.AngularVelocity, progress),
-                AngularAcceleration = Real<AngularAcceleration>.Lerp(A.AngularAcceleration, B.AngularAcceleration, progress),
+                Velocity = Vector2d.Lerp(A.Velocity, B.Velocity, progress),
+                Acceleration = Vector2d.Lerp(A.Acceleration, B.Acceleration, progress),
+                AngularVelocity = MathExt.Lerp(A.AngularVelocity, B.AngularVelocity, progress),
+                AngularAcceleration = MathExt.Lerp(A.AngularAcceleration, B.AngularAcceleration, progress),
             };
         }
     }
@@ -783,7 +775,7 @@ public class Trajectory
         _segments = builder.Build();
     }
 
-    public TrajectoryPoint Evaluate(Real<Time> time)
+    public TrajectoryPoint Evaluate(double time)
     {
         time = time.Clamped(_segments.Range.Start, _segments.Range.End);
 

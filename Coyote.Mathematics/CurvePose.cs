@@ -8,16 +8,16 @@ namespace Coyote.Mathematics;
 public readonly struct CurvePose
 {
     [JsonInclude]
-    public Pose Pose { get; }
+    public Pose2d Pose { get; }
 
     [JsonInclude]
-    public Real<Curvature> Curvature { get; }
+    public double Curvature { get; }
 
     [JsonInclude]
-    public Real<Percentage> Parameter { get; }
+    public double Parameter { get; }
 
     [JsonConstructor]
-    public CurvePose(Pose pose, Real<Curvature> curvature, Real<Percentage> parameter)
+    public CurvePose(Pose2d pose, double curvature, double parameter)
     {
         Pose = pose;
         Curvature = curvature;

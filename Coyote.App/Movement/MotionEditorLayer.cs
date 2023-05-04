@@ -572,23 +572,23 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
                 if (ImGui.CollapsingHeader("Kinematics"))
                 {
-                    ImGui.TextColored(TimeColor, $"{lastPoint.Time.Value:F4} s ({_simulator.TotalTime:F4} s total)");
+                    ImGui.TextColored(TimeColor, $"{lastPoint.Time:F4} s ({_simulator.TotalTime:F4} s total)");
 
-                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length().Value:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
+                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
                     ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length().Value:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
+                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
                     ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity.Value:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
+                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration.Value:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
+                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
                     ImGui.Separator();
 
-                    ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement.Value:F4} m ({_simulator.TotalLength:F4} m total)");
+                    ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement:F4} m ({_simulator.TotalLength:F4} m total)");
                     ImGui.Separator();
                 }
 
@@ -650,7 +650,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     foreach (var @event in _simulator.MarkerEvents)
                     {
                         ImGui.Text(@event.Marker.Label);
-                        ImGui.Text($"T+{@event.HitTime.Value:F4}s");
+                        ImGui.Text($"T+{@event.HitTime:F4}s");
                         ImGui.Separator();
                     }
 
@@ -832,7 +832,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         if (_simulator.Update(_dt, out var pose))
         {
             _playerBatch.Clear();
-            _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, pose.Rotation, _robotSprite.Texture);
+            _playerBatch.TexturedQuad(pose.Translation, Vector2.One * 0.4f, (float)pose.Rotation.Log(), _robotSprite.Texture);
             _playerBatch.Submit(framebuffer: framebuffer);
 
             void Arrow(Vector2 start, Vector2 end, RgbaFloat tint)
