@@ -161,6 +161,8 @@ public sealed class Vector2dDual
 
 public readonly struct Rotation2d
 {
+    public static readonly Rotation2d Zero = Exp(0.0);
+
     public double Re { get; }
     public double Im { get; }
 
@@ -200,6 +202,12 @@ public readonly struct Rotation2d
                other.Im.Equals(Im);
     }
 
+    public bool ApproxEqs(Rotation2d other, double eps = 10e-10)
+    {
+        return Re.ApproxEquals(other.Re, eps) && 
+               Im.ApproxEquals(other.Im, eps);
+    }
+
     public override int GetHashCode()
     {
         return HashCode.Combine(Re, Im);
@@ -216,6 +224,11 @@ public readonly struct Rotation2d
     public static bool operator !=(Rotation2d a, Rotation2d b) => !a.Equals(b);
     public static Rotation2d operator *(Rotation2d a, Rotation2d b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
     public static Vector2d operator *(Rotation2d a, Vector2d r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
+
+    public static Rotation2d Interpolate(Rotation2d r0, Rotation2d r1, double t)
+    {
+        return Exp(t * (r1 * r0.Inverse).Log()) * r0;
+    }
 }
 
 public sealed class Rotation2dDual
@@ -262,3 +275,4 @@ public sealed class Rotation2dDual
     public static Rotation2dDual operator *(Rotation2dDual a, Rotation2dDual b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
     public static Vector2dDual operator *(Rotation2dDual a, Vector2dDual r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
 }
+

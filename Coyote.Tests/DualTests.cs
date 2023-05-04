@@ -8,50 +8,12 @@ public class DualTests
 
     private const double Eps = 10e-12;
 
-    private static void RangeScan(Action<double> action, double start = 0d, double end = 10d, int steps = 10000)
-    {
-        var stepSize = (end - start) / steps;
-
-        var x = start;
-
-        while (x < end)
-        {
-            action(x);
-            x += stepSize;
-        }
-    }
-
     private static void RangeScan(Action<double, Dual> action, int derivatives = 3, double start = 0d, double end = 10d, int steps = 10000)
     {
-        RangeScan(x =>
+        Utilities.RangeScan(x =>
         {
             action(x, Dual.Var(x, derivatives + 1));
         }, start, end, steps);
-    }
-
-    private static void RangeScanRec(Action<double[]> action, int layers, double start = 0d, double end = 10d, int steps = 10)
-    {
-        void Helper(int depth, double[] results)
-        {
-            RangeScan(v =>
-            {
-                results[depth] = v;
-
-                if (depth > 0)
-                {
-                    Helper(depth - 1, results);
-                }
-                else
-                {
-                    action(results);
-                }
-
-            }, start: start, end: end, steps: steps);
-        }
-
-        var results = new double[layers];
-
-        Helper(layers - 1, results);
     }
 
     private static void AreEqual(double a, double b)
@@ -151,7 +113,7 @@ public class DualTests
     [Test]
     public void PowTest()
     {
-        RangeScan(power =>
+        Utilities.RangeScan(power =>
         {
             RangeScan((x, xDual) =>
             {
@@ -189,7 +151,7 @@ public class DualTests
                    h3 * a1 + h4 * v1 + h5 * p1;
         }
 
-        RangeScanRec(vector =>
+        Utilities.RangeScanRec(vector =>
         {
            RangeScan((t, tDual) =>
            {

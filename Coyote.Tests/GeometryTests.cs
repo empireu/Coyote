@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using Coyote.Mathematics;
 
 namespace Coyote.Tests;
@@ -35,11 +36,42 @@ public class GeometryTests
     [Test]
     public void TestRotation2d()
     {
-        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(Math.PI), Is.EqualTo(Rotation2d.Exp(Math.PI * 2)));
-        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(-Math.PI), Is.EqualTo(Rotation2d.Exp(0)));
-        Assert.That(Rotation2d.Exp(Math.PI) * Rotation2d.Exp(Math.PI).Inverse, Is.EqualTo(Rotation2d.Exp(0)));
-        Assert.IsTrue((Rotation2d.Exp(Math.PI) * Vector2d.UnitX).ApproxEqs(-Vector2d.UnitX, Eps));
+        void AreEqual(params Rotation2d[] values)
+        {
+            if (values.Length <= 1)
+            {
+                return;
+            }
+
+            for (var i = 1; i < values.Length; i++)
+            {
+                Assert.IsTrue(values[i - 1].ApproxEqs(values[i]));
+            }
+        }
+
+        var rpi = Rotation2d.Exp(Math.PI);
+
+        AreEqual(rpi, rpi);
+
+        Assert.That(rpi.Scaled(1.0), Is.EqualTo(rpi));
+        Assert.That(rpi.Scaled(-1), Is.EqualTo(rpi.Inverse));
+        Assert.That(rpi.Scaled(0.5), Is.EqualTo(Rotation2d.Exp(Math.PI / 2)));
+
+        AreEqual(rpi * rpi, Rotation2d.Exp(Math.PI * 2), Rotation2d.Zero);
+        AreEqual(rpi * Rotation2d.Exp(-Math.PI), Rotation2d.Zero);
+        AreEqual(rpi * rpi.Inverse, Rotation2d.Zero);
+        Assert.IsTrue((rpi * Vector2d.UnitX).ApproxEqs(-Vector2d.UnitX, Eps));
         Assert.IsTrue((Rotation2d.Exp(Math.PI * 2) * Vector2d.UnitX).ApproxEqs(Vector2d.UnitX, Eps));
         Assert.IsTrue((Rotation2d.Exp(Math.PI * 8) * Vector2d.UnitX).ApproxEqs(Vector2d.UnitX, Eps));
+
+        Assert.That(Rotation2d.Interpolate(Rotation2d.Zero, rpi, 0.0), Is.EqualTo(Rotation2d.Zero));
+        Assert.That(Rotation2d.Interpolate(Rotation2d.Zero, rpi, 1.0), Is.EqualTo(rpi));
+        Assert.That(Rotation2d.Interpolate(Rotation2d.Zero, rpi, 0.5), Is.EqualTo(Rotation2d.Exp(Math.PI / 2)));
+        Assert.That(Rotation2d.Interpolate(Rotation2d.Zero, rpi, 0.25), Is.EqualTo(Rotation2d.Exp(Math.PI / 4)));
+        
+        Utilities.RangeScan(t =>
+        {
+            AreEqual(Rotation2d.Interpolate(rpi, rpi, t), rpi);
+        }, start: 0, end: 1);
     }
 }
