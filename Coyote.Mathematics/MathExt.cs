@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Coyote.Mathematics;
 
@@ -92,5 +93,31 @@ internal class MathExt
         }
 
         return Math.Max(a, b);
+    }
+
+    // Sign-non-zero function from the SymForce paper.
+    // Roadrunner uses this instead of the approximation method for sin(x)/x,
+    // And it is cleaner in my opinion.
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static double SignNonZero(double a)
+    {
+        if (a >= 0.0)
+        {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static double SnzEps(double a)
+    {
+        if (a >= 0.0)
+        {
+            return 2.2e-15;
+        }
+
+        return -2.2e-15;
     }
 }
