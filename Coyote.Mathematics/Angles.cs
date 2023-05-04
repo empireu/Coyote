@@ -21,7 +21,7 @@ public static class Angles
     /// <returns>An angle, wrapped in the interval <see cref="n"/></returns>
     public static Rotation Modulus(Rotation a, Rotation n)
     {
-        return new Rotation(Modulus(a.Angle.Value, n.Angle.Value));
+        return new Rotation(Modulus(a.Angle, n.Angle));
     }
 
     /// <summary>

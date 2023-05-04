@@ -9,52 +9,43 @@ namespace Coyote.Mathematics;
 /// </summary>
 public readonly struct Rotation
 {
-    public static readonly Rotation Zero = new(Real<AngularDisplacement>.Zero);
+    public static readonly Rotation Zero = new(0.0);
 
     [JsonInclude]
-    public Real<AngularDisplacement> Angle { get; }
+    public double Angle { get; }
 
     [JsonIgnore]
-    public Real<Displacement> Cos { get; }
+    public double Cos { get; }
 
     [JsonIgnore]
-    public Real<Displacement> Sin { get; }
+    public double Sin { get; }
 
     [JsonIgnore]
-    public double Tangent => Sin.Value / Cos.Value;
+    public double Tangent => Sin / Cos;
 
     [JsonConstructor]
-    public Rotation(Real<AngularDisplacement> angle)
+    public Rotation(double angle)
     {
         Angle = angle;
 
-        Cos = Math.Cos(angle).ToReal<Displacement>();
-        Sin = Math.Sin(angle).ToReal<Displacement>();
+        Cos = Math.Cos(angle);
+        Sin = Math.Sin(angle);
     }
 
-    public Rotation(double angle) : this(angle.ToReal<AngularDisplacement>())
-    {
 
-    }
-
-    public static Rotation Exp(Real2<Displacement> direction)
+    public static Rotation Exp(Vector2d direction)
     {
-        return new Rotation(Math.Atan2(direction.Y, direction.X).ToReal<AngularDisplacement>());
-    }
-
-    public static Rotation Exp(Real<Displacement> x, Real<Displacement> y)
-    {
-        return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
+        return new Rotation(Math.Atan2(direction.Y, direction.X));
     }
 
     public static Rotation Exp(double x, double y)
     {
-        return new Rotation(Math.Atan2(y, x).ToReal<AngularDisplacement>());
+        return new Rotation(Math.Atan2(y, x));
     }
 
     public Rotation Rotated(Rotation other)
     {
-        return Exp(new Real2<Displacement>(Cos * other.Cos - Sin * other.Sin, Cos * other.Sin + Sin * other.Cos));
+        return Exp(new Vector2d(Cos * other.Cos - Sin * other.Sin, Cos * other.Sin + Sin * other.Cos));
     }
 
     #region Operators
@@ -81,42 +72,34 @@ public readonly struct Rotation
 
     public static Rotation operator *(Rotation a, double scalar)
     {
-        return new Rotation(new Real<AngularDisplacement>(a.Angle.Value * scalar));
+        return new Rotation((a.Angle * scalar));
     }
 
     public static Rotation operator /(Rotation a, double scalar)
     {
-        return new Rotation(new Real<AngularDisplacement>(a.Angle.Value / scalar));
+        return new Rotation(a.Angle / scalar);
     }
 
     public static implicit operator double(Rotation r)
     {
-        return r.Angle.Value;
+        return r.Angle;
     }
 
     public static implicit operator float(Rotation r)
     {
-        return (float)r.Angle.Value;
+        return (float)r.Angle;
     }
 
-    public static implicit operator Real<AngularDisplacement>(Rotation a)
-    {
-        return a.Angle;
-    }
 
-    public static implicit operator Rotation(Real<AngularDisplacement> a)
+
+    public static explicit operator Rotation(double a)
     {
         return new Rotation(a);
     }
 
-    public static explicit operator Rotation(double a)
-    {
-        return new Rotation(a.ToReal<AngularDisplacement>());
-    }
-
     public static explicit operator Rotation(float a)
     {
-        return new Rotation(a.ToReal<AngularDisplacement>());
+        return new Rotation(a);
     }
 
     public static bool operator ==(Rotation a, Rotation b)
@@ -133,7 +116,7 @@ public readonly struct Rotation
 
     public override string ToString()
     {
-        return $"Rotation [A={Angle.ToDegrees()}deg, Cos={Cos}, Sin={Sin}, Tan={Tangent}]";
+        return $"Rotation [A={Angle}deg, Cos={Cos}, Sin={Sin}, Tan={Tangent}]";
     }
 
     public override int GetHashCode()
@@ -156,18 +139,8 @@ public readonly struct Rotation
         return Angle.Equals(other.Angle);
     }
 
-    public bool ApproxEquals(Rotation other, double tolerance = 10e-6f)
-    {
-        return Angle.ApproxEquals(other.Angle, tolerance);
-    }
-
-    public bool ApproxEqualsZero(Rotation other, double tolerance = 10e-6f)
-    {
-        return Angle.ApproxEqualsZero(tolerance);
-    }
-
     public static Rotation Lerp(Rotation a, Rotation b, double t)
     {
-        return new Rotation(Math.Atan2(Real<Displacement>.Lerp(a.Sin, b.Sin, t), Real<Displacement>.Lerp(a.Cos, b.Cos, t)));
+        return new Rotation(Math.Atan2(MathExt.Lerp(a.Sin, b.Sin, t), MathExt.Lerp(a.Cos, b.Cos, t)));
     }
 }

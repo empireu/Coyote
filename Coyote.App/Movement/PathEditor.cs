@@ -42,7 +42,7 @@ public sealed class PathEditor : IDisposable
     /// <summary>
     ///     Gets the arc length of the translation path.
     /// </summary>
-    public Real<Displacement> ArcLength { get; private set; }
+    public double ArcLength { get; private set; }
 
     /// <summary>
     ///     Gets the translation spline.
@@ -94,7 +94,7 @@ public sealed class PathEditor : IDisposable
         {
             // We find the best position on the spline to insert this.
 
-            var projection = TranslationSpline.Project(position.ToRealVector<Displacement>());
+            var projection = TranslationSpline.Project(position.ToRealVector());
 
             // It is close enough to the ends that we can add it there:
             if (projection < AddToEndThreshold)
@@ -145,7 +145,7 @@ public sealed class PathEditor : IDisposable
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
+        var translationParameter = TranslationSpline.Project(position.ToRealVector());
         
         var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
 
@@ -183,7 +183,7 @@ public sealed class PathEditor : IDisposable
 
     public bool CanCreateMarker => TranslationSpline.Segments.Count > 0;
 
-    private Pose GetMarkerSpriteTransform(Real<Percentage> parameter)
+    private Pose GetMarkerSpriteTransform(double parameter)
     {
         var rotation = TranslationSpline
             .EvaluateVelocity(parameter)
@@ -219,7 +219,7 @@ public sealed class PathEditor : IDisposable
 
         // These are pretty similar to rotation points. They get projected onto the path and we use them with our node system to 
         // trigger actions on the trajectory.
-        var translationParameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
+        var translationParameter = TranslationSpline.Project(position.ToRealVector());
         var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
 
         var entity = _world.Create(new PositionComponent
@@ -256,7 +256,7 @@ public sealed class PathEditor : IDisposable
         _markerPoints.Clear();
 
         _pathRenderer.Clear();
-        ArcLength = Real<Displacement>.Zero;
+        ArcLength = 0;
         RebuildTranslation();
         RebuildRotationSpline();
     }
@@ -459,7 +459,7 @@ public sealed class PathEditor : IDisposable
         TranslationSpline.Clear();
         _pathRenderer.Clear();
 
-        ArcLength = Real<Displacement>.Zero;
+        ArcLength = 0;
 
         if (_translationPoints.Count < 2)
         {
@@ -477,12 +477,12 @@ public sealed class PathEditor : IDisposable
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
             TranslationSpline.Add(new QuinticSplineSegment(
-                p0.ToRealVector<Displacement>(), 
-                v0.ToRealVector<Velocity>(), 
-                a0.ToRealVector<Acceleration>(), 
-                a1.ToRealVector<Acceleration>(), 
-                v1.ToRealVector<Velocity>(), 
-                p1.ToRealVector<Displacement>()));
+                p0.ToRealVector(), 
+                v0.ToRealVector(), 
+                a0.ToRealVector(), 
+                a1.ToRealVector(), 
+                v1.ToRealVector(), 
+                p1.ToRealVector()));
         }
 
         if (TranslationSpline.Segments.Count > 0)
@@ -547,10 +547,10 @@ public sealed class PathEditor : IDisposable
     ///         - The rotation point's parameter is updated to the re-projected one using <see cref="applyUpdate"/>
     ///         - The rotation point's world position is updated to the re-projected position
     /// </summary>
-    private void ReProjectPathElement(Entity point, Action<Real<Percentage>> applyUpdate)
+    private void ReProjectPathElement(Entity point, Action<double> applyUpdate)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(position.ToRealVector<Displacement>());
+        var parameter = TranslationSpline.Project(position.ToRealVector());
 
         applyUpdate(parameter);
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
@@ -599,7 +599,7 @@ public sealed class PathEditor : IDisposable
 
             previousAngle = (Rotation)angle;
 
-            builder.Add(parameter, angle.ToRealVector<Displacement>());
+            builder.Add(parameter, angle.ToRealVector());
         }
 
         builder.Build(RotationSpline);
@@ -663,7 +663,7 @@ public sealed class PathEditor : IDisposable
         batch.TexturedQuad(
             TranslationSpline.Evaluate(
                 TranslationSpline
-                    .Project(position.ToRealVector<Displacement>()))
+                    .Project(position.ToRealVector()))
                 .ToVector2(),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);

@@ -26,9 +26,9 @@ public sealed class SplineRenderer : IDisposable
         Splines.GetPoints(
             _points,
             spline,
-            Real<Percentage>.Zero,
-            Real<Percentage>.One,
-            new Real<Percentage>(0.01),
+            0,
+            1,
+            0.01,
             AdmissibleTwist,
             MaxIterations);
     }

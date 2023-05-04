@@ -22,7 +22,7 @@ public readonly struct Pose
     ///     <remarks>This will issue <see cref="Math.Cos"/> and <see cref="Math.Sin"/> calls.</remarks>
     /// </summary>
     [JsonIgnore]
-    public Real2<Displacement> RotationVector => new(Math.Cos(Rotation), Math.Sin(Rotation));
+    public Vector2d RotationVector => new(Math.Cos(Rotation), Math.Sin(Rotation));
 
     [JsonConstructor]
     public Pose(Translation translation, Rotation rotation)
@@ -31,16 +31,10 @@ public readonly struct Pose
         Rotation = rotation;
     }
 
-    public Pose(Translation translation, Real<AngularDisplacement> rotation)
+    public Pose(Translation translation, double rotation)
     {
         Translation = translation;
-        Rotation = rotation;
-    }
-
-    public Pose(Real2<Displacement> translation, Real<AngularDisplacement> rotation)
-    {
-        Translation = translation;
-        Rotation = rotation;
+        Rotation = new Rotation(rotation);
     }
 
     public Pose(double x, double y, double rotation) : this(new Translation(x, y), new Rotation(rotation))
@@ -49,21 +43,6 @@ public readonly struct Pose
     }
 
     public Pose(Vector2 translation, double rotation) : this(translation.X, translation.Y, rotation)
-    {
-
-    }
-
-    public Pose(Real2<Displacement> displacement, double rotation) : this(displacement.X, displacement.Y, rotation)
-    {
-
-    }
-
-    /// <summary>
-    ///     Computes a pose using the specified <see cref="Displacement"/> and a <see cref="tangent"/> vector.
-    /// </summary>
-    /// <param name="displacement">The displacement to use.</param>
-    /// <param name="tangent">The direction vector of the pose.</param>
-    public Pose(Real2<Displacement> displacement, Real2<Displacement> tangent) : this(new Translation(displacement), Rotation.Exp(tangent))
     {
 
     }
@@ -80,9 +59,9 @@ public readonly struct Pose
         return new Pose(a.Translation - b.Translation, a.Rotation - b.Rotation);
     }
 
-    public static Pose operator +(Pose a, Vector2 translation)
+    public static Pose operator +(Pose a, Vector2d translation)
     {
-        return new Pose(a.Translation + translation.ToReal2<Displacement>(), a.Rotation);
+        return new Pose(a.Translation + translation, a.Rotation);
     }
 
     public static Pose operator +(Pose a, Transformation b)
@@ -95,7 +74,7 @@ public readonly struct Pose
         return new Pose(a.Translation + b, a.Rotation);
     }
 
-    public static Pose operator -(Pose a, Vector2 translation)
+    public static Pose operator -(Pose a, Vector2d translation)
     {
         return new Pose(a.Translation - translation, a.Rotation);
     }
@@ -186,7 +165,7 @@ public readonly struct Pose
         }
 
         var translation = new Translation(dx * s - dy * c, dx * c + dy * s);
-        var rotation = Rotation.Exp(new Real2<Displacement>(cosTheta, sinTheta));
+        var rotation = Rotation.Exp(new Vector2d(cosTheta, sinTheta));
 
         var transform = new Transformation(translation, rotation);
 
@@ -219,7 +198,7 @@ public readonly struct Pose
         return new Twist(translationPart.X, translationPart.Y, dTheta);
     }
 
-    public static Pose Interpolate(Pose a, Pose b, Real<Percentage> t)
+    public static Pose Interpolate(Pose a, Pose b, double t)
     {
         if (t < 0)
         {
@@ -234,9 +213,9 @@ public readonly struct Pose
         var twist = a.Log(b);
 
         return a.Exp(new Twist(
-            twist.Dx * t.Value, 
-            twist.Dy * t.Value, 
-            twist.DTheta * t.Value));
+            twist.Dx * t, 
+            twist.Dy * t, 
+            twist.DTheta * t));
     }
 
     public static Pose Lerp(Pose a, Pose b, double t)

@@ -68,10 +68,10 @@ internal sealed class Simulator : IDisposable
 
     public readonly struct Marker
     {
-        public Real<Percentage> Parameter { get; }
+        public double Parameter { get; }
         public string Label { get; }
 
-        public Marker(Real<Percentage> parameter, string label)
+        public Marker(double parameter, string label)
         {
             Parameter = parameter;
             Label = label;
@@ -80,14 +80,14 @@ internal sealed class Simulator : IDisposable
 
     public readonly struct MarkerEvent
     {
-        public MarkerEvent(Marker marker, Real<Time> hitTime)
+        public MarkerEvent(Marker marker, double hitTime)
         {
             Marker = marker;
             HitTime = hitTime;
         }
 
         public Marker Marker { get; }
-        public Real<Time> HitTime { get; }
+        public double HitTime { get; }
     }
 
     private readonly List<MarkerEvent> _markerEvents = new();
@@ -124,9 +124,9 @@ internal sealed class Simulator : IDisposable
             {
                 Splines.GetPoints(poses,
                     _editor.TranslationSpline,
-                    Real<Percentage>.Zero,
-                    Real<Percentage>.One,
-                    new Real<Percentage>(DParameterTranslation),
+                    0,
+                    1,
+                    DParameterTranslation,
                     new Twist(Dx, Dy, DAngleTranslation),
                     int.MaxValue,
                     _editor.RotationSpline.IsEmpty
@@ -166,11 +166,11 @@ internal sealed class Simulator : IDisposable
             var generateTime = Measurements.MeasureTimeSpan(() =>
             {
                 Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
-                    new Real<Velocity>(MaxLinearVelocity),
-                    new Real<Acceleration>(MaxLinearAcceleration),
-                    new Real<AngularVelocity>(Angles.ToRadians(MaxAngularVelocity)),
-                    new Real<AngularAcceleration>(Angles.ToRadians(MaxAngularAcceleration)),
-                    new Real<CentripetalAcceleration>(MaxCentripetalAcceleration)), out trajectoryPoints);
+                    MaxLinearVelocity,
+                    MaxLinearAcceleration,
+                    Angles.ToRadians(MaxAngularVelocity),
+                    Angles.ToRadians(MaxAngularAcceleration),
+                    MaxCentripetalAcceleration), out trajectoryPoints);
             });
 
             foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
@@ -190,18 +190,18 @@ internal sealed class Simulator : IDisposable
             Points = trajectoryPoints.Length;
             
             TotalTime = (float)Trajectory!.TimeRange.End;
-            TotalLength = (float)Trajectory.Evaluate((Real<Time>)Trajectory.TimeRange.End).Displacement;
+            TotalLength = (float)Trajectory.Evaluate(Trajectory.TimeRange.End).Displacement;
 
             _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
         }
 
-        Last = Trajectory.Evaluate(PlayTime.ToReal<Time>().Clamped(0, Trajectory.TimeRange.End));
+        Last = Trajectory.Evaluate(((double)PlayTime).Clamped(0, Trajectory.TimeRange.End));
         pose = Last.CurvePose.Pose;
         pose -= new Rotation(Math.PI / 2); // Graphic points upwards with identity transform
 
         foreach (var marker in _markers.Where(x => !_markerEvents.Any(e => e.Marker.Parameter.Equals(x.Parameter))).Where(x => Last.CurvePose.Parameter >= x.Parameter))
         {
-            _markerEvents.Add(new MarkerEvent(marker, PlayTime.ToReal<Time>()));
+            _markerEvents.Add(new MarkerEvent(marker, PlayTime));
 
             break;
         }

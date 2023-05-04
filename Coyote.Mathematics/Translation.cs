@@ -11,26 +11,21 @@ public readonly struct Translation
     public static readonly Translation UnitY = new(0, 1);
 
     [JsonInclude]
-    public Real2<Displacement> Displacement { get; }
+    public Vector2d Displacement { get; }
 
     [JsonIgnore]
-    public Real<Displacement> X => Displacement.X;
+    public double X => Displacement.X;
     
     [JsonIgnore]
-    public Real<Displacement> Y => Displacement.Y;
+    public double Y => Displacement.Y;
 
     [JsonConstructor]
-    public Translation(Real2<Displacement> displacement)
+    public Translation(Vector2d displacement)
     {
         Displacement = displacement;
     }
 
-    public Translation(Real<Displacement> x, Real<Displacement> y) : this(new Real2<Displacement>(x, y))
-    {
-
-    }
-
-    public Translation(double x, double y) : this(new Real2<Displacement>(x, y))
+    public Translation(double x, double y) : this(new Vector2d(x, y))
     {
 
     }
@@ -57,46 +52,35 @@ public readonly struct Translation
         return new Translation(a.Displacement + b.Displacement);
     }
 
-    public static Translation operator +(Translation a, Vector2 b)
+    public static Translation operator +(Translation a, Vector2d b)
     {
         return new Translation(a.Displacement + b);
     }
 
-    public static Translation operator +(Translation a, Real2<Displacement> b)
-    {
-        return new Translation(a.Displacement + b);
-    }
-
+ 
     public static Translation operator -(Translation a, Translation b)
     {
         return new Translation(a.Displacement - b.Displacement);
     }
 
-    public static Translation operator -(Translation a, Vector2 b)
+    public static Translation operator -(Translation a, Vector2d b)
     {
         return new Translation(a.Displacement - b);
     }
 
-    public static Translation operator -(Translation a, Real2<Displacement> b)
-    {
-        return new Translation(a.Displacement - b);
-    }
+   
     
     public static Translation operator *(Translation a, Translation b)
     {
         return new Translation(a.Displacement * b.Displacement);
     }
 
-    public static Translation operator *(Translation a, Vector2 b)
+    public static Translation operator *(Translation a, Vector2d b)
     {
         return new Translation(a.Displacement * b);
     }
 
-    public static Translation operator *(Translation a, Real2<Displacement> b)
-    {
-        return new Translation(a.Displacement * b);
-    }
-
+  
     public static Translation operator *(Translation a, double scalar)
     {
         return new Translation(a.Displacement * scalar);
@@ -107,30 +91,19 @@ public readonly struct Translation
         return new Translation(a.Displacement / b.Displacement);
     }
 
-    public static Translation operator /(Translation a, Vector2 b)
+    public static Translation operator /(Translation a, Vector2d b)
     {
         return new Translation(a.Displacement / b);
     }
 
-    public static Translation operator /(Translation a, Real2<Displacement> b)
-    {
-        return new Translation(a.Displacement / b);
-    }
-
+  
     public static Translation operator /(Translation a, double scalar)
     {
         return new Translation(a.Displacement / scalar);
     }
 
-    public static implicit operator Real2<Displacement>(Translation a)
-    {
-        return a.Displacement;
-    }
-
-    public static implicit operator Translation(Real2<Displacement> displacement)
-    {
-        return new Translation(displacement);
-    }
+ 
+  
 
     public static implicit operator Vector2(Translation a)
     {
@@ -166,11 +139,6 @@ public readonly struct Translation
         return Displacement.Equals(other.Displacement);
     }
 
-    public bool ApproxEquals(Translation other, double tolerance = 10e-6f)
-    {
-        return Displacement.ApproxEquals(other.Displacement, tolerance);
-    }
-
     public override string ToString()
     {
         return $"Translation [{Displacement}]";
@@ -178,6 +146,6 @@ public readonly struct Translation
 
     public static Translation Lerp(Translation a, Translation b, double t)
     {
-        return new Translation(Real2<Displacement>.Lerp(a.Displacement, b.Displacement, t));
+        return new Translation(Vector2d.Lerp(a.Displacement, b.Displacement, t));
     }
 }

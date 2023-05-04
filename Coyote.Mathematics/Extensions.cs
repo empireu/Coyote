@@ -29,113 +29,39 @@ public static class Extensions
         return Math.Abs(d - other) < threshold;
     }
 
-    public static Real<TUnit> ToReal<TUnit>(this float f)
-    {
-        return (Real<TUnit>)f;
-    }
-
-    public static Real<TUnit> ToReal<TUnit>(this double d)
-    {
-        return (Real<TUnit>)d;
-    }
-
-    public static Real2<TUnit> ToReal2<TUnit>(this Vector2 v)
-    {
-        return new Real2<TUnit>(new Real<TUnit>(v.X), new Real<TUnit>(v.Y));
-    }
-
-    public static Real<AngularDisplacement> ToRadians(this Real<AngleDegrees> r)
-    {
-        return new Real<AngularDisplacement>(Angles.ToRadians(r));
-    }
-
-    public static Real<AngleDegrees> ToDegrees(this Real<AngularDisplacement> r)
-    {
-        return new Real<AngleDegrees>(Angles.ToDegrees(r));
-    }
-
-    public static Real<TResult> Convert<TSource, TResult>(this Real<TSource> source)
-    {
-        return new Real<TResult>(source.Value);
-    }
-
-    public static Real2<TResult> Convert<TSource, TResult>(this Real2<TSource> source)
-    {
-        return new Real2<TResult>(source.X.Convert<TSource, TResult>(), source.Y.Convert<TSource, TResult>());
-    }
-
-    public static Rotation ToRotation(this Real2<Displacement> direction)
-    {
-        return Rotation.Exp(direction);
-    }
-
-    public static Rotation ToRotation(this Real2<Velocity> direction)
-    {
-        return direction.Convert<Velocity, Displacement>().ToRotation();
-    }
-
-    public static Rotation ToRotation(this Real2<Acceleration> direction)
-    {
-        return direction.Convert<Acceleration, Displacement>().ToRotation();
-    }
-
-    public static Real<Displacement> Integrate(this Real<Velocity> velocity, Real<Time> time)
-    {
-        return new Real<Displacement>(velocity.Value * time.Value);
-    }
-
-    public static Real<Velocity> Integrate(this Real<Acceleration> acceleration, Real<Time> time)
-    {
-        return new Real<Velocity>(acceleration.Value * time.Value);
-    }
     
-    public static Real<T> Squared<T>(this Real<T> real)
-    {
-        return new Real<T>(real.Value * real.Value);
-    }
-
-    public static Real<T> SquareRoot<T>(this Real<T> real)
-    {
-        return new Real<T>(Math.Sqrt(real.Value));
-    }
-
     public static bool IsNan(this double d)
     {
         return double.IsNaN(d);
     }
 
-    public static Real2<TUnit> ToReal2<TUnit>(this RealVector<TUnit> vector)
+    public static Vector2d ToReal2(this Coyote.Mathematics.Vector vector)
     {
         Vectors.Validate(vector, 2);
 
-        return new Real2<TUnit>(vector[0], vector[1]);
+        return new Vector2d(vector[0], vector[1]);
     }
 
-    public static RealVector<TUnit> ToRealVector<TUnit>(this Real<TUnit> real)
+    public static Vector ToRealVector(this Vector2d v)
     {
-        return new RealVector<TUnit>(real);
+        return Vector.Create(v.X, v.Y);
     }
 
-    public static RealVector<TUnit> ToRealVector<TUnit>(this Real2<TUnit> real)
+    public static Vector ToRealVector(this Vector2 v)
     {
-        return new RealVector<TUnit>(real.X, real.Y);
+        return Vector.Create(v.X, v.Y);
     }
 
-    public static RealVector<TUnit> ToRealVector<TUnit>(this Vector2 v)
-    {
-        return new RealVector<TUnit>(new Real<TUnit>(v.X), new Real<TUnit>(v.Y));
-    }
-
-    public static Vector2 ToVector2<TUnit>(this RealVector<TUnit> vector)
+    public static Vector2 ToVector2(this Vector vector)
     {
         Vectors.Validate(vector, 2);
 
         return new Vector2((float)vector[0], (float)vector[1]);
     }
 
-    public static RealVector<TUnit> ToRealVector<TUnit>(this double d)
+    public static Vector ToRealVector(this double d)
     {
-        return new RealVector<TUnit>(new Real<TUnit>(d));
+        return Vector.Create(d);
     }
 
     public static double Squared(this double d) => d * d;
@@ -143,6 +69,6 @@ public static class Extensions
     public static double MinWith(this double d, double b) => Math.Min(d, b);
     public static double MaxWith(this double d, double b) => Math.Max(d, b);
     public static double Clamped(this double d, double min, double max) => Math.Clamp(d, min, max);
-
     public static double Mapped(this double d, double srcMin, double srcMax, double dstMin, double dstMax) => MathUtilities.MapRange(d, srcMin, srcMax, dstMin, dstMax);
+    public static double Pow(this double d, double power) => Math.Pow(d, power);
 }

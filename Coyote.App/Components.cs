@@ -52,12 +52,12 @@ internal struct RotationPointComponent
     public const float HeadingLineThickness = 0.01f;
 
     public Entity HeadingMarker;
-    public Real<Percentage> Parameter;
+    public double Parameter;
 }
 
 internal struct MarkerComponent
 {
-    public Real<Percentage> Parameter;
+    public double Parameter;
 
     [StringEditor]
     public string Name;

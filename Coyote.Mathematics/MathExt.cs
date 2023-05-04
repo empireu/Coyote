@@ -50,11 +50,6 @@ internal class MathExt
         return value1 * (1.0 - amount) + value2 * amount;
     }
 
-    public static Real<Curvature> ComputeCurvature(Real<AngularDisplacement> angle, Real<Displacement> displacement)
-    {
-        return (angle.Value / displacement.Value).ToReal<Curvature>();
-    }
-
     public static double MinNaN(double a, double b)
     {
         if (double.IsNaN(a) && double.IsNaN(b))

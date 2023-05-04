@@ -862,7 +862,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                                 (p.RotationPoints.Length >= 2
                                     ? p.RotationPoints[indexer].Heading
                                     : p.TranslationPoints[indexer].Velocity)
-                                .Map(v => new Real2<Displacement>(v.X, v.Y)))
+                                .Map(v => new Vector2d(v.X, v.Y)))
                         );
                     }
 

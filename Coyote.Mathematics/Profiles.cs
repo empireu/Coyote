@@ -96,8 +96,8 @@ public static class TrajectoryGenerator
             var previous = points[i - 1];
             ref var current = ref points[i];
 
-            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length();
-            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Angle, previous.CurvePose.Pose.Rotation.Angle).Angle.Abs();
+            current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Displacement.Length;
+            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Angle, previous.CurvePose.Pose.Rotation.Angle).Abs();
 
             if (current.Displacement.Equals(previous.Displacement))
             {
@@ -635,7 +635,7 @@ public static class TrajectoryGenerator
                 Assert.Fail();
             }
 
-            pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity.ToReal<Velocity>());
+            pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity);
         }
 
         // Forward pass:

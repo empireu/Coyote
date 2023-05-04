@@ -5,25 +5,20 @@ namespace Coyote.Mathematics;
 public readonly struct Twist
 {
     [JsonInclude]
-    public Real<Displacement> Dx { get; }
+    public double Dx { get; }
 
     [JsonInclude]
-    public Real<Displacement> Dy { get; }
+    public double Dy { get; }
 
     [JsonInclude]
-    public Real<AngularDisplacement> DTheta { get; }
+    public double DTheta { get; }
 
     [JsonConstructor]
-    public Twist(Real<Displacement> dx, Real<Displacement> dy, Real<AngularDisplacement> dTheta)
+    public Twist(double dx, double dy, double dTheta)
     {
         Dx = dx;
         Dy = dy;
         DTheta = dTheta;
-    }
-
-    public Twist(double dx, double dy, double dTheta) : this(dx.ToReal<Displacement>(), dy.ToReal<Displacement>(), dTheta.ToReal<AngularDisplacement>())
-    {
-
     }
 
     public override string ToString()
@@ -44,13 +39,6 @@ public readonly struct Twist
     public bool Equals(Twist other)
     {
         return Dx.Equals(other.Dx) && Dy.Equals(other.Dy) && DTheta.Equals(other.DTheta);
-    }
-
-    public bool EqualsApprox(Twist other, double tolerance = 10e-6f)
-    {
-        return Dx.ApproxEquals(other.Dx, tolerance) && 
-               Dy.ApproxEquals(other.Dy, tolerance) && 
-               DTheta.ApproxEquals(other.DTheta, tolerance);
     }
 
     public static bool operator ==(Twist a, Twist b)

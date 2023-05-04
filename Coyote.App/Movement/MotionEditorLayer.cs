@@ -650,7 +650,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                     foreach (var @event in _simulator.MarkerEvents)
                     {
                         ImGui.Text(@event.Marker.Label);
-                        ImGui.Text($"T+{@event.HitTime.Value:F4}s");
+                        ImGui.Text($"T+{@event.HitTime:F4}s");
                         ImGui.Separator();
                     }
 
