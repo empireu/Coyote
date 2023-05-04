@@ -187,7 +187,7 @@ public readonly struct Real<TUnit> :
 
     public static bool ApproxEquals(Real<TUnit> a, Real<TUnit> b, double tolerance = 10e-6)
     {
-        return a.Value.ApproxEquals(b.Value, tolerance);
+        return a.Value.ApproxEqs(b.Value, tolerance);
     }
 
     public string ToStringFormatted()

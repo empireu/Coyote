@@ -11,7 +11,7 @@ public static class Extensions
     /// <param name="other">The second value.</param>
     /// <param name="threshold">A comparision threshold.</param>
     /// <returns>True, if the values are no more than <see cref="threshold"/> apart. Otherwise, false.</returns>
-    public static bool ApproxEquals(this float f, float other, float threshold = 10e-6f)
+    public static bool ApproxEqs(this float f, float other, float threshold = 10e-6f)
     {
         return Math.Abs(f - other) < threshold;
     }
@@ -23,7 +23,7 @@ public static class Extensions
     /// <param name="other">The second value.</param>
     /// <param name="threshold">A comparision threshold.</param>
     /// <returns>True, if the values are no more than <see cref="threshold"/> apart. Otherwise, false.</returns>
-    public static bool ApproxEquals(this double d, double other, double threshold = 10e-6)
+    public static bool ApproxEqs(this double d, double other, double threshold = 10e-6)
     {
         return Math.Abs(d - other) < threshold;
     }

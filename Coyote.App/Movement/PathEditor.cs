@@ -589,7 +589,7 @@ public sealed class PathEditor : IDisposable
                 UnpackRotation(_rotationPoints[index - 1], out _, out _, out var previousParameter);
 
                 // Prevent rare occurrence of equal parameters (e.g. when two points get snapped to the end of the spline)
-                if (parameter.ApproxEquals(previousParameter))
+                if (parameter.ApproxEqs(previousParameter))
                 {
                     continue;
                 }

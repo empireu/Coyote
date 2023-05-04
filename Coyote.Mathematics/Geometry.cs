@@ -50,8 +50,8 @@ public readonly struct Vector2d
 
     public bool ApproxEqs(Vector2d other, double eps = 10e-6)
     {
-        return X.ApproxEquals(other.X, eps) && 
-               Y.ApproxEquals(other.Y, eps);
+        return X.ApproxEqs(other.X, eps) && 
+               Y.ApproxEqs(other.Y, eps);
     }
 
     public override int GetHashCode()
@@ -156,6 +156,7 @@ public sealed class Vector2dDual
     public static Vector2dDual operator /(Vector2dDual v, double constant) => new(v.X / constant, v.Y / constant);
 
     public static Vector2dDual Const(double x, double y, int n = 1) => new(Dual.Const(x, n), Dual.Const(y, n));
+    public static Vector2dDual Const(Vector2d v, int n = 1) => Const(v.X, v.Y, n);
     public static Vector2dDual Var(double x, double y, int n = 1) => new(Dual.Var(x, n), Dual.Var(y, n));
 }
 
@@ -204,8 +205,8 @@ public readonly struct Rotation2d
 
     public bool ApproxEqs(Rotation2d other, double eps = 10e-10)
     {
-        return Re.ApproxEquals(other.Re, eps) && 
-               Im.ApproxEquals(other.Im, eps);
+        return Re.ApproxEqs(other.Re, eps) && 
+               Im.ApproxEqs(other.Im, eps);
     }
 
     public override int GetHashCode()
@@ -249,7 +250,7 @@ public sealed class Rotation2dDual
     public static Rotation2dDual Exp(Dual angleIncr) => new(Dual.Cos(angleIncr), Dual.Sin(angleIncr));
 
     public Rotation2d Value => new(Re.Value, Im.Value);
-
+    public Dual AngularVelocity => Re * Im.Tail() - Im * Re.Tail();
     public Rotation2dDual Inverse => new(Re, -Im);
     public Vector2dDual Direction => new(Re, Im);
 
@@ -277,7 +278,9 @@ public sealed class Rotation2dDual
     public static bool operator ==(Rotation2dDual a, Rotation2dDual b) => a.Equals(b);
     public static bool operator !=(Rotation2dDual a, Rotation2dDual b) => !a.Equals(b);
     public static Rotation2dDual operator *(Rotation2dDual a, Rotation2dDual b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
+    public static Rotation2dDual operator *(Rotation2dDual a, Rotation2d b) => new(a.Re * b.Re - a.Im * b.Im, a.Re * b.Im + a.Im * b.Re);
     public static Vector2dDual operator *(Rotation2dDual a, Vector2dDual r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
+    public static Vector2dDual operator *(Rotation2dDual a, Vector2d r2) => new(a.Re * r2.X - a.Im * r2.Y, a.Im * r2.X + a.Re * r2.Y);
 }
 
 public readonly struct Twist2dIncr
@@ -324,6 +327,154 @@ public readonly struct Twist2dIncr
 
     public static bool operator ==(Twist2dIncr a, Twist2dIncr b) => a.Equals(b);
     public static bool operator !=(Twist2dIncr a, Twist2dIncr b) => !a.Equals(b);
+}
+
+public sealed class Twist2dIncrDual
+{
+    public Vector2dDual TrIncr { get; }
+    public Dual RotIncr { get; }
+
+    public Twist2dIncrDual(Vector2dDual tTrIncr, Dual rotIncr)
+    {
+        TrIncr = tTrIncr;
+        RotIncr = rotIncr;
+    }
+
+    public static Twist2dIncrDual Const(Vector2d trIncr, double rotIncr, int n = 1) => new(Vector2dDual.Const(trIncr, n), Dual.Const(rotIncr, n));
+
+    public Twist2dIncr Value => new(TrIncr.Value, RotIncr.Value);
+    public Twist2dDual Velocity => new(TrIncr.Tail(), RotIncr.Tail());
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Twist2dIncrDual other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Twist2dIncrDual other)
+    {
+        return TrIncr.Equals(other.TrIncr) &&
+               RotIncr.Equals(other.RotIncr);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(TrIncr, RotIncr);
+    }
+
+    public override string ToString()
+    {
+        return $"{TrIncr} {RotIncr}";
+    }
+}
+
+public readonly struct Twist2d
+{
+    public static readonly Twist2d Zero = new(0, 0, 0);
+
+    public Vector2d TrVelocity { get; }
+    public double RotVelocity { get; }
+
+    public Twist2d(Vector2d trVelocity, double rotVelocity)
+    {
+        TrVelocity = trVelocity;
+        RotVelocity = rotVelocity;
+    }
+
+    public Twist2d(double dx, double dy, double dTheta) : this(new Vector2d(dx, dy), dTheta)
+    {
+
+    }
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Twist2d other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Twist2d other)
+    {
+        return TrVelocity.Equals(other.TrVelocity) &&
+               RotVelocity.Equals(other.RotVelocity);
+    }
+
+    public bool ApproxEqs(Twist2d other, double eps = 10e-10)
+    {
+        return TrVelocity.ApproxEqs(other.TrVelocity, eps) &&
+               RotVelocity.ApproxEqs(other.RotVelocity, eps);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(TrVelocity, RotVelocity);
+    }
+
+    public override string ToString()
+    {
+        return $"{TrVelocity} {RotVelocity}";
+    }
+
+    public static bool operator ==(Twist2d a, Twist2d b) => a.Equals(b);
+    public static bool operator !=(Twist2d a, Twist2d b) => !a.Equals(b);
+    public static Twist2d operator +(Twist2d a, Twist2d b) => new(a.TrVelocity + b.TrVelocity, a.RotVelocity + b.RotVelocity);
+    public static Twist2d operator -(Twist2d a, Twist2d b) => new(a.TrVelocity - b.TrVelocity, a.RotVelocity - b.RotVelocity);
+    public static Twist2d operator *(Twist2d tw, double scalar) => new(tw.TrVelocity * scalar, tw.RotVelocity * scalar);
+    public static Twist2d operator /(Twist2d tw, double scalar) => new(tw.TrVelocity / scalar, tw.RotVelocity / scalar);
+}
+
+public sealed class Twist2dDual
+{
+    public Vector2dDual TrVelocity { get; }
+    public Dual RotVelocity { get; }
+
+    public Twist2dDual(Vector2dDual trVelocity, Dual rotVelocity)
+    {
+        TrVelocity = trVelocity;
+        RotVelocity = rotVelocity;
+    }
+
+    public static Twist2dDual Const(Twist2d value, int n = 1) => new(Vector2dDual.Const(value.TrVelocity, n), Dual.Const(value.RotVelocity, n));
+
+    public Twist2d Value => new(TrVelocity.Value, RotVelocity.Value);
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Twist2dDual other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Twist2dDual other)
+    {
+        return TrVelocity.Equals(other.TrVelocity) &&
+               RotVelocity.Equals(other.RotVelocity);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(TrVelocity, RotVelocity);
+    }
+
+    public override string ToString()
+    {
+        return $"{TrVelocity} {RotVelocity}";
+    }
+
+    public static bool operator ==(Twist2dDual a, Twist2dDual b) => a.Equals(b);
+    public static bool operator !=(Twist2dDual a, Twist2dDual b) => !a.Equals(b);
+    public static Twist2dDual operator +(Twist2dDual a, Twist2dDual b) => new(a.TrVelocity + b.TrVelocity, a.RotVelocity + b.RotVelocity);
+    public static Twist2dDual operator -(Twist2dDual a, Twist2dDual b) => new(a.TrVelocity - b.TrVelocity, a.RotVelocity - b.RotVelocity);
 }
 
 public readonly struct Pose2d
@@ -415,4 +566,54 @@ public readonly struct Pose2d
     public static Pose2d operator /(Pose2d a, Pose2d b) => b.Inverse * a;
     public static Pose2d operator +(Pose2d p, Twist2dIncr incr) => p * Exp(incr);
     public static Twist2dIncr operator -(Pose2d a, Pose2d b) => (a / b).Log();
+}
+
+
+public sealed class Pose2dDual
+{
+    public Vector2dDual Translation { get; }
+    public Rotation2dDual Rotation { get; }
+
+    public Pose2dDual(Vector2dDual translation, Rotation2dDual rotation)
+    {
+        Translation = translation;
+        Rotation = rotation;
+    }
+
+    public Pose2dDual Inverse => new(Rotation.Inverse * -Translation, Rotation.Inverse);
+    public Pose2d Value => new(Translation.Value, Rotation.Value);
+    public Twist2dDual Velocity => new(Translation.Tail(), Rotation.AngularVelocity);
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is not Pose2dDual other)
+        {
+            return false;
+        }
+
+        return Equals(other);
+    }
+
+    public bool Equals(Pose2dDual other)
+    {
+        return Translation.Equals(other.Translation) &&
+               Rotation.Equals(other.Rotation);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(Translation, Rotation);
+    }
+
+    public override string ToString()
+    {
+        return $"{Translation} {Rotation}";
+    }
+
+    public static bool operator ==(Pose2dDual a, Pose2dDual b) => a.Equals(b);
+    public static bool operator !=(Pose2dDual a, Pose2dDual b) => !a.Equals(b);
+    public static Pose2dDual operator *(Pose2dDual a, Pose2dDual b) => new(a.Translation + a.Rotation * b.Translation, a.Rotation * b.Rotation);
+    public static Pose2dDual operator *(Pose2dDual a, Pose2d b) => new(a.Translation + a.Rotation * b.Translation, a.Rotation * b.Rotation);
+    public static Pose2dDual operator /(Pose2dDual a, Pose2dDual b) => b.Inverse * a;
+    public static Pose2dDual operator +(Pose2dDual p, Twist2dIncr incr) => p * Pose2d.Exp(incr);
 }
