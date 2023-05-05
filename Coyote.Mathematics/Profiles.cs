@@ -12,7 +12,6 @@ public struct TrajectoryPoint
     public CurvePose CurvePose;
     public double RotationCurvature;
     public double Displacement;
-    public double AngularDisplacement;
     public double Time;
 
     public Vector2d Velocity;
@@ -89,7 +88,6 @@ public static class TrajectoryGenerator
     private static void AssignPathPoints(TrajectoryPoint[] points)
     {
         points[0].Displacement = 0d;
-        points[0].AngularDisplacement = 0d;
 
         for (var i = 1; i < points.Length; i++)
         {
@@ -97,7 +95,6 @@ public static class TrajectoryGenerator
             ref var current = ref points[i];
 
             current.Displacement = previous.Displacement + (current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation).Length;
-            current.AngularDisplacement = previous.AngularDisplacement + Angles.DeltaAngle(current.CurvePose.Pose.Rotation.Log(), previous.CurvePose.Pose.Rotation.Log()).Abs();
 
             if (current.Displacement.Equals(previous.Displacement))
             {
@@ -107,7 +104,7 @@ public static class TrajectoryGenerator
             // Numerically evaluate curvature (will be different to path curvature if the rotation directions are not tangent to the path)
             // We need this to compute the rotation constraints for holonomic paths.
             current.RotationCurvature = 
-                (current.CurvePose.Pose.Rotation.Log() - previous.CurvePose.Pose.Rotation.Log()) / 
+                (current.CurvePose.Pose.Rotation / previous.CurvePose.Pose.Rotation).Log() / 
                 (current.Displacement - previous.Displacement);
         }
     }
@@ -171,7 +168,7 @@ public static class TrajectoryGenerator
             ref var current = ref points[i];
 
             var dPos = current.CurvePose.Pose.Translation - previous.CurvePose.Pose.Translation;
-            var dAngle = current.AngularDisplacement - previous.AngularDisplacement;
+            var dAngle = (current.CurvePose.Pose.Rotation / previous.CurvePose.Pose.Rotation).Log().Abs();
             var dt = current.Time - previous.Time;
 
             current.Velocity = new Vector2d((dPos / dt).X, (dPos / dt).Y);
@@ -737,7 +734,6 @@ public class Trajectory
                     MathExt.Lerp(A.CurvePose.Parameter, B.CurvePose.Parameter, progress)),
                 RotationCurvature = MathExt.Lerp(A.RotationCurvature, B.RotationCurvature, progress),
                 Displacement = MathExt.Lerp(A.Displacement, B.Displacement, progress),
-                AngularDisplacement = MathExt.Lerp(A.AngularDisplacement, B.AngularDisplacement, progress),
                 // Equal to the actual t
                 Time = MathExt.Lerp(A.Time, B.Time, progress),
 
