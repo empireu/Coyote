@@ -576,19 +576,22 @@ public sealed class PathEditor : IDisposable
 
         var builder = new QuinticSplineMappedBuilder(1);
         
-        // todo refactor this trash
-
-        var previousAngle = Rotation2d.Zero;
+        var angle = 0.0;
 
         for (var index = 0; index < _rotationPoints.Count; index++)
         {
             var rotationPoint = _rotationPoints[index];
             UnpackRotation(rotationPoint, out _, out var headingVector, out var parameter);
-            var angle = Math.Atan2(headingVector.Y, headingVector.X);
 
-            if (index > 0)
+            var currentRotation = Rotation2d.Dir(headingVector);
+
+            if (index == 0)
             {
-                UnpackRotation(_rotationPoints[index - 1], out _, out _, out var previousParameter);
+                angle = currentRotation.Log();
+            }
+            else
+            {
+                UnpackRotation(_rotationPoints[index - 1], out _, out var previousHeadingVector, out var previousParameter);
 
                 // Prevent rare occurrence of equal parameters (e.g. when two points get snapped to the end of the spline)
                 if (parameter.ApproxEqs(previousParameter))
@@ -596,10 +599,9 @@ public sealed class PathEditor : IDisposable
                     continue;
                 }
 
-                angle = (previousAngle * Rotation2d.Exp(Angles.DeltaAngle(angle, previousAngle.Log()))).Log();
+                angle += (currentRotation / Rotation2d.Dir(previousHeadingVector)).Log();
             }
 
-            previousAngle = Rotation2d.Exp(angle);
 
             builder.Add(parameter, angle.ToRealVector());
         }
