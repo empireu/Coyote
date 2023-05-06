@@ -39,6 +39,11 @@ public sealed class FnvStream
         Add(span);
     }
 
+    public void AddRound(double d)
+    {
+        Add(Math.Round(d, 10));
+    }
+
     public void Add(Vector2d vector)
     {
         Add(vector.X);
@@ -49,5 +54,18 @@ public sealed class FnvStream
     {
         Add(pose.Translation);
         Add(pose.Rotation.Direction);
+    }
+
+    public void Add(Vector vector)
+    {
+        for (var i = 0; i < vector.Size; i++)
+        {
+            Add(vector[i]);
+        }
+    }
+
+    public override string ToString()
+    {
+        return Result.ToString();
     }
 }

@@ -218,6 +218,11 @@ public class Vector : IVector
             return hash;
         }
     }
+
+    public override string ToString()
+    {
+        return string.Join(", ", _values);
+    }
 }
 
 public static class Vectors

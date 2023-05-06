@@ -66,6 +66,13 @@ internal sealed class Simulator : IDisposable
     public float MaxAngularVelocity = 180f;
     public float MaxAngularAcceleration = 140f;
 
+    public BaseTrajectoryConstraints Constraints => new(
+        MaxLinearVelocity,
+        MaxLinearAcceleration,
+        Angles.ToRadians(MaxAngularVelocity),
+        Angles.ToRadians(MaxAngularAcceleration),
+        MaxCentripetalAcceleration);
+
     public readonly struct Marker
     {
         public double Parameter { get; }
@@ -118,31 +125,40 @@ internal sealed class Simulator : IDisposable
 
             PlayTime = 0;
 
+            var stream = new FnvStream();
+
+            _editor.TranslationSpline.Segments.HashScan(stream);
+
+            Console.WriteLine($"Spline: {stream.Result}");
+
             var poses = new List<CurvePose>();
 
             var getPointsTime = Measurements.MeasureTimeSpan(() =>
             {
                 Splines.GetPoints(poses,
                     _editor.TranslationSpline,
-                    0,
-                    1,
+                    0.0,
+                    1.0,
                     DParameterTranslation,
                     new Twist2dIncr(Dx, Dy, DAngleTranslation),
                     int.MaxValue,
-                    _editor.RotationSpline.IsEmpty
-                        ? null
-                        : (t0, t1) =>
+                    (t0, t1) =>
+                    {
+                        if ((t0 - t1).Abs() > DParameterRotation)
                         {
-                            if ((t0 - t1).Abs() > DParameterRotation)
-                            {
-                                return true;
-                            }
-
-                            var r0 = _editor.RotationSpline.Evaluate(t0);
-                            var r1 = _editor.RotationSpline.Evaluate(t1);
-
-                            return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
+                            return true;
                         }
+
+                        if (_editor.RotationSpline.IsEmpty)
+                        {
+                            return false;
+                        }
+
+                        var r0 = _editor.RotationSpline.Evaluate(t0);
+                        var r1 = _editor.RotationSpline.Evaluate(t1);
+
+                        return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
+                    }
                 );
             });
 
@@ -162,16 +178,25 @@ internal sealed class Simulator : IDisposable
                 }
             }
 
+
+            poses.HashScan(stream);
+            Console.WriteLine($"Path: {stream.Result}");
+
+            var constraints = Constraints;
+
+            constraints.HashScan(stream);
+            Console.WriteLine($"Constraints: {stream.Result}");
+
             TrajectoryPoint[]? trajectoryPoints = null;
             var generateTime = Measurements.MeasureTimeSpan(() =>
             {
-                Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), new BaseTrajectoryConstraints(
-                    MaxLinearVelocity,
-                    MaxLinearAcceleration,
-                    Angles.ToRadians(MaxAngularVelocity),
-                    Angles.ToRadians(MaxAngularAcceleration),
-                    MaxCentripetalAcceleration), out trajectoryPoints);
+                Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), constraints, out trajectoryPoints);
             });
+            
+            Assert.NotNull(ref trajectoryPoints);
+
+            trajectoryPoints.HashScan(stream);
+            Console.WriteLine($"Trajectory: {stream.Result}");
 
             foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
             {
@@ -179,9 +204,6 @@ internal sealed class Simulator : IDisposable
               
                 _markers.Add(new Marker(component.Parameter, component.Name));
             }
-
-
-            Assert.NotNull(ref trajectoryPoints);
 
             MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSqr).Velocity.Length;
             MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSqr).Acceleration.Length;

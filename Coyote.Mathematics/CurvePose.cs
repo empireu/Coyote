@@ -23,4 +23,9 @@ public readonly struct CurvePose
         Curvature = curvature;
         Parameter = parameter;
     }
+
+    public override string ToString()
+    {
+        return $"{Pose} {Curvature} {Parameter}";
+    }
 }

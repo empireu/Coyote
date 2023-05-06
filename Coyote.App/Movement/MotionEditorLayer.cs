@@ -718,14 +718,16 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         var motionProject = MotionProject.FromPath(_path);
 
         motionProject.Version = _path.Version;
-       
+
+        var constr = _simulator.Constraints;
+
         motionProject.Constraints = new JsonMotionConstraints
         {
-            LinearVelocity = _simulator.MaxLinearVelocity,
-            LinearAcceleration = _simulator.MaxLinearAcceleration,
-            AngularVelocity = Angles.ToRadians(_simulator.MaxAngularVelocity),
-            AngularAcceleration = Angles.ToRadians(_simulator.MaxAngularAcceleration),
-            CentripetalAcceleration = _simulator.MaxCentripetalAcceleration
+            LinearVelocity = constr.LinearVelocity,
+            LinearAcceleration = constr.LinearAcceleration,
+            AngularVelocity = constr.AngularVelocity,
+            AngularAcceleration = constr.AngularAcceleration,
+            CentripetalAcceleration = constr.CentripetalAcceleration
         };
 
         motionProject.Parameters = new JsonGenerationParameters

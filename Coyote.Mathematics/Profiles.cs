@@ -1,4 +1,5 @@
 ﻿#define WRITE_TO_FILE
+#define DEBUG_HASH
 
 using Coyote.Data;
 using GameFramework.Utilities;
@@ -18,6 +19,31 @@ public struct TrajectoryPoint
     public Vector2d Acceleration;
     public double AngularVelocity;
     public double AngularAcceleration;
+
+    public void HashScan(FnvStream stream)
+    {
+        stream.Add(CurvePose.Pose);
+        stream.Add(CurvePose.Curvature);
+        stream.AddRound(RotationCurvature); // ISSUE: rotation log yields a slightly different result to the JVM implementation, making this fail when comparing the exact value.
+        stream.Add(Displacement);
+        stream.Add(Time);
+        stream.Add(Velocity);
+        stream.Add(Acceleration);
+        stream.Add(AngularVelocity);
+        stream.Add(AngularAcceleration);
+    }
+
+    public long Hash
+    {
+        get
+        {
+            var stream = new FnvStream();
+
+            HashScan(stream);
+
+            return stream.Result;
+        }
+    }
 }
 
 public sealed class BaseTrajectoryConstraints
@@ -80,7 +106,23 @@ public static class TrajectoryGenerator
         public double LinearDisplacement;
         public double LinearVelocity;
         public double RotationCurvature;
+
+        public void HashScan(FnvStream stream)
+        {
+            stream.Add(LinearDisplacement);
+            stream.AddRound(LinearVelocity);
+            stream.AddRound(RotationCurvature);
+        }
     }
+
+    private static void HashScan(this IEnumerable<Intermediary> points, FnvStream stream)
+    {
+        foreach (var intermediary in points)
+        {
+            intermediary.HashScan(stream);
+        }
+    }
+
 
     /// <summary>
     ///     Computes the displacement at each point, relative to the start point.
@@ -191,11 +233,22 @@ public static class TrajectoryGenerator
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith((constraints.AngularVelocity / profile[i].RotationCurvature.Abs()));
         }
 
+#if DEBUG_HASH
+        var fnv = new FnvStream();
+        profile.HashScan(fnv);
+        Console.WriteLine($"    Angular velocity constraint: {fnv.Result}");
+#endif
+
         // Centripetal Acceleration:
         for (var i = 0; i < poses.Length; i++)
         { 
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)));
         }
+
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"    Centripetal acceleration constraint: {fnv.Result}");
+#endif
 
         var awMax = constraints.AngularAcceleration;
         var atMax = constraints.LinearAcceleration;
@@ -394,12 +447,20 @@ public static class TrajectoryGenerator
             profile[i - 1].LinearVelocity = Math.Min(profile[i - 1].LinearVelocity, Bounds(i - 1, i));
         }
 
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"    Angular acceleration forward pass: {fnv.Result}");
+#endif
+
         profile[^1].LinearVelocity = 0;
         for (var i = poses.Length - 2; i >= 0; i--)
         {
             profile[i + 1].LinearVelocity = Math.Min(profile[i + 1].LinearVelocity, Bounds(i + 1, i));
         }
-
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"    Angular acceleration backward pass: {fnv.Result}");
+#endif
         #endregion
     }
 
@@ -448,7 +509,18 @@ public static class TrajectoryGenerator
             points[i].CurvePose = poses[i];
         }
 
+#if DEBUG_HASH
+        var fnv = new FnvStream();
+        points.HashScan(fnv);
+        Console.WriteLine($"Initial path points: {fnv.Result}");
+#endif
         AssignPathPoints(points);
+
+
+#if DEBUG_HASH
+        points.HashScan(fnv);
+        Console.WriteLine($"Assigned path points: {fnv.Result}");
+#endif
 
         var profile = new Intermediary[points.Length];
 
@@ -463,8 +535,19 @@ public static class TrajectoryGenerator
             };
         }
 
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"Initial intermediary points: {fnv.Result}");
+        Console.WriteLine("Upper velocities:");
+#endif
+
         // Compute isolated velocities:
         ComputeUpperVelocities(points, profile, constraints);
+
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"Upper velocity intermediary points: {fnv.Result}");
+#endif
 
 #if WRITE_TO_FILE
         var upperBounds = profile.Select(x => x.LinearVelocity).ToArray();
@@ -642,12 +725,22 @@ public static class TrajectoryGenerator
             CombinedPass(i - 1, i);
         }
 
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"Forward pass: {fnv.Result}");
+#endif
+
         // Backward pass:
         profile[^1].LinearVelocity = 0;
         for (var i = profile.Length - 2; i >= 0; i--)
         {
             CombinedPass(i + 1, i);
         }
+
+#if DEBUG_HASH
+        profile.HashScan(fnv);
+        Console.WriteLine($"Backward pass: {fnv.Result}");
+#endif
 
         // Compute time:
         for (var i = 1; i < profile.Length; i++)

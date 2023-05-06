@@ -80,4 +80,34 @@ public static class Extensions
             stream.Add(curvePose.Curvature);
         }
     }
+
+    public static void HashScan(this IEnumerable<TrajectoryPoint> poses, FnvStream stream)
+    {
+        foreach (var tp in poses)
+        {
+            tp.HashScan(stream);
+        }
+    }
+
+    public static void HashScan(this IEnumerable<QuinticSplineSegment> segments, FnvStream stream)
+    {
+        foreach (var seg in segments)
+        {
+            stream.Add(seg.P0);
+            stream.Add(seg.V0);
+            stream.Add(seg.A0);
+            stream.Add(seg.A1);
+            stream.Add(seg.V1);
+            stream.Add(seg.P1);
+        }
+    }
+
+    public static void HashScan(this BaseTrajectoryConstraints constraints, FnvStream stream)
+    {
+        stream.Add(constraints.LinearVelocity);
+        stream.Add(constraints.LinearAcceleration);
+        stream.Add(constraints.AngularVelocity);
+        stream.Add(constraints.AngularAcceleration);
+        stream.Add(constraints.CentripetalAcceleration);
+    }
 }
