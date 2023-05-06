@@ -62,6 +62,7 @@ internal sealed class Simulator : IDisposable
 
     public float MaxLinearVelocity = 1.5f;
     public float MaxLinearAcceleration = 1f;
+    public float MaxLinearDeacceleration = 1f;
     public float MaxCentripetalAcceleration = 0.5f;
     public float MaxAngularVelocity = 180f;
     public float MaxAngularAcceleration = 140f;
@@ -69,6 +70,7 @@ internal sealed class Simulator : IDisposable
     public BaseTrajectoryConstraints Constraints => new(
         MaxLinearVelocity,
         MaxLinearAcceleration,
+        MaxLinearDeacceleration,
         Angles.ToRadians(MaxAngularVelocity),
         Angles.ToRadians(MaxAngularAcceleration),
         MaxCentripetalAcceleration);
@@ -125,12 +127,6 @@ internal sealed class Simulator : IDisposable
 
             PlayTime = 0;
 
-            var stream = new FnvStream();
-
-            _editor.TranslationSpline.Segments.HashScan(stream);
-
-            Console.WriteLine($"Spline: {stream.Result}");
-
             var poses = new List<CurvePose>();
 
             var getPointsTime = Measurements.MeasureTimeSpan(() =>
@@ -179,14 +175,7 @@ internal sealed class Simulator : IDisposable
             }
 
 
-            poses.HashScan(stream);
-            Console.WriteLine($"Path: {stream.Result}");
-
             var constraints = Constraints;
-
-            constraints.HashScan(stream);
-            Console.WriteLine($"Constraints: {stream.Result}");
-
             TrajectoryPoint[]? trajectoryPoints = null;
             var generateTime = Measurements.MeasureTimeSpan(() =>
             {
@@ -194,10 +183,7 @@ internal sealed class Simulator : IDisposable
             });
             
             Assert.NotNull(ref trajectoryPoints);
-
-            trajectoryPoints.HashScan(stream);
-            Console.WriteLine($"Trajectory: {stream.Result}");
-
+            
             foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
             {
                 var component = markerEntity.Get<MarkerComponent>();

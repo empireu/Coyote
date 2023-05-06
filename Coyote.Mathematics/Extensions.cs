@@ -71,43 +71,4 @@ public static class Extensions
     public static double Clamped(this double d, double min, double max) => Math.Clamp(d, min, max);
     public static double Mapped(this double d, double srcMin, double srcMax, double dstMin, double dstMax) => MathUtilities.MapRange(d, srcMin, srcMax, dstMin, dstMax);
     public static double Pow(this double d, double power) => Math.Pow(d, power);
-
-    public static void HashScan(this IEnumerable<CurvePose> poses, FnvStream stream)
-    {
-        foreach (var curvePose in poses)
-        {
-            stream.Add(curvePose.Pose);
-            stream.Add(curvePose.Curvature);
-        }
-    }
-
-    public static void HashScan(this IEnumerable<TrajectoryPoint> poses, FnvStream stream)
-    {
-        foreach (var tp in poses)
-        {
-            tp.HashScan(stream);
-        }
-    }
-
-    public static void HashScan(this IEnumerable<QuinticSplineSegment> segments, FnvStream stream)
-    {
-        foreach (var seg in segments)
-        {
-            stream.Add(seg.P0);
-            stream.Add(seg.V0);
-            stream.Add(seg.A0);
-            stream.Add(seg.A1);
-            stream.Add(seg.V1);
-            stream.Add(seg.P1);
-        }
-    }
-
-    public static void HashScan(this BaseTrajectoryConstraints constraints, FnvStream stream)
-    {
-        stream.Add(constraints.LinearVelocity);
-        stream.Add(constraints.LinearAcceleration);
-        stream.Add(constraints.AngularVelocity);
-        stream.Add(constraints.AngularAcceleration);
-        stream.Add(constraints.CentripetalAcceleration);
-    }
 }

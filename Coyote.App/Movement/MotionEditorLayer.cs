@@ -565,6 +565,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
                 {
                     ImGui.SliderFloat("Lin Velocity", ref _simulator.MaxLinearVelocity, 0.1f, 5f);
                     ImGui.SliderFloat("Lin Acceleration", ref _simulator.MaxLinearAcceleration, 0.1f, 5f);
+                    ImGui.SliderFloat("Lin Deacceleration", ref _simulator.MaxLinearDeacceleration, 0.1f, 5f);
                     ImGui.SliderFloat("Centripetal Acceleration²", ref _simulator.MaxCentripetalAcceleration, 0.1f, 5f);
                     ImGui.SliderFloat("Ang Velocity", ref _simulator.MaxAngularVelocity, 10, 720);
                     ImGui.SliderFloat("Ang Acceleration", ref _simulator.MaxAngularAcceleration, 10, 720);
@@ -725,6 +726,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         {
             LinearVelocity = constr.LinearVelocity,
             LinearAcceleration = constr.LinearAcceleration,
+            LinearDeacceleration = constr.LinearDeacceleration,
             AngularVelocity = constr.AngularVelocity,
             AngularAcceleration = constr.AngularAcceleration,
             CentripetalAcceleration = constr.CentripetalAcceleration
@@ -757,6 +759,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         _simulator.MaxLinearVelocity = (float)motionProject.Constraints.LinearVelocity;
         _simulator.MaxLinearAcceleration = (float)motionProject.Constraints.LinearAcceleration;
+        _simulator.MaxLinearDeacceleration = (float)motionProject.Constraints.LinearDeacceleration;
         _simulator.MaxCentripetalAcceleration = (float)motionProject.Constraints.CentripetalAcceleration;
         _simulator.MaxAngularVelocity = Angles.ToDegrees((float)motionProject.Constraints.AngularVelocity);
         _simulator.MaxAngularAcceleration = Angles.ToDegrees((float)motionProject.Constraints.AngularAcceleration);

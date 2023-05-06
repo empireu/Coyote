@@ -1,6 +1,7 @@
 ﻿#define WRITE_TO_FILE
 #define DEBUG_HASH
 
+using System.Runtime.CompilerServices;
 using Coyote.Data;
 using GameFramework.Utilities;
 using System.Text.Json.Serialization;
@@ -19,31 +20,6 @@ public struct TrajectoryPoint
     public Vector2d Acceleration;
     public double AngularVelocity;
     public double AngularAcceleration;
-
-    public void HashScan(FnvStream stream)
-    {
-        stream.Add(CurvePose.Pose);
-        stream.Add(CurvePose.Curvature);
-        stream.AddRound(RotationCurvature); // ISSUE: rotation log yields a slightly different result to the JVM implementation, making this fail when comparing the exact value.
-        stream.Add(Displacement);
-        stream.Add(Time);
-        stream.Add(Velocity);
-        stream.Add(Acceleration);
-        stream.Add(AngularVelocity);
-        stream.Add(AngularAcceleration);
-    }
-
-    public long Hash
-    {
-        get
-        {
-            var stream = new FnvStream();
-
-            HashScan(stream);
-
-            return stream.Result;
-        }
-    }
 }
 
 public sealed class BaseTrajectoryConstraints
@@ -51,6 +27,7 @@ public sealed class BaseTrajectoryConstraints
     public BaseTrajectoryConstraints(
         double linearVelocity,
         double linearAcceleration,
+        double linearDeaccceleration,
         double angularVelocity,
         double angularAcceleration,
         double centripetalAcceleration)
@@ -63,6 +40,11 @@ public sealed class BaseTrajectoryConstraints
         if (linearAcceleration <= 0)
         {
             throw new ArgumentException("Max translational acceleration must be positive", nameof(linearAcceleration));
+        }
+
+        if (linearDeaccceleration <= 0)
+        {
+            throw new ArgumentException("Max translational deacceleration must be positive", nameof(linearDeaccceleration));
         }
 
         if (angularVelocity <= 0)
@@ -82,6 +64,7 @@ public sealed class BaseTrajectoryConstraints
 
         LinearVelocity = linearVelocity;
         LinearAcceleration = linearAcceleration;
+        LinearDeacceleration = linearDeaccceleration;
         AngularVelocity = angularVelocity;
         AngularAcceleration = angularAcceleration;
         CentripetalAcceleration = centripetalAcceleration;
@@ -91,6 +74,8 @@ public sealed class BaseTrajectoryConstraints
     public double LinearVelocity { get; }
     [JsonInclude]
     public double LinearAcceleration { get; }
+    [JsonInclude]
+    public double LinearDeacceleration { get; }
     [JsonInclude]
     public double AngularVelocity { get; }
     [JsonInclude]
@@ -106,23 +91,7 @@ public static class TrajectoryGenerator
         public double LinearDisplacement;
         public double LinearVelocity;
         public double RotationCurvature;
-
-        public void HashScan(FnvStream stream)
-        {
-            stream.Add(LinearDisplacement);
-            stream.AddRound(LinearVelocity);
-            stream.AddRound(RotationCurvature);
-        }
     }
-
-    private static void HashScan(this IEnumerable<Intermediary> points, FnvStream stream)
-    {
-        foreach (var intermediary in points)
-        {
-            intermediary.HashScan(stream);
-        }
-    }
-
 
     /// <summary>
     ///     Computes the displacement at each point, relative to the start point.
@@ -157,46 +126,18 @@ public static class TrajectoryGenerator
     /// <param name="displacement">The distance between the two points.</param>
     /// <param name="initialVelocity">The velocity at the first point.</param>
     /// <param name="finalVelocity">the velocity at the destination.</param>
-    /// <param name="minAcceleration">The de-acceleration.</param>
-    /// <param name="maxAcceleration">The acceleration.</param>
     /// <returns>The time needed to perform this movement.</returns>
-    private static double ComputeMovementTime(
-        double displacement,
-        double initialVelocity,
-        double finalVelocity,
-        double minAcceleration,
-        double maxAcceleration)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double ComputeMovementTime(double displacement, double initialVelocity, double finalVelocity)
     {
-        Assert.IsTrue(minAcceleration < 0);
-        Assert.IsTrue(maxAcceleration > 0);
+        var v = (initialVelocity + finalVelocity);
 
-        if (displacement == 0)
-        {
-            if (initialVelocity.Equals(finalVelocity))
-            {
-                // It is probably fine, since time 0 is acceptable.
-
-                return 0;
-            }
-
-            Assert.Fail("Generation failed");
-        }
-
-        var acceleration = (finalVelocity.Squared() - initialVelocity.Squared()) / (2 * displacement);
-
-        if (acceleration.Abs() > 0)
-        {
-            return (finalVelocity - initialVelocity) / acceleration;
-        }
-
-        var sum = initialVelocity + finalVelocity;
-
-        if (sum == 0)
+        if (v == 0)
         {
             Assert.Fail("Velocity sum zero");
         }
 
-        return 2 * displacement / sum;
+        return 2 * displacement / v;
     }
 
     private static void ComputeVelocityAcceleration(TrajectoryPoint[] points)
@@ -233,30 +174,18 @@ public static class TrajectoryGenerator
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith((constraints.AngularVelocity / profile[i].RotationCurvature.Abs()));
         }
 
-#if DEBUG_HASH
-        var fnv = new FnvStream();
-        profile.HashScan(fnv);
-        Console.WriteLine($"    Angular velocity constraint: {fnv.Result}");
-#endif
-
         // Centripetal Acceleration:
         for (var i = 0; i < poses.Length; i++)
         { 
             profile[i].LinearVelocity = profile[i].LinearVelocity.MinWith(Math.Sqrt(constraints.CentripetalAcceleration / Math.Abs(poses[i].CurvePose.Curvature)));
         }
 
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"    Centripetal acceleration constraint: {fnv.Result}");
-#endif
-
         var awMax = constraints.AngularAcceleration;
-        var atMax = constraints.LinearAcceleration;
 
         #region Angular Acceleration Bounds
 
         // Find the derivation of this work in http://www2.informatik.uni-freiburg.de/~lau/students/Sprunk2008.pdf
-        double Bounds(int index1, int index)
+        double Bounds(int index1, int index, double atMax)
         {
             double Sqr(double a)
             {
@@ -444,23 +373,15 @@ public static class TrajectoryGenerator
         profile[0].LinearVelocity = 0;
         for (var i = 1; i < poses.Length; i++)
         {
-            profile[i - 1].LinearVelocity = Math.Min(profile[i - 1].LinearVelocity, Bounds(i - 1, i));
+            profile[i - 1].LinearVelocity = Math.Min(profile[i - 1].LinearVelocity, Bounds(i - 1, i, constraints.LinearAcceleration));
         }
-
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"    Angular acceleration forward pass: {fnv.Result}");
-#endif
 
         profile[^1].LinearVelocity = 0;
         for (var i = poses.Length - 2; i >= 0; i--)
         {
-            profile[i + 1].LinearVelocity = Math.Min(profile[i + 1].LinearVelocity, Bounds(i + 1, i));
+            profile[i + 1].LinearVelocity = Math.Min(profile[i + 1].LinearVelocity, Bounds(i + 1, i, constraints.LinearDeacceleration));
         }
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"    Angular acceleration backward pass: {fnv.Result}");
-#endif
+
         #endregion
     }
 
@@ -509,18 +430,8 @@ public static class TrajectoryGenerator
             points[i].CurvePose = poses[i];
         }
 
-#if DEBUG_HASH
-        var fnv = new FnvStream();
-        points.HashScan(fnv);
-        Console.WriteLine($"Initial path points: {fnv.Result}");
-#endif
         AssignPathPoints(points);
 
-
-#if DEBUG_HASH
-        points.HashScan(fnv);
-        Console.WriteLine($"Assigned path points: {fnv.Result}");
-#endif
 
         var profile = new Intermediary[points.Length];
 
@@ -535,25 +446,14 @@ public static class TrajectoryGenerator
             };
         }
 
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"Initial intermediary points: {fnv.Result}");
-        Console.WriteLine("Upper velocities:");
-#endif
-
         // Compute isolated velocities:
         ComputeUpperVelocities(points, profile, constraints);
-
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"Upper velocity intermediary points: {fnv.Result}");
-#endif
 
 #if WRITE_TO_FILE
         var upperBounds = profile.Select(x => x.LinearVelocity).ToArray();
 #endif
         // Passes over two points and adjusts velocities so that acceleration constrains are respected.
-        void CombinedPass(int previousIndex, int currentIndex)
+        void CombinedPass(int previousIndex, int currentIndex, double atMax)
         {
             // Previous point:
             var pi1 = profile[previousIndex];
@@ -563,7 +463,6 @@ public static class TrajectoryGenerator
 
             var translationalDisplacement = pi.LinearDisplacement - pi1.LinearDisplacement;
             
-            var atMax = constraints.LinearAcceleration;
             var awMax = constraints.AngularAcceleration;
 
             var ci1 = profile[previousIndex].RotationCurvature;
@@ -701,9 +600,8 @@ public static class TrajectoryGenerator
                             .MinBy(pair => Math.Abs(pair.angVel - pair.linVel));
 
                         velocity = Math.Max((linVel + angVel) / 2d, 0);
-
-                        //Console.WriteLine($"Constraint approximation {currentIndex}: {Math.Abs(linVel - angVel) * 100000:F4}");
                     }
+
                     continue;
                 }
 
@@ -722,25 +620,15 @@ public static class TrajectoryGenerator
         profile[0].LinearVelocity = 0;
         for (var i = 1; i < profile.Length; i++)
         {
-            CombinedPass(i - 1, i);
+            CombinedPass(i - 1, i, constraints.LinearAcceleration);
         }
-
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"Forward pass: {fnv.Result}");
-#endif
 
         // Backward pass:
         profile[^1].LinearVelocity = 0;
         for (var i = profile.Length - 2; i >= 0; i--)
         {
-            CombinedPass(i + 1, i);
+            CombinedPass(i + 1, i, constraints.LinearDeacceleration);
         }
-
-#if DEBUG_HASH
-        profile.HashScan(fnv);
-        Console.WriteLine($"Backward pass: {fnv.Result}");
-#endif
 
         // Compute time:
         for (var i = 1; i < profile.Length; i++)
@@ -751,9 +639,7 @@ public static class TrajectoryGenerator
             points[i].Time = points[i - 1].Time + ComputeMovementTime(
                 current.LinearDisplacement - previous.LinearDisplacement,
                 previous.LinearVelocity, 
-                current.LinearVelocity, 
-                -constraints.LinearAcceleration,
-                constraints.LinearAcceleration);
+                current.LinearVelocity);
         }
 
         // Compute actual velocities and accelerations:

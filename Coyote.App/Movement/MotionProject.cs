@@ -47,6 +47,8 @@ public struct JsonMotionConstraints
     [JsonInclude]
     public double LinearAcceleration { get; set; }
     [JsonInclude]
+    public double LinearDeacceleration { get; set; }
+    [JsonInclude]
     public double AngularVelocity { get; set; }
     [JsonInclude]
     public double AngularAcceleration { get; set; }
