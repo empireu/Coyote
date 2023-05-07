@@ -8,11 +8,19 @@ namespace Coyote.App;
 internal struct PositionComponent
 {
     public delegate void UpdateDelegate(Entity entity, Vector2 oldPosition);
+    public delegate Vector2 ControlledMoveDelegate(Entity entity, Vector2 targetPos, GameFramework.GameInput input);
 
     [FloatEditor(-3.66f, 3.66f)]
     public Vector2 Position;
 
-    // old position
+    /// <summary>
+    ///     Called before a position is applied, to calculate a position based on user actions.
+    /// </summary>
+    public ControlledMoveDelegate? ControlledMoveCallback;
+
+    /// <summary>
+    ///     Called when a position is applied.
+    /// </summary>
     public UpdateDelegate? UpdateCallback;
 }
 
@@ -31,6 +39,11 @@ internal struct SpriteComponent
     public Sprite Sprite;
     public Pose2d? Transform;
     public bool Disabled;
+}
+
+internal struct KnobComponent
+{
+    public Entity Parent;
 }
 
 internal struct TranslationPointComponent

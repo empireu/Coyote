@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Drawing;
 using System.Numerics;
-using System.Text;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -392,6 +391,14 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
             ImGui.Separator();
 
+            if (ImGui.Button("Reverse Path"))
+            {
+                _path.ReversePath();
+                _simulator.Generate();
+            }
+
+            ImGui.Separator();
+
             if (ImGui.Button("Clear"))
             {
                 if (_clearTimer.Elapsed.TotalSeconds > ClearForceThreshold && HasUnsavedChanges)
@@ -525,6 +532,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
             else
             {
                 if (Inspector.SubmitEditor(_selectedEntity.Value))
+                {
+                    OnUserChange();
+                }
+
+                if (SubmitPointInspector(_selectedEntity.Value))
                 {
                     OnUserChange();
                 }
@@ -705,6 +717,79 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
             ImGui.End();
         }
+    }
+
+    private bool SubmitPointInspector(Entity point)
+    {
+        var pointPosWorld = point.Position();
+
+        var changed = false;
+
+        void SubmitAngleControl(Entity markerEntity, string label)
+        {
+            var markerPosWorld = markerEntity.Get<PositionComponent>().Position;
+            var actualPosActual = markerPosWorld - pointPosWorld;
+            var actualDistance = actualPosActual.Length();
+
+            if (actualDistance > 0)
+            {
+                var actualRotation = Rotation2d.Dir(actualPosActual);
+                var tangentAngle = Angles.ToDegrees((float)actualRotation.Log());
+
+                if (ImGui.SliderFloat(label, ref tangentAngle, -180, 180))
+                {
+                    markerEntity.Move(pointPosWorld + actualDistance * (Vector2)Rotation2d.Exp(Angles.ToRadians(tangentAngle)).Direction);
+                  
+                    changed = true;
+                }
+            }
+        }
+
+        void SubmitAlignControl(Entity marker, string label, Entity targetPoint, Entity targetMarker)
+        {
+            if (ImGui.Button(label))
+            {
+                var targetPosActual = targetMarker.Position() - targetPoint.Position();
+
+                marker.Move(point.Position() + targetPosActual);
+            }
+        }
+
+        if (point.Has<TranslationPointComponent>())
+        {
+            var tangentMarker = point.Get<TranslationPointComponent>().VelocityMarker;
+            SubmitAngleControl(tangentMarker, "Tangent Angle");
+
+            var index = Array.FindIndex(_path.TranslationPoints.ToArray(), e => e == point);
+
+            if (index > 0)
+            {
+                SubmitAlignControl(
+                    tangentMarker,
+                    "Pre-align tangent",
+                    _path.TranslationPoints[index - 1],
+                    _path.TranslationPoints[index - 1].Get<TranslationPointComponent>().VelocityMarker);
+            }
+        }
+
+        if (point.Has<RotationPointComponent>())
+        {
+            var rotationMarker = point.Get<RotationPointComponent>().HeadingMarker;
+            SubmitAngleControl(rotationMarker, "Heading Angle");
+
+            var index = Array.FindIndex(_path.RotationPoints.ToArray(), e => e == point);
+
+            if (index > 0)
+            {
+                SubmitAlignControl(
+                    rotationMarker, 
+                    "Pre-align heading", 
+                    _path.RotationPoints[index - 1],
+                    _path.RotationPoints[index - 1].Get<RotationPointComponent>().HeadingMarker);
+            }
+        }
+
+        return changed;
     }
 
     private void OnUserChange()
@@ -902,8 +987,15 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         }
 
         var entity = _selectedEntity.Value;
+        var position = MouseWorld + _selectPoint;
+        var component = entity.Get<PositionComponent>();
 
-        entity.Move(MouseWorld + _selectPoint);
+        if (component.ControlledMoveCallback != null)
+        {
+            position = component.ControlledMoveCallback(entity, position, _app.Input);
+        }
+
+        entity.Move(position);
     }
 
     protected override void Update(FrameInfo frameInfo)

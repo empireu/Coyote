@@ -35,19 +35,19 @@ public static class Extensions
         return double.IsNaN(d);
     }
 
-    public static Vector2d ToReal2(this Coyote.Mathematics.Vector vector)
+    public static Vector2d ToVector2d(this Coyote.Mathematics.Vector vector)
     {
         Vectors.Validate(vector, 2);
 
         return new Vector2d(vector[0], vector[1]);
     }
 
-    public static Vector ToRealVector(this Vector2d v)
+    public static Vector ToVector(this Vector2d v)
     {
         return Vector.Create(v.X, v.Y);
     }
 
-    public static Vector ToRealVector(this Vector2 v)
+    public static Vector ToVector(this Vector2 v)
     {
         return Vector.Create(v.X, v.Y);
     }
@@ -59,7 +59,7 @@ public static class Extensions
         return new Vector2((float)vector[0], (float)vector[1]);
     }
 
-    public static Vector ToRealVector(this double d)
+    public static Vector ToVector(this double d)
     {
         return Vector.Create(d);
     }

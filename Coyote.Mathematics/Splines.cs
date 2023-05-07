@@ -80,12 +80,12 @@ public readonly struct QuinticSplineSegment
         Vectors.Validate(P0, 2);
 
         return Splines.HermiteQuintic2Curvature(
-            P0.ToReal2(), 
-            V0.ToReal2(), 
-            A0.ToReal2(), 
-            A1.ToReal2(), 
-            V1.ToReal2(), 
-            P1.ToReal2(), 
+            P0.ToVector2d(), 
+            V0.ToVector2d(), 
+            A0.ToVector2d(), 
+            A1.ToVector2d(), 
+            V1.ToVector2d(), 
+            P1.ToVector2d(), 
             t);
     }
 }
@@ -242,7 +242,7 @@ public sealed class QuinticSpline : IPositionSpline, IVelocitySpline, IAccelerat
             throw new Exception($"Cannot evaluate pose in {Dimensions}D spline");
         }
 
-        return new Pose2d(EvaluateTranslation(progress).ToReal2(), Rotation2d.Dir(EvaluateVelocity(progress).ToReal2()));
+        return new Pose2d(EvaluateTranslation(progress).ToVector2d(), Rotation2d.Dir(EvaluateVelocity(progress).ToVector2d()));
     }
 
     #region Interface
@@ -689,7 +689,7 @@ public static class Splines
             }
             else
             {
-                results.Add(spline.EvaluateCurvePose(current.T1));
+                results.Add(end);
                 t = current.T1;
             }
 

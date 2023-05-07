@@ -7,8 +7,16 @@ using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
+using Veldrid;
 
 namespace Coyote.App.Movement;
+
+[InputAccessor]
+public static class PathEditorKeys
+{
+    public static KeyBind PolarMove = new("Polar Move", Key.AltLeft);
+    public static KeyBind AxisMove = new("Axis Move", Key.ShiftLeft);
+}
 
 public sealed class PathEditor : IDisposable
 {
@@ -90,11 +98,14 @@ public sealed class PathEditor : IDisposable
             new TranslationPointComponent { VelocityMarker = velocityKnob, AccelerationMarker = accelerationKnob },
             new SpriteComponent { Sprite = _positionSprite });
 
+        velocityKnob.Get<KnobComponent>().Parent = entity;
+        accelerationKnob.Get<KnobComponent>().Parent = entity;
+
         if (!addToEnd && _translationPoints.Count >= 2)
         {
             // We find the best position on the spline to insert this.
 
-            var projection = TranslationSpline.Project(position.ToRealVector());
+            var projection = TranslationSpline.Project(position.ToVector());
 
             // It is close enough to the ends that we can add it there:
             if (projection < AddToEndThreshold)
@@ -145,9 +156,9 @@ public sealed class PathEditor : IDisposable
     {
         // Basically, rotation points are parameterized by translation. So we project this on the path to get the parameter
         // and then create the entity at that position on the arc.
-        var translationParameter = TranslationSpline.Project(position.ToRealVector());
+        var translationParameter = TranslationSpline.Project(position.ToVector());
         
-        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
+        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToVector2d();
 
         var headingKnob = CreateDerivativeKnob(0, projectedPosition, RebuildRotationSpline);
 
@@ -170,6 +181,8 @@ public sealed class PathEditor : IDisposable
             new ScaleComponent { Scale = Vector2.One * RotationKnobSize },
             new RotationPointComponent { HeadingMarker = headingKnob, Parameter = translationParameter },
             new SpriteComponent { Sprite = _velocitySprite });
+
+        headingKnob.Get<KnobComponent>().Parent = entity;
 
         _rotationPoints.Add(entity);
 
@@ -219,8 +232,8 @@ public sealed class PathEditor : IDisposable
 
         // These are pretty similar to rotation points. They get projected onto the path and we use them with our node system to 
         // trigger actions on the trajectory.
-        var translationParameter = TranslationSpline.Project(position.ToRealVector());
-        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToReal2();
+        var translationParameter = TranslationSpline.Project(position.ToVector());
+        var projectedPosition = TranslationSpline.Evaluate(translationParameter).ToVector2d();
 
         var entity = _world.Create(new PositionComponent
         {
@@ -373,6 +386,7 @@ public sealed class PathEditor : IDisposable
 
     /// <summary>
     ///     Creates a manipulable control knob (marker) for the specified derivative.
+    ///     <see cref="KnobComponent.Parent"/> <b>must be assigned</b> after the parent of this knob is created.
     /// </summary>
     /// <param name="derivative">The derivative order to use. This will be used to select the rendering options.</param>
     /// <param name="initialPosition">The position of the parent entity.</param>
@@ -423,11 +437,57 @@ public sealed class PathEditor : IDisposable
         var scale = InitialKnobSize * Vector2.One / (1 + derivative);
 
         var entity = _world.Create(
-            new PositionComponent { Position = position, UpdateCallback = (_, _) => changeCallback() },
+            new PositionComponent { 
+                Position = position, 
+                UpdateCallback = (_, _) => changeCallback(),
+                ControlledMoveCallback = ((e, pos, _) => ProcessKnobPosition(e, pos))},
             new ScaleComponent { Scale = scale },
-            new SpriteComponent { Sprite = sprite });
+            new SpriteComponent { Sprite = sprite },
+            new KnobComponent { Parent = Entity.Null });
 
         return entity;
+    }
+
+    private static Vector2 ProcessKnobPosition(Entity knob, Vector2 targetPosWorld)
+    {
+        var parent = knob.Get<KnobComponent>().Parent;
+        var parentPosWorld = parent.Position();
+
+        Assert.IsTrue(parent.IsAlive(), "Knob parent was never assigned");
+
+        var actualPosWorld = knob.Position();
+        var actualPosActual = actualPosWorld - parentPosWorld;
+        var actualDistance = actualPosActual.Length();
+
+        if (actualDistance == 0.0)
+        {
+            return targetPosWorld;
+        }
+
+        var targetPosActual = targetPosWorld - parentPosWorld;
+        var targetDistance = targetPosActual.Length();
+
+        if (targetDistance == 0.0)
+        {
+            return targetPosWorld;
+        }
+
+        if (PathEditorKeys.PolarMove)
+        {
+            return parentPosWorld + Vector2.Normalize(targetPosActual) * actualDistance;
+        }
+
+        if (PathEditorKeys.AxisMove)
+        {
+            if ((Rotation2d.Dir(targetPosActual) / Rotation2d.Dir(actualPosActual)).Log().Abs() > Math.PI / 2)
+            {
+                targetDistance *= -1;
+            }
+
+            return parentPosWorld + Vector2.Normalize(actualPosActual) * targetDistance;
+        }
+
+        return targetPosWorld;
     }
 
     /// <summary>
@@ -477,12 +537,12 @@ public sealed class PathEditor : IDisposable
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
             TranslationSpline.Add(new QuinticSplineSegment(
-                p0.ToRealVector(), 
-                v0.ToRealVector(), 
-                a0.ToRealVector(), 
-                a1.ToRealVector(), 
-                v1.ToRealVector(), 
-                p1.ToRealVector()));
+                p0.ToVector(), 
+                v0.ToVector(), 
+                a0.ToVector(), 
+                a1.ToVector(), 
+                v1.ToVector(), 
+                p1.ToVector()));
         }
 
         if (TranslationSpline.Segments.Count > 0)
@@ -550,7 +610,7 @@ public sealed class PathEditor : IDisposable
     private void ReProjectPathElement(Entity point, Action<double> applyUpdate)
     {
         var position = point.Get<PositionComponent>().Position;
-        var parameter = TranslationSpline.Project(position.ToRealVector());
+        var parameter = TranslationSpline.Project(position.ToVector());
 
         applyUpdate(parameter);
         point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
@@ -603,7 +663,7 @@ public sealed class PathEditor : IDisposable
             }
 
 
-            builder.Add(parameter, angle.ToRealVector());
+            builder.Add(parameter, angle.ToVector());
         }
 
         builder.Build(RotationSpline);
@@ -646,6 +706,25 @@ public sealed class PathEditor : IDisposable
         parameter = (float)markers.Parameter;
     }
 
+    public void ReversePath()
+    {
+        _translationPoints.Reverse();
+
+        foreach (var translationPoint in _translationPoints)
+        {
+            var component = translationPoint.Get<TranslationPointComponent>();
+            var translationPos = translationPoint.Position();
+            component.VelocityMarker.Move(translationPos + (translationPos - component.VelocityMarker.Position()));
+        }
+
+        foreach (var rotationPoint in RotationPoints)
+        {
+            rotationPoint.Get<RotationPointComponent>().Parameter = 1 - rotationPoint.Get<RotationPointComponent>().Parameter;
+        }
+
+        RebuildTranslation();
+    }
+
     /// <summary>
     ///     Renders the translation path.
     /// </summary>
@@ -667,7 +746,7 @@ public sealed class PathEditor : IDisposable
         batch.TexturedQuad(
             TranslationSpline.Evaluate(
                 TranslationSpline
-                    .Project(position.ToRealVector()))
+                    .Project(position.ToVector()))
                 .ToVector2(),
             Vector2.One * IndicatorSize,
             _positionSprite.Texture);

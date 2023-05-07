@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace Coyote.Mathematics;
 
-internal class MathExt
+public static class MathExt
 {
     public static T Min<T>(params T[] values) where T : IComparisonOperators<T, T, bool>
     {
