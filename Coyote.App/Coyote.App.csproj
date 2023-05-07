@@ -5,6 +5,7 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <ApplicationIcon>coyote.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +38,10 @@
     <None Remove="Assets\Images\RunOnce.png" />
     <None Remove="Assets\Images\Slideshow0.png" />
     <None Remove="Assets\Images\VelocityMarker.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="coyote.ico" />
   </ItemGroup>
 
   <ItemGroup>
