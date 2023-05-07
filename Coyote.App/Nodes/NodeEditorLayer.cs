@@ -528,6 +528,38 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         }
 
         ImGui.End();
+
+        if (NodeEditorBinds.MultiDrag || NodeEditorBinds.AlignSnap || NodeEditorBinds.GridSnap)
+        {
+            if (ImGui.BeginTooltip())
+            {
+                if (NodeEditorBinds.AlignSnap)
+                {
+                    ImGui.Text("Snap node");
+                }
+
+                if (NodeEditorBinds.MultiDrag)
+                {
+                    if (_selectedEntity.HasValue)
+                    {
+                        var entity = _selectedEntity.Value;
+
+                        ImGui.Text(entity.Children().Count == 0 ? "Drag entire level" : "Drag tree");
+                    }
+                    else
+                    {
+                        ImGui.Text("Multi-drag");
+                    }
+                }
+
+                if (NodeEditorBinds.GridSnap)
+                {
+                    ImGui.Text("Grid Snap");
+                }
+            }
+
+            ImGui.EndTooltip();
+        }
     }
 
     private void SendEntitiesChanged(params Entity[] changed)
