@@ -228,9 +228,12 @@ internal class App : GameApplication
                 _showSettingsWindow = true;
             }
 
-            if (ImGui.Button("Save"))
+            if (ImGui.Button("Save All"))
             {
-                //todo implement this, the current implementation is useless
+                _layerController.Layers.ForEach(l =>
+                {
+                    (l as IProjectTab)?.Save();
+                });
 
                 Project.Save();
 

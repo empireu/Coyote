@@ -18,7 +18,7 @@ using ImGuiNET;
 
 namespace Coyote.App.Nodes;
 
-internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEditor
+internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEditor, IProjectTab
 {
     private const float ZoomSpeed = 35;
     private const float MinZoom = 2.0f;
@@ -580,6 +580,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         var project = NodeProject.FromNodeWorld(_world);
         _app.Project.NodeProjects[_nodeProjectName] = project;
         _app.Project.Save();
+
+        _app.ToastInfo($"Saved nodes {_nodeProjectName}");
     }
 
     private void LoadProject(string nodeProjectName)
@@ -929,6 +931,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     public override string ToString()
     {
         return $"Nodes | {_nodeProjectName}";
+    }
+
+    public void Save()
+    {
+        SaveProject();
     }
 
     public void FocusCamera(Vector2 txWorldTarget)

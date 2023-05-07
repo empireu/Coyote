@@ -21,7 +21,7 @@ using Point = System.Drawing.Point;
 
 namespace Coyote.App.Movement;
 
-internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
+internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 {
     private const double ClearForceThreshold = 0.25;
 
@@ -841,6 +841,8 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         _app.Project.SetChanged(motionProject);
 
         _app.Project.Save();
+
+        _app.ToastInfo($"Saved motion {_motionProjectName}");
     }
 
     private void LoadProject(string motionProjectName)
@@ -1072,6 +1074,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
     public override string ToString()
     {
         return $"Motion | {_motionProjectName}";
+    }
+
+    public void Save()
+    {
+        SaveProject();
     }
 
     public void Dispose()
