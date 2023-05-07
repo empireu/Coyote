@@ -558,7 +558,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
                 if (ImGui.Button("Re-generate"))
                 {
-                    _simulator.InvalidateTrajectory();
+                    _simulator.Generate();
                 }
 
                 if (ImGui.CollapsingHeader("Motion Constraints"))

@@ -1,5 +1,4 @@
-﻿#define WRITE_TO_FILE
-#define DEBUG_HASH
+﻿//#define WRITE_TO_FILE
 
 using System.Runtime.CompilerServices;
 using Coyote.Data;

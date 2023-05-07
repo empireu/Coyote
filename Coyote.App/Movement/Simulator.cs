@@ -104,6 +104,89 @@ internal sealed class Simulator : IDisposable
 
     private readonly List<Marker> _markers = new();
 
+    public void Generate()
+    {
+        _markerEvents.Clear();
+        _markers.Clear();
+
+        PlayTime = 0;
+
+        var poses = new List<CurvePose>();
+
+        var getPointsTime = Measurements.MeasureTimeSpan(() =>
+        {
+            Splines.GetPoints(poses,
+                _editor.TranslationSpline,
+                0.0,
+                1.0,
+                DParameterTranslation,
+                new Twist2dIncr(Dx, Dy, DAngleTranslation),
+                int.MaxValue,
+                (t0, t1) =>
+                {
+                    if ((t0 - t1).Abs() > DParameterRotation)
+                    {
+                        return true;
+                    }
+
+                    if (_editor.RotationSpline.IsEmpty)
+                    {
+                        return false;
+                    }
+
+                    var r0 = _editor.RotationSpline.Evaluate(t0);
+                    var r1 = _editor.RotationSpline.Evaluate(t1);
+
+                    return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
+                }
+            );
+        });
+
+        if (!_editor.RotationSpline.IsEmpty)
+        {
+            var span = CollectionsMarshal.AsSpan(poses);
+
+            // Assign spline-spline rotations:
+            for (var i = 0; i < poses.Count; i++)
+            {
+                var point = span[i];
+
+                span[i] = new CurvePose(
+                    new Pose2d(point.Pose.Translation, Rotation2d.Exp(_editor.RotationSpline.Evaluate(point.Parameter)[0])),
+                    point.Curvature,
+                    point.Parameter);
+            }
+        }
+
+
+        var constraints = Constraints;
+        TrajectoryPoint[]? trajectoryPoints = null;
+        var generateTime = Measurements.MeasureTimeSpan(() =>
+        {
+            Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), constraints, out trajectoryPoints);
+        });
+
+        Assert.NotNull(ref trajectoryPoints);
+
+        foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
+        {
+            var component = markerEntity.Get<MarkerComponent>();
+
+            _markers.Add(new Marker(component.Parameter, component.Name));
+        }
+
+        MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSqr).Velocity.Length;
+        MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSqr).Acceleration.Length;
+        MaxProfileAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
+        MaxProfileAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
+        Points = trajectoryPoints.Length;
+
+        TotalTime = (float)Trajectory!.TimeRange.End;
+        TotalLength = (float)Trajectory.Evaluate(Trajectory.TimeRange.End).Displacement;
+
+        _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
+    }
+
     public bool Update(float dt, out Pose2d pose)
     {
         if (_editor.ArcLength == 0)
@@ -122,88 +205,10 @@ internal sealed class Simulator : IDisposable
                 return false;
             }
 
-            _markerEvents.Clear();
-            _markers.Clear();
-
-            PlayTime = 0;
-
-            var poses = new List<CurvePose>();
-
-            var getPointsTime = Measurements.MeasureTimeSpan(() =>
-            {
-                Splines.GetPoints(poses,
-                    _editor.TranslationSpline,
-                    0.0,
-                    1.0,
-                    DParameterTranslation,
-                    new Twist2dIncr(Dx, Dy, DAngleTranslation),
-                    int.MaxValue,
-                    (t0, t1) =>
-                    {
-                        if ((t0 - t1).Abs() > DParameterRotation)
-                        {
-                            return true;
-                        }
-
-                        if (_editor.RotationSpline.IsEmpty)
-                        {
-                            return false;
-                        }
-
-                        var r0 = _editor.RotationSpline.Evaluate(t0);
-                        var r1 = _editor.RotationSpline.Evaluate(t1);
-
-                        return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
-                    }
-                );
-            });
-
-            if (!_editor.RotationSpline.IsEmpty)
-            {
-                var span = CollectionsMarshal.AsSpan(poses);
-
-                // Assign spline-spline rotations:
-                for (var i = 0; i < poses.Count; i++)
-                {
-                    var point = span[i];
-
-                    span[i] = new CurvePose(
-                        new Pose2d(point.Pose.Translation, Rotation2d.Exp(_editor.RotationSpline.Evaluate(point.Parameter)[0])),
-                        point.Curvature, 
-                        point.Parameter);
-                }
-            }
-
-
-            var constraints = Constraints;
-            TrajectoryPoint[]? trajectoryPoints = null;
-            var generateTime = Measurements.MeasureTimeSpan(() =>
-            {
-                Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), constraints, out trajectoryPoints);
-            });
-            
-            Assert.NotNull(ref trajectoryPoints);
-            
-            foreach (var markerEntity in _editor.MarkerPoints.OrderBy(x => x.Get<MarkerComponent>().Parameter))
-            {
-                var component = markerEntity.Get<MarkerComponent>();
-              
-                _markers.Add(new Marker(component.Parameter, component.Name));
-            }
-
-            MaxProfileVelocity = trajectoryPoints.MaxBy(x => x.Velocity.LengthSqr).Velocity.Length;
-            MaxProfileAcceleration = trajectoryPoints.MaxBy(x => x.Acceleration.LengthSqr).Acceleration.Length;
-            MaxProfileAngularVelocity = trajectoryPoints.Max(x => x.AngularVelocity);
-            MaxProfileAngularAcceleration = trajectoryPoints.MaxBy(x => x.AngularAcceleration.Abs()).AngularAcceleration;
-            Points = trajectoryPoints.Length;
-            
-            TotalTime = (float)Trajectory!.TimeRange.End;
-            TotalLength = (float)Trajectory.Evaluate(Trajectory.TimeRange.End).Displacement;
-
-            _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
+            Generate();
         }
 
-        Last = Trajectory.Evaluate(((double)PlayTime).Clamped(0, Trajectory.TimeRange.End));
+        Last = Trajectory!.Evaluate(((double)PlayTime).Clamped(0, Trajectory.TimeRange.End));
         pose = new Pose2d(Last.CurvePose.Pose.Translation, Last.CurvePose.Pose.Rotation / Rotation2d.Exp(Math.PI / 2));
 
         foreach (var marker in _markers.Where(x => !_markerEvents.Any(e => e.Marker.Parameter.Equals(x.Parameter))).Where(x => Last.CurvePose.Parameter >= x.Parameter))
