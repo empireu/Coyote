@@ -545,6 +545,16 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
 
         ImGui.End();
 
+        if (PathEditorKeys.AxisMove)
+        {
+            ImGui.SetTooltip("Axis Move");
+        }
+
+        if (PathEditorKeys.PolarMove)
+        {
+            ImGui.SetTooltip("Polar Move");
+        }
+
         if (_showPlayer)
         {
             if (ImGuiExt.Begin("Player", imId, ref _showPlayer))

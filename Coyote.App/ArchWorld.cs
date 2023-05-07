@@ -10,7 +10,6 @@ internal static class ArchWorld
     // For now, I am just pooling the worlds.
     // Also, world creation is not thread-safe, apparently.
 
-
     private static readonly Stack<World> Worlds = new();
     private static readonly HashSet<World> InUse = new();
 
