@@ -204,9 +204,11 @@ internal class App : GameApplication
             // pre-load
             // This is the lazy solution.
 
+            ToastManager.StopWatch.Stop();
             Resources.AssetManager.GetSpriteForTexture(Asset("Images.PowerPlayField.jpg"));
             Resources.AssetManager.GetSpriteForTexture(Asset("Images.Robot.png"));
             Resources.AssetManager.GetSpriteForTexture(Asset("Images.Arrow.png"));
+            ToastManager.StopWatch.Start();
         }
 
         var imGui = _serviceProvider.GetRequiredService<ImGuiLayer>();
