@@ -160,7 +160,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         _robotSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Robot.png"));
         _arrowSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Arrow.png"));
 
-        _world = World.Create();
+        _world = ArchWorld.Get();
         _path = new PathEditor(app, _world);
         _simulator = new Simulator(app, _path);
 
@@ -1082,6 +1082,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable
         _commandList.Dispose();
         _path.Dispose();
         _simulator.Dispose();
-        _world.Dispose();
+        ArchWorld.Return(_world);
     }
 }

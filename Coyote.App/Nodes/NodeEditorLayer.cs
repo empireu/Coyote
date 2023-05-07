@@ -98,7 +98,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         _editorProcessor = new PostProcessor(app);
         _editorProcessor.BackgroundColor = ClearColor;
 
-        _world = World.Create();
+        _world = ArchWorld.Get();
 
         _runOnceSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.RunOnce.png"));
         _parentTerminalSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Nodes.InputTerminal.png"));
@@ -954,7 +954,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         _app.Resources.BatchPool.Return(_editorBatch);
         _editorProcessor.Dispose();
-        _world.Dispose();
+        ArchWorld.Return(_world);
         _imGui.Submit -= ImGuiOnSubmit;
     }
 }
