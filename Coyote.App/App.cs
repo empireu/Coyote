@@ -308,7 +308,7 @@ internal class App : GameApplication
             {
                 _layerController.Add(l);
 
-                if (_layerController.Selected == null && l == addLayers.Last())
+                if (_layerController.Selected == null || l == addLayers.Last())
                 {
                     _layerController.SwitchSelection(l);
                 }
