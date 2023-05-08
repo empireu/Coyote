@@ -16,6 +16,9 @@
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
     <None Remove="Assets\Images\Nodes\Call.png" />
+    <None Remove="Assets\Images\Nodes\Repeat.png" />
+    <None Remove="Assets\Images\Nodes\RepeatUntilFail.png" />
+    <None Remove="Assets\Images\Nodes\RepeatUntilSuccess.png" />
     <None Remove="Assets\Images\RotationPoint.png" />
     <None Remove="Assets\Images\DeleteMarker.png" />
     <None Remove="Assets\Images\DeleteTranslationPoint.png" />
@@ -65,6 +68,7 @@
     <EmbeddedResource Include="Assets\Images\Nodes\Motion.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\OutputTerminal.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Parallel.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Repeat.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Selector.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Sequence.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Success.png" />
@@ -93,6 +97,11 @@
     <ProjectReference Include="..\GraphicsFramework\GameFramework.PostProcessing\GameFramework.PostProcessing.csproj" />
     <ProjectReference Include="..\GraphicsFramework\GameFramework.Utilities\GameFramework.Utilities.csproj" />
     <ProjectReference Include="..\GraphicsFramework\GameFramework\GameFramework.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Images\Nodes\RepeatUntilFail.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\RepeatUntilSuccess.png" />
   </ItemGroup>
 
 </Project>

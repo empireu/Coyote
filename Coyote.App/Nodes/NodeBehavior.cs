@@ -1146,6 +1146,49 @@ public sealed class CallNode : NodeBehavior
     }
 }
 
+public sealed class RepeatNode : ProxyNode
+{
+    public RepeatNode(TextureSampler icon, string name) : base(icon, new Vector4(0.4f, 0.9f, 0.2f, 0.6f), name) { }
+
+    private struct RepeatNodeComponent
+    {
+        public int RepeatCount;
+    }
+
+    public override void AttachComponents(Entity entity)
+    {
+        entity.Add(new RepeatNodeComponent
+        {
+            RepeatCount = 1
+        });
+    }
+
+    public override bool SubmitInspector(Entity entity, INodeEditor editor)
+    {
+        ref var component = ref entity.Get<RepeatNodeComponent>();
+
+        var changed = ImGui.InputInt("Repeat Count", ref component.RepeatCount, 1);
+        component.RepeatCount = Math.Max(component.RepeatCount, 1);
+
+        return changed;
+    }
+
+    public override void Hover(Entity entity, Vector2 mousePos, INodeEditor editor)
+    {
+        ImGui.SetTooltip($"Repeat {entity.Get<RepeatNodeComponent>().RepeatCount} times");
+    }
+
+    public override string Save(Entity entity)
+    {
+        return entity.Get<RepeatNodeComponent>().RepeatCount.ToString();
+    }
+
+    public override void InitialLoad(Entity entity, string storedData)
+    {
+        entity.Get<RepeatNodeComponent>().RepeatCount = int.Parse(storedData);
+    }
+}
+
 #endregion
 
 public static class NodeExtensions

@@ -665,10 +665,10 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 var delta = (_app.Input.MouseDelta / new Vector2(_app.Window.Width, _app.Window.Height)) * new Vector2(-1, 1) * _cameraController.Camera.Zoom * CamDragSpeed;
                 _cameraController.FuturePosition2 += delta;
             }
-        }
 
-        _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
-        _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
+            _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
+            _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
+        }
 
         _cameraController.Update(frameInfo.DeltaTime);
     }

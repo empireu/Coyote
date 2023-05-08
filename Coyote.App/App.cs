@@ -145,6 +145,9 @@ internal class App : GameApplication
         reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
         reg.Register(new ParallelNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Parallel.png")).Texture, "Parallel"));
         reg.Register(new CallNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Call.png")).Texture, "Call"));
+        reg.Register(new RepeatNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Repeat.png")).Texture, "Repeat"));
+        reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilFail.png")).Texture, "Repeat Until Fail")).Also(x => x.BackgroundColor *= new Vector4(1.4f, 0.6f, 0.6f, 1f));
+        reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilSuccess.png")).Texture, "Repeat Until Success")).Also(x => x.BackgroundColor *= new Vector4(0.9f, 1.1f, 0.9f, 1f));
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)
