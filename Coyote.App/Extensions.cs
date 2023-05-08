@@ -121,6 +121,13 @@ internal static class Extensions
         }
     }
 
+    public static IReadOnlyList<TItem> ForEach<TItem>(this IReadOnlyList<TItem> list, Action<TItem> body)
+    {
+        list.AsEnumerable().ForEach(body);
+
+        return list;
+    }
+
     /// <summary>
     ///     Iterates over the list of items.
     ///     Afterwards, the list is cleared.

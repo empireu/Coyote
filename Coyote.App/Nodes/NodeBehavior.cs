@@ -229,8 +229,25 @@ public sealed class NodeAnalysis
     public NodeAnalysis Error(string text) => With(new Message(MessageType.Error, text));
 }
 
+public sealed class NodeFlag
+{
+    private static int _counter;
+
+    public int Id { get; }
+
+    public NodeFlag()
+    {
+        Id = Interlocked.Increment(ref _counter);
+    }
+
+    public static readonly NodeFlag DriveBehaviorFlag = new();
+    public static readonly NodeFlag NonParallelFlag = new();
+}
+
 public abstract class NodeBehavior
 {
+    private readonly HashSet<NodeFlag> _flags = new();
+
     /// <summary>
     ///     Unique name for this <see cref="NodeBehavior"/>. This is also used during serialization.
     /// </summary>
@@ -242,6 +259,19 @@ public abstract class NodeBehavior
         Icon = icon;
         BackgroundColor = backgroundColor;
     }
+
+    protected void AddFlags(params NodeFlag[] flags)
+    {
+        foreach (var flag in flags)
+        {
+            if (!_flags.Add(flag))
+            {
+                throw new ArgumentException("Duplicate flag", nameof(flag));
+            }
+        }
+    }
+
+    public bool HasFlag(NodeFlag flag) => _flags.Contains(flag);
 
     public TextureSampler Icon { get; set; }
 
@@ -509,25 +539,9 @@ public class DecoratorNode : NodeBehavior
     }
 }
 
-#region Behavior Marker Interfaces
-
-// These are mostly used in node connection validation.
-
-/// <summary>
-///     Marks a behavior that cannot be executed in parallel.
-/// </summary>
-public interface INonParallelBehavior { }
-
-/// <summary>
-///     Marks a drivetrain behavior. Anything that changes the state of the drivetrain should implement this.
-/// </summary>
-public interface IDriveBehavior : INonParallelBehavior { }
-
-#endregion
-
 #region Special Implementations
 
-public sealed class MotionNode : NodeBehavior, IDriveBehavior
+public sealed class MotionNode : NodeBehavior
 {
     public sealed class MarkerTerminal : NodeTerminal
     {
@@ -593,8 +607,11 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
         public MotionNodeState State;
     }
 
-    public MotionNode(TextureSampler icon, string name) : base(icon, new Vector4(0.95f, 0.8f, 0.5f, 0.7f), name) { }
-    
+    public MotionNode(TextureSampler icon, string name) : base(icon, new Vector4(0.95f, 0.8f, 0.5f, 0.7f), name)
+    {
+        AddFlags(NodeFlag.DriveBehaviorFlag, NodeFlag.NonParallelFlag);
+    }
+
     // Listen for marker deletes and updates
     public override bool ListenForProjectUpdate => true;
 
@@ -681,7 +698,7 @@ public sealed class MotionNode : NodeBehavior, IDriveBehavior
                 node
                     .ChildrenRef.Instance
                     .Select(x => x.Entity)
-                    .WithBehavior<INonParallelBehavior>()
+                    .WithFlags(NodeFlag.NonParallelFlag)
                     .Bind()
                     .ForEach(c => entity.UnlinkFrom(c));
             }
@@ -907,14 +924,11 @@ public sealed class ParallelNode : ProxyNode
             .NoneHaveBehavior<ParallelNode>();
     }
 
-    /// <summary>
-    ///     Prohibits <see cref="INonParallelBehavior"/> of the same type in parallel branches.
-    /// </summary>
     protected override bool AcceptsSubTree(Entity actualEntity, Entity bottomEntityActual, IReadOnlyList<Entity> subTreeCandidate, Entity bottomEntityActualChildCandidate)
     {
         // Handling for INonParallelBehaviors of different types:
         var subTypes = subTreeCandidate
-            .WithBehavior<INonParallelBehavior>()
+            .WithFlags(NodeFlag.NonParallelFlag)
             .Select(x => x.Behavior().GetType())
             .ToHashSet();
 
@@ -1553,11 +1567,21 @@ public static class NodeExtensions
         return enumerable.Where(x => x.IsBehavior<TBehavior>());
     }
 
+    public static IEnumerable<Entity> WithFlags(this IEnumerable<Entity> enumerable, params NodeFlag[] flags)
+    {
+        return enumerable.Where(x => flags.All(f => x.Behavior().HasFlag(f)));
+    }
+
     /// <summary>
     ///     Checks if none of the entities in <see cref="enumerable"/> have the specified <see cref="TBehavior"/>.
     /// </summary>
     public static bool NoneHaveBehavior<TBehavior>(this IEnumerable<Entity> enumerable)
     {
         return enumerable.All(e => e.IsNotBehavior<TBehavior>());
+    }
+
+    public static IEnumerable<Entity> WithoutFlags(this IEnumerable<Entity> enumerable, params NodeFlag[] flags)
+    {
+        return enumerable.Where(x => flags.All(f => !x.Behavior().HasFlag(f)));
     }
 }
