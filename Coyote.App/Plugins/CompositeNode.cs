@@ -163,6 +163,9 @@ internal sealed class CompositeState
     [StructuredMember] public CompositeTextInputField[] TextInputFields { get; set; } = Array.Empty<CompositeTextInputField>();
     [StructuredMember] public CompositeRealInputField[] RealInputFields { get; set; } = Array.Empty<CompositeRealInputField>();
     [StructuredMember] public CompositeIntegerInputField[] IntegerInputFields { get; set; } = Array.Empty<CompositeIntegerInputField>();
+
+    [StructuredMember] public bool IsDriveBehavior { get; set; }
+    [StructuredMember] public bool IsNonParallel { get; set; }
 }
 
 internal sealed class CompositeNode : NodeBehavior
@@ -177,6 +180,16 @@ internal sealed class CompositeNode : NodeBehavior
     public CompositeNode(TextureSampler icon, Vector4 backgroundColor, string name, CompositeState structure) : base(icon, backgroundColor, name)
     {
         _structure = structure;
+
+        if (structure.IsDriveBehavior)
+        {
+            AddFlags(NodeFlag.DriveBehaviorFlag);
+        }
+
+        if (structure.IsNonParallel)
+        {
+            AddFlags(NodeFlag.NonParallelFlag);
+        }
     }
 
     public override void AttachComponents(Entity entity)
