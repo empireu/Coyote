@@ -16,6 +16,7 @@
     <None Remove="Assets\Images\AddTranslationPoint.png" />
     <None Remove="Assets\Images\Arrow.png" />
     <None Remove="Assets\Images\Nodes\Call.png" />
+    <None Remove="Assets\Images\Nodes\Failure.png" />
     <None Remove="Assets\Images\Nodes\Repeat.png" />
     <None Remove="Assets\Images\Nodes\RepeatUntilFail.png" />
     <None Remove="Assets\Images\Nodes\RepeatUntilSuccess.png" />
@@ -63,6 +64,7 @@
     <EmbeddedResource Include="Assets\Images\Nodes\Action.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Condition.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Call.png" />
+    <EmbeddedResource Include="Assets\Images\Nodes\Failure.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\InputTerminal.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Inverter.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Motion.png" />

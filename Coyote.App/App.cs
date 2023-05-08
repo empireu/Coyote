@@ -140,7 +140,8 @@ internal class App : GameApplication
         Proxy("Sequence");
         Proxy("Selector").Also(x => x.BackgroundColor = new Vector4(0.6f, 0.1f, 0.2f, 0.8f));
 
-        Decorator("Success");
+        Decorator("Success").Also(x => x.BackgroundColor *= new Vector4(0.6f, 1.5f, 0.6f, 0.9f));
+        Decorator("Failure").Also(x => x.BackgroundColor *= new Vector4(1.5f, 0.5f, 0.5f, 0.9f));
 
         reg.Register(new MotionNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Motion.png")).Texture, "Motion"));
         reg.Register(new ParallelNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Parallel.png")).Texture, "Parallel"));
