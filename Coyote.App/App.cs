@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Numerics;
 using Coyote.App.Movement;
 using Coyote.App.Nodes;
+using Coyote.App.Plugins;
 using GameFramework;
 using GameFramework.Assets;
 using GameFramework.Extensions;
@@ -17,12 +18,14 @@ using GameFramework.Utilities;
 using GameFramework.Utilities.Extensions;
 using ImGuiNET;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 using Veldrid;
 
 namespace Coyote.App;
 
 internal class App : GameApplication
 {
+    private const string LuaPluginsDirectory = "./plugins-lua/";
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
     private const string KeyBindFile = "keybinds.json";
@@ -149,6 +152,16 @@ internal class App : GameApplication
         reg.Register(new RepeatNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.Repeat.png")).Texture, "Repeat"));
         reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilFail.png")).Texture, "Repeat Until Fail")).Also(x => x.BackgroundColor *= new Vector4(1.4f, 0.6f, 0.6f, 1f));
         reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilSuccess.png")).Texture, "Repeat Until Success")).Also(x => x.BackgroundColor *= new Vector4(0.9f, 1.1f, 0.9f, 1f));
+
+        if (Directory.Exists(LuaPluginsDirectory))
+        {
+            Directory
+                .EnumerateFiles(LuaPluginsDirectory, "*.lua")
+                .SelectMany(f => LuaPlugin.LoadBehaviors(this, f))
+                .Bind()
+                .ForEach(b => reg.Register(b))
+                .ForEach(b => Log.Information("Loaded Lua node {name}", b.Name));
+        }
     }
 
     private void RegisterTab(string label, string texture, Func<Layer> factory)
