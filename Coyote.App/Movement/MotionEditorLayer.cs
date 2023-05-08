@@ -485,11 +485,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     {
                         if (!string.IsNullOrEmpty(_motionProjectName))
                         {
-                            var overwrote = _app.Project.MotionProjects.ContainsKey(_motionProjectName);
-
                             SaveProject();
-
-                            _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_motionProjectName}");
                         }
                         else
                         {

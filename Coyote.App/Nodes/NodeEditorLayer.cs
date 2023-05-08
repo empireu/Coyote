@@ -468,9 +468,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                     {
                         if (!string.IsNullOrEmpty(_nodeProjectName))
                         {
-                            var overwrote = _app.Project.NodeProjects.ContainsKey(_nodeProjectName);
                             SaveProject();
-                            _app.ToastInfo($"{(overwrote ? "Updated" : "Created")} project {_nodeProjectName}");
                         }
                         else
                         {
