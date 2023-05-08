@@ -978,10 +978,10 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     MoveSpeed * frameInfo.DeltaTime,
                     0);
             }
-        }
 
-        _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
-        _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
+            _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
+            _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
+        }
 
         _cameraController.Update(frameInfo.DeltaTime);
     }
