@@ -1,90 +1,168 @@
-﻿using System.Data.Common;
+﻿using System.Collections;
 using System.Numerics;
+using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.App.Nodes;
 using GameFramework.Assets;
 using GameFramework.Renderer;
+using GameFramework.Utilities;
 using ImGuiNET;
-using Serilog;
 using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace Coyote.App.Plugins;
 
 // P.S. "Composite" means user-defined here. We should find a better name.
 
-internal interface IStructuredElement<in TSelf>
-{
-    bool MatchesStructure(TSelf other);
-}
+[AttributeUsage(AttributeTargets.Property)]
+internal sealed class StructuredMemberAttribute : Attribute { }
 
-internal static class StructuredElement
+internal static class CompositeStructure
 {
-    public static bool MatchesMany<TElement>(TElement[] a, TElement[] b) where TElement : IStructuredElement<TElement>
+    public static bool Matches(object? a, object? b)
     {
-        if (a.Length != b.Length)
+        if (a == null && b == null)
+        {
+            return true;
+        }
+
+        if (a != null && b == null)
         {
             return false;
         }
 
-        for (var i = 0; i < a.Length; i++)
+        if (a == null && b != null)
         {
-            if (!a[i].MatchesStructure(b[i]))
-            {
-                return false;
-            }
+            return false;
         }
 
-        return true;
+        Assert.NotNull(ref a);
+        Assert.NotNull(ref b);
+
+        if (a.GetType() != b.GetType())
+        {
+            return false;
+        }
+
+        if (a == b)
+        {
+            return true;
+        }
+
+        return a.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Where(p => p.GetCustomAttribute<StructuredMemberAttribute>() != null)
+            .Bind()
+            .Map(properties =>
+            {
+                if (properties.Length == 0)
+                {
+                    return a.Equals(b);
+                }
+
+                return properties.All(property =>
+                {
+                    var aValue = property.GetValue(a);
+                    var bValue = property.GetValue(b);
+
+                    if (aValue is not IEnumerable aEnumerable)
+                    {
+                        return Matches(aValue, bValue);
+                    }
+
+                    var aEnumerator = aEnumerable.GetEnumerator();
+                    var bEnumerator = Assert.Is<IEnumerable>(bValue).GetEnumerator();
+
+                    while (aEnumerator.MoveNext())
+                    {
+                        if (!bEnumerator.MoveNext())
+                        {
+                            return false;
+                        }
+
+                        if (!Matches(aEnumerator.Current, bEnumerator.Current))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return !bEnumerator.MoveNext();
+                });
+            });
     }
 }
 
-internal sealed class CompositeFlag : IStructuredElement<CompositeFlag>
+#region Composite Data
+
+internal sealed class CompositeFlag
 {
-    public bool MatchesStructure(CompositeFlag other)
-    {
-        return Name.Equals(other.Name);
-    }
+    [StructuredMember] public string Name { get; set; } = "Flag";
 
-    [JsonInclude]
-    public string Name { get; set; } = "Flag";
-
-    [JsonInclude]
     public bool State { get; set; }
 }
 
-internal sealed class CompositeEnum : IStructuredElement<CompositeEnum>
+internal sealed class CompositeEnum
 {
-    public bool MatchesStructure(CompositeEnum other)
-    {
-        return Name.Equals(other.Name) && Options.SequenceEqual(other.Options);
-    }
+    [StructuredMember] public string Name { get; set; } = "Option";
+    [StructuredMember] public string[] Options { get; set; } = { "None" };
 
-    [JsonInclude]
-    public string Name { get; set; } = "Option";
-    
-    [JsonInclude]
-    public string[] Options { get; set; } = new [] { "None" };
-
-    [JsonInclude]
     public string Selected { get; set; } = "";
 }
 
-internal sealed class CompositeState : IStructuredElement<CompositeState>
+internal sealed class CompositeRealSlider
 {
-    public bool MatchesStructure(CompositeState other)
-    {
-        return StructuredElement.MatchesMany(Flags, other.Flags) && StructuredElement.MatchesMany(Enums, other.Enums);
-    }
+    [StructuredMember] public string Name { get; set; } = "Real Slider";
+    [StructuredMember] public float Min { get; set; } = 0;
+    [StructuredMember] public float Max { get; set; } = 1;
 
-    [JsonInclude]
-    public CompositeFlag[] Flags { get; set; } = Array.Empty<CompositeFlag>();
+    public float Value { get; set; } = 0;
+}
 
-    [JsonInclude]
-    public CompositeEnum[] Enums { get; set; } = Array.Empty<CompositeEnum>();
+internal sealed class CompositeIntegerSlider
+{
+    [StructuredMember] public string Name { get; set; } = "Integer Slider";
+    [StructuredMember] public int Min { get; set; } = 0;
+    [StructuredMember] public int Max { get; set; } = 10;
+
+    public int Value { get; set; } = 0;
+}
+
+internal sealed class CompositeTextInputField
+{
+    [StructuredMember] public string Name { get; set; } = "Text Input Field";
+    [StructuredMember] public uint MaxLength { get; set; } = 512;
+
+    public string Value { get; set; } = string.Empty;
+}
+
+internal sealed class CompositeRealInputField
+{
+    [StructuredMember] public string Name { get; set; } = "Real Input Field";
+    [StructuredMember] public float Step { get; set; } = 0.01f;
+
+    public float Value { get; set; } = 0;
+}
+
+internal sealed class CompositeIntegerInputField
+{
+    [StructuredMember] public string Name { get; set; } = "Integer Input Field";
+    [StructuredMember] public int Step { get; set; } = 1;
+
+    public int Value { get; set; } = 0;
+}
+
+#endregion
+
+internal sealed class CompositeState
+{
+    [StructuredMember] public CompositeFlag[] Flags { get; set; } = Array.Empty<CompositeFlag>();
+    [StructuredMember] public CompositeEnum[] Enums { get; set; } = Array.Empty<CompositeEnum>();
+    [StructuredMember] public CompositeRealSlider[] RealSliders { get; set; } = Array.Empty<CompositeRealSlider>();
+    [StructuredMember] public CompositeIntegerSlider[] IntegerSliders { get; set; } = Array.Empty<CompositeIntegerSlider>();
+    [StructuredMember] public CompositeTextInputField[] TextInputFields { get; set; } = Array.Empty<CompositeTextInputField>();
+    [StructuredMember] public CompositeRealInputField[] RealInputFields { get; set; } = Array.Empty<CompositeRealInputField>();
+    [StructuredMember] public CompositeIntegerInputField[] IntegerInputFields { get; set; } = Array.Empty<CompositeIntegerInputField>();
 }
 
 internal sealed class CompositeNode : NodeBehavior
@@ -111,7 +189,7 @@ internal sealed class CompositeNode : NodeBehavior
         var savedState = JsonSerializer.Deserialize<CompositeState>(storedData) 
                          ?? throw new Exception($"Failed to load composite node {Name}.");
 
-        if (!savedState.MatchesStructure(_structure))
+        if (!CompositeStructure.Matches(savedState, _structure))
         {
             throw new Exception($"Saved node {Name} does not match definition.");
         }
@@ -131,26 +209,68 @@ internal sealed class CompositeNode : NodeBehavior
         nint id = 1;
 
         var changed = false;
-
+        
         foreach (var composedFlag in state.Flags)
         {
             var flag = composedFlag.State;
             ImGui.PushID(id++);
             changed |= ImGui.Checkbox(composedFlag.Name, ref flag);
             ImGui.PopID();
-
             composedFlag.State = flag;
         }
 
         foreach (var composedEnum in state.Enums)
         {
             var selected = composedEnum.Selected;
-
             ImGui.PushID(id++);
             changed |= ImGuiExt.StringComboBox(composedEnum.Options, ref selected, composedEnum.Name);
             ImGui.PopID();
-
             composedEnum.Selected = selected;
+        }
+
+        foreach (var compositeDoubleSlider in state.RealSliders)
+        {
+            var value = compositeDoubleSlider.Value;
+            ImGui.PushID(id++);
+            changed |= ImGui.SliderFloat(compositeDoubleSlider.Name, ref value, compositeDoubleSlider.Min, compositeDoubleSlider.Max);
+            ImGui.PopID();
+            compositeDoubleSlider.Value = value;
+        }
+
+        foreach (var compositeIntegerSlider in state.IntegerSliders)
+        {
+            var value = compositeIntegerSlider.Value;
+            ImGui.PushID(id++);
+            changed |= ImGui.SliderInt(compositeIntegerSlider.Name, ref value, compositeIntegerSlider.Min, compositeIntegerSlider.Max);
+            ImGui.PopID();
+            compositeIntegerSlider.Value = value;
+        }
+
+        foreach (var compositeInputField in state.TextInputFields)
+        {
+            var value = compositeInputField.Value;
+            ImGui.PushID(id++);
+            changed |= ImGui.InputText(compositeInputField.Name, ref value, compositeInputField.MaxLength);
+            ImGui.PopID();
+            compositeInputField.Value = value;
+        }
+
+        foreach (var compositeRealInputField in state.RealInputFields)
+        {
+            var value = compositeRealInputField.Value;
+            ImGui.PushID(id++);
+            changed |= ImGui.InputFloat(compositeRealInputField.Name, ref value, compositeRealInputField.Step);
+            ImGui.PopID();
+            compositeRealInputField.Value = value;
+        }
+
+        foreach (var compositeIntegerInputField in state.IntegerInputFields)
+        {
+            var value = compositeIntegerInputField.Value;
+            ImGui.PushID(id++);
+            changed |= ImGui.InputInt(compositeIntegerInputField.Name, ref value, compositeIntegerInputField.Step);
+            ImGui.PopID();
+            compositeIntegerInputField.Value = value;
         }
 
         return changed;
@@ -158,7 +278,7 @@ internal sealed class CompositeNode : NodeBehavior
 
     private struct YamlData
     {
-        public string? TexturePath { get; set; }
+        public string? Texture { get; set; }
         public string NodeName { get; set; }
         public Vector4 Color { get; set; }
         public CompositeState? Structure { get; set; }
@@ -170,9 +290,9 @@ internal sealed class CompositeNode : NodeBehavior
 
         var data = Deserializer.Deserialize<YamlData>(reader);
 
-        if (string.IsNullOrEmpty(data.TexturePath))
+        if (string.IsNullOrEmpty(data.Texture))
         {
-            data.TexturePath = $"{Path.GetFileNameWithoutExtension(path)}.png";
+            data.Texture = $"{Path.GetFileNameWithoutExtension(path)}.png";
         }
 
         if (string.IsNullOrEmpty(data.NodeName))
@@ -184,7 +304,7 @@ internal sealed class CompositeNode : NodeBehavior
 
         var texturePath = Path.Combine(
             Path.GetDirectoryName(path) ?? throw new InvalidOperationException($"Failed to find directory of {path}"),
-            data.TexturePath);
+            data.Texture);
 
         if (!File.Exists(texturePath))
         {

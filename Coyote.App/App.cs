@@ -25,7 +25,7 @@ namespace Coyote.App;
 
 internal class App : GameApplication
 {
-    private const string YamlPluginsDirectory = "./plugins-yaml/";
+    private const string YamlDefinitionsDirectory = "./definitions/";
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
     private const string KeyBindFile = "keybinds.json";
@@ -153,10 +153,10 @@ internal class App : GameApplication
         reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilFail.png")).Texture, "Repeat Until Fail")).Also(x => x.BackgroundColor *= new Vector4(1.4f, 0.6f, 0.6f, 1f));
         reg.Register(new ProxyNode(Resources.AssetManager.GetSpriteForTexture(Asset("Images.Nodes.RepeatUntilSuccess.png")).Texture, "Repeat Until Success")).Also(x => x.BackgroundColor *= new Vector4(0.9f, 1.1f, 0.9f, 1f));
 
-        if (Directory.Exists(YamlPluginsDirectory))
+        if (Directory.Exists(YamlDefinitionsDirectory))
         {
             Directory
-                .EnumerateFiles(YamlPluginsDirectory, "*.yaml")
+                .EnumerateFiles(YamlDefinitionsDirectory, "*.yaml")
                 .Select(f =>
                 {
                     try
