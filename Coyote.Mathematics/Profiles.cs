@@ -573,39 +573,7 @@ public static class TrajectoryGenerator
                 }
             }
 
-            double velocity = 0;
-
-            for (var i = 0; i < vtAwRanges.Length; i++)
-            {
-                var vtAw = Range.Intersect(Range.R0Plus, vtAwRanges[i]);
-                var intersect = Range.Intersect(vtAw, vtAt);
-
-                if (!Range.CheckValidity(intersect))
-                {
-                    if (i == vtAwRanges.Length - 1)
-                    {
-                        var (angVel, linVel) = vtAwRanges
-                            .SelectMany(range => new[]
-                            {
-                                range.Min, 
-                                range.Max
-                            })
-                            .Where(av => av >= -10e-4)
-                            .SelectMany(av => new[]
-                            {
-                                (angVel: av, linVel: vtAt.Min), 
-                                (angVel: av, linVel: vtAt.Max)
-                            })
-                            .MinBy(pair => Math.Abs(pair.angVel - pair.linVel));
-
-                        velocity = Math.Max((linVel + angVel) / 2d, 0);
-                    }
-
-                    continue;
-                }
-
-                velocity = Math.Max(velocity, intersect.Max);
-            }
+            var velocity = SolutionScan(vtAt, vtAwRanges);
 
             if (velocity is NaN || IsInfinity(velocity))
             {
@@ -668,6 +636,54 @@ public static class TrajectoryGenerator
         points = GenerateProfile(poses, constraints);
 
         return new Trajectory(points);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static double SolutionScan(Range vtAt, Range[] vtAwRanges)
+    {
+        static double IntersectMidpoint(Range a, Range b, out double error)
+        {
+            Assert.IsTrue(a.IsValid && b.IsValid);
+
+            if (a.Max.Equals(b.Min))
+            {
+                error = 0;
+                return a.Max;
+            }
+
+            if (b.Max.Equals(a.Min))
+            {
+                error = 0;
+                return b.Max;
+            }
+
+            if (a.Max < b.Min)
+            {
+                error = b.Min - a.Max;
+                Assert.IsTrue(error > 0.0);
+                return (a.Max + b.Min) / 2.0;
+            }
+
+            Assert.IsTrue(b.Max < a.Min);
+
+            error = a.Min - b.Max;
+            Assert.IsTrue(error > 0);
+            return (b.Max + a.Min) / 2.0;
+        }
+
+        return vtAwRanges.Select(vtAw =>
+        {
+            var intersection = Range.Intersect(vtAt, vtAw);
+
+            if (Range.CheckValidity(intersection))
+            {
+                return (solution: intersection.Max, error: 0.0);
+            }
+
+            var approximation = IntersectMidpoint(vtAt, vtAw, out var error);
+
+            return (solution: approximation, error: error);
+        }).MinBy(solution => solution.error).solution;
     }
 }
 

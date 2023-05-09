@@ -71,4 +71,6 @@ public static class Extensions
     public static double Clamped(this double d, double min, double max) => Math.Clamp(d, min, max);
     public static double Mapped(this double d, double srcMin, double srcMax, double dstMin, double dstMax) => MathUtilities.MapRange(d, srcMin, srcMax, dstMin, dstMax);
     public static double Pow(this double d, double power) => Math.Pow(d, power);
+
+    public static double PlusSnzEps(this double d) => d + MathExt.SnzEps(d);
 }

@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
 using GameFramework.Utilities;

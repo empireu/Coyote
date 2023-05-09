@@ -687,32 +687,32 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     var dAngleRotation = _simulator.DAngleRotation * factor;
                     var dParameterRotation = _simulator.DParameterRotation * factor;
 
-                    if (ImGui.SliderFloat($"Dx {factor}", ref dx, 0.01f, 10f))
+                    if (ImGui.SliderFloat($"X Incr x{factor}", ref dx, 0.01f, 10f))
                     {
                         _simulator.Dx = dx / factor;
                     }
 
-                    if (ImGui.SliderFloat($"Dy {factor}", ref dy, 0.01f, 10f))
+                    if (ImGui.SliderFloat($"Y Incr x{factor}", ref dy, 0.01f, 10f))
                     {
                         _simulator.Dy = dy / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DAngleT {factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    if (ImGui.SliderFloat($"Path Angle Incr x{factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
                     {
                         _simulator.DAngleTranslation = dAngleTranslation / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DParamT {factor}", ref dParameterTranslation, 0.001f, 10))
+                    if (ImGui.SliderFloat($"Path Parameter x{factor}", ref dParameterTranslation, 0.001f, 10))
                     {
                         _simulator.DParameterTranslation = dParameterTranslation / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DAngleR {factor}", ref dAngleRotation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
+                    if (ImGui.SliderFloat($"Rotation Increment x{factor}", ref dAngleRotation, MathF.PI / 3600 * factor, MathF.PI / 16 * factor))
                     {
                         _simulator.DAngleRotation = dAngleRotation / factor;
                     }
 
-                    if (ImGui.SliderFloat($"DParamR {factor}", ref dParameterRotation, 0.001f, 10))
+                    if (ImGui.SliderFloat($"Rotation Parameter x{factor}", ref dParameterRotation, 0.001f, 10))
                     {
                         _simulator.DParameterRotation = dParameterRotation / factor;
                     }

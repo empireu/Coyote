@@ -18,6 +18,7 @@ internal sealed class Simulator : IDisposable
     private readonly Stopwatch _editTime = Stopwatch.StartNew();
 
     public Trajectory? Trajectory { get; private set; }
+    public Exception? GenerateError { get; private set; }
 
     public Simulator(App app, PathEditor editor)
     {
@@ -37,6 +38,7 @@ internal sealed class Simulator : IDisposable
     public void InvalidateTrajectory()
     {
         Trajectory = null;
+        GenerateError = null;
         _editTime.Restart();
     }
 
@@ -56,9 +58,9 @@ internal sealed class Simulator : IDisposable
     public float Dx = 0.001f;
     public float Dy = 0.001f;
     public float DAngleTranslation = MathF.PI / 64;
-    public float DParameterTranslation = 0.00025f;
+    public float DParameterTranslation = 0.001f;
     public float DAngleRotation = MathF.PI / 64;
-    public float DParameterRotation = 0.00025f;
+    public float DParameterRotation = 0.001f;
 
     public float MaxLinearVelocity = 1.5f;
     public float MaxLinearAcceleration = 1f;
@@ -104,8 +106,9 @@ internal sealed class Simulator : IDisposable
 
     private readonly List<Marker> _markers = new();
 
-    public void Generate()
+    public bool Generate()
     {
+        GenerateError = null;
         _markerEvents.Clear();
         _markers.Clear();
 
@@ -134,10 +137,11 @@ internal sealed class Simulator : IDisposable
                         return false;
                     }
 
-                    var r0 = _editor.RotationSpline.Evaluate(t0);
-                    var r1 = _editor.RotationSpline.Evaluate(t1);
+                    var displacement = Math.Abs(
+                        _editor.RotationSpline.Evaluate(t0)[0] - 
+                        _editor.RotationSpline.Evaluate(t1)[0]);
 
-                    return Math.Abs(r0[0] - r1[0]) > DAngleRotation;
+                    return displacement > DAngleRotation;
                 }
             );
         });
@@ -163,8 +167,22 @@ internal sealed class Simulator : IDisposable
         TrajectoryPoint[]? trajectoryPoints = null;
         var generateTime = Measurements.MeasureTimeSpan(() =>
         {
-            Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), constraints, out trajectoryPoints);
+            try
+            {
+                Trajectory = TrajectoryGenerator.GenerateTrajectory(poses.ToArray(), constraints, out trajectoryPoints);
+            }
+            catch (Exception e)
+            {
+                GenerateError = e;
+            }
         });
+
+        if (GenerateError != null)
+        {
+            _app.ToastError(GenerateError.Message);
+
+            return false;
+        }
 
         Assert.NotNull(ref trajectoryPoints);
 
@@ -185,6 +203,8 @@ internal sealed class Simulator : IDisposable
         TotalLength = (float)Trajectory.Evaluate(Trajectory.TimeRange.End).Displacement;
 
         _app.ToastInfo($"{trajectoryPoints.Length} pts. Scan: {getPointsTime.TotalMilliseconds:F2}ms. Gen: {generateTime.TotalMilliseconds:F2}ms");
+
+        return true;
     }
 
     public bool Update(float dt, out Pose2d pose)
@@ -198,14 +218,23 @@ internal sealed class Simulator : IDisposable
 
         if (Trajectory == null)
         {
-            if (_editTime.Elapsed.TotalSeconds < EditTimeRefreshThreshold)
+            if (GenerateError != null)
             {
                 pose = default;
-
                 return false;
             }
 
-            Generate();
+            if (_editTime.Elapsed.TotalSeconds < EditTimeRefreshThreshold)
+            {
+                pose = default;
+                return false;
+            }
+
+            if (!Generate())
+            {
+                pose = default;
+                return false;
+            }
         }
 
         Last = Trajectory!.Evaluate(((double)PlayTime).Clamped(0, Trajectory.TimeRange.End));
