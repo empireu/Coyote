@@ -581,12 +581,12 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
                 if (ImGui.CollapsingHeader("Motion Constraints"))
                 {
-                    ImGui.SliderFloat("Lin Velocity", ref _simulator.MaxLinearVelocity, 0.1f, 5f);
-                    ImGui.SliderFloat("Lin Acceleration", ref _simulator.MaxLinearAcceleration, 0.1f, 5f);
-                    ImGui.SliderFloat("Lin Deacceleration", ref _simulator.MaxLinearDeacceleration, 0.1f, 5f);
-                    ImGui.SliderFloat("Centripetal Acceleration²", ref _simulator.MaxCentripetalAcceleration, 0.1f, 5f);
-                    ImGui.SliderFloat("Ang Velocity", ref _simulator.MaxAngularVelocity, 10, 720);
-                    ImGui.SliderFloat("Ang Acceleration", ref _simulator.MaxAngularAcceleration, 10, 720);
+                    ImGuiExt.InputDouble("Lin Vel(m/s)", ref _simulator.MaxLinearVelocity, step: 0.01, stepFast: 0.1, min: 10e-5);
+                    ImGuiExt.InputDouble("Lin Accel(m/s²)", ref _simulator.MaxLinearAcceleration, step: 0.01, stepFast: 0.1, min: 10e-5);
+                    ImGuiExt.InputDouble("Lin Deaccel(m/s²)", ref _simulator.MaxLinearDeacceleration, step: 0.01, stepFast: 0.1, min: 10e-5);
+                    ImGuiExt.InputDouble("Centripetal Accel(m/s²/r)", ref _simulator.MaxCentripetalAcceleration, step: 0.01, stepFast: 0.1, min: 10e-5);
+                    ImGuiExt.InputDegrees("Ang Vel(rad/s)", ref _simulator.MaxAngularVelocity, step: 1, stepFast: 10, minDeg: 10e-5);
+                    ImGuiExt.InputDegrees("Ang Accel(rad/s²)", ref _simulator.MaxAngularAcceleration, step: 1, stepFast: 10, minDeg: 10e-5);
                 }
 
                 if (ImGui.CollapsingHeader("Kinematics"))
@@ -678,45 +678,11 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
                 if (ImGui.CollapsingHeader("Point Density"))
                 {
-                    const int factor = 1000;
-
-                    var dx = _simulator.Dx * factor;
-                    var dy = _simulator.Dy * factor;
-                    var dAngleTranslation = _simulator.DAngleTranslation * factor;
-                    var dParameterTranslation = _simulator.DParameterTranslation * factor;
-                    var dAngleRotation = _simulator.DAngleRotation * factor;
-                    var dParameterRotation = _simulator.DParameterRotation * factor;
-
-                    if (ImGui.SliderFloat($"X Incr x{factor}", ref dx, 0.01f, 10f))
-                    {
-                        _simulator.Dx = dx / factor;
-                    }
-
-                    if (ImGui.SliderFloat($"Y Incr x{factor}", ref dy, 0.01f, 10f))
-                    {
-                        _simulator.Dy = dy / factor;
-                    }
-
-                    if (ImGui.SliderFloat($"Path Angle Incr x{factor}", ref dAngleTranslation, MathF.PI / 360 * factor, MathF.PI / 2 * factor))
-                    {
-                        _simulator.DAngleTranslation = dAngleTranslation / factor;
-                    }
-
-                    if (ImGui.SliderFloat($"Path Parameter x{factor}", ref dParameterTranslation, 0.001f, 10))
-                    {
-                        _simulator.DParameterTranslation = dParameterTranslation / factor;
-                    }
-
-                    if (ImGui.SliderFloat($"Rotation Increment x{factor}", ref dAngleRotation, MathF.PI / 3600 * factor, MathF.PI / 16 * factor))
-                    {
-                        _simulator.DAngleRotation = dAngleRotation / factor;
-                    }
-
-                    if (ImGui.SliderFloat($"Rotation Parameter x{factor}", ref dParameterRotation, 0.001f, 10))
-                    {
-                        _simulator.DParameterRotation = dParameterRotation / factor;
-                    }
-
+                    // I don't like these names very much, but the "proper" full name is super clunky.
+                    ImGuiExt.InputTwist2dIncr("Path Incr(m, deg)", ref _simulator.PathIncr, min: 10e-5, format: "%f");
+                    ImGuiExt.InputDouble("Path T Incr(%)", ref _simulator.PathParamIncr, min: 10e-5, max: 1, format: "%f");
+                    ImGuiExt.InputDegrees("Rot Incr(deg)", ref _simulator.SplineRotIncr, minDeg: 10e-5, format: "%f");
+                    ImGuiExt.InputDouble("Rot T Incr(%)", ref _simulator.RotParamIncr, min: 10e-5, max: 1, format: "%f");
                     ImGui.Text($"Points: {_simulator.Points}");
                 }
             }
@@ -825,12 +791,12 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
         motionProject.Parameters = new JsonGenerationParameters
         {
-            Dx = _simulator.Dx,
-            Dy = _simulator.Dy,
-            DAngleTranslation = _simulator.DAngleTranslation,
-            DParameterTranslation = _simulator.DParameterTranslation,
-            DAngleRotation = _simulator.DAngleRotation,
-            DParameterRotation = _simulator.DParameterRotation,
+            Dx = _simulator.PathIncr.TrIncr.X,
+            Dy = _simulator.PathIncr.TrIncr.Y,
+            DAngleTranslation = _simulator.PathIncr.RotIncr,
+            DParameterTranslation = _simulator.PathParamIncr,
+            DAngleRotation = _simulator.SplineRotIncr,
+            DParameterRotation = _simulator.RotParamIncr,
         };
 
         _app.Project.MotionProjects[_motionProjectName] = motionProject;
@@ -850,20 +816,18 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
         motionProject.Load(_path);
 
-        _simulator.MaxLinearVelocity = (float)motionProject.Constraints.LinearVelocity;
-        _simulator.MaxLinearAcceleration = (float)motionProject.Constraints.LinearAcceleration;
-        _simulator.MaxLinearDeacceleration = (float)motionProject.Constraints.LinearDeacceleration;
-        _simulator.MaxCentripetalAcceleration = (float)motionProject.Constraints.CentripetalAcceleration;
-        _simulator.MaxAngularVelocity = Angles.ToDegrees((float)motionProject.Constraints.AngularVelocity);
-        _simulator.MaxAngularAcceleration = Angles.ToDegrees((float)motionProject.Constraints.AngularAcceleration);
+        _simulator.MaxLinearVelocity = motionProject.Constraints.LinearVelocity;
+        _simulator.MaxLinearAcceleration = motionProject.Constraints.LinearAcceleration;
+        _simulator.MaxLinearDeacceleration = motionProject.Constraints.LinearDeacceleration;
+        _simulator.MaxCentripetalAcceleration = motionProject.Constraints.CentripetalAcceleration;
+        _simulator.MaxAngularVelocity = motionProject.Constraints.AngularVelocity;
+        _simulator.MaxAngularAcceleration = motionProject.Constraints.AngularAcceleration;
 
         var parameters = motionProject.Parameters;
-        _simulator.Dx = parameters.Dx;
-        _simulator.Dy = parameters.Dy;
-        _simulator.DAngleTranslation = parameters.DAngleTranslation;
-        _simulator.DParameterTranslation = parameters.DParameterTranslation;
-        _simulator.DAngleRotation = parameters.DAngleRotation;
-        _simulator.DParameterRotation = parameters.DParameterRotation;
+        _simulator.PathIncr = new Twist2dIncr(motionProject.Parameters.Dx, motionProject.Parameters.Dy, parameters.DAngleTranslation);
+        _simulator.PathParamIncr = parameters.DParameterTranslation;
+        _simulator.SplineRotIncr = parameters.DAngleRotation;
+        _simulator.RotParamIncr = parameters.DParameterRotation;
     }
 
     protected override void Resize(Size size)

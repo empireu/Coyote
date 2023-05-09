@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -55,26 +56,24 @@ internal sealed class Simulator : IDisposable
     public double MaxProfileAngularAcceleration { get; private set; }
     public int Points { get; private set; }
 
-    public float Dx = 0.001f;
-    public float Dy = 0.001f;
-    public float DAngleTranslation = MathF.PI / 64;
-    public float DParameterTranslation = 0.001f;
-    public float DAngleRotation = MathF.PI / 64;
-    public float DParameterRotation = 0.001f;
+    public Twist2dIncr PathIncr = new(0.001, 0.001, Angles.ToRadians(0.5));
+    public double PathParamIncr = 0.001;
+    public double SplineRotIncr = Angles.ToRadians(0.5);
+    public double RotParamIncr = 0.001;
 
-    public float MaxLinearVelocity = 1.5f;
-    public float MaxLinearAcceleration = 1f;
-    public float MaxLinearDeacceleration = 1f;
-    public float MaxCentripetalAcceleration = 0.5f;
-    public float MaxAngularVelocity = 180f;
-    public float MaxAngularAcceleration = 140f;
+    public double MaxLinearVelocity = 1.5;
+    public double MaxLinearAcceleration = 1.25;
+    public double MaxLinearDeacceleration = 1;
+    public double MaxCentripetalAcceleration = 0.5;
+    public double MaxAngularVelocity = Angles.ToRadians(180);
+    public double MaxAngularAcceleration = Angles.ToRadians(100);
 
     public BaseTrajectoryConstraints Constraints => new(
         MaxLinearVelocity,
         MaxLinearAcceleration,
         MaxLinearDeacceleration,
-        Angles.ToRadians(MaxAngularVelocity),
-        Angles.ToRadians(MaxAngularAcceleration),
+        MaxAngularVelocity,
+        MaxAngularAcceleration,
         MaxCentripetalAcceleration);
 
     public readonly struct Marker
@@ -108,6 +107,11 @@ internal sealed class Simulator : IDisposable
 
     public bool Generate()
     {
+        if (_editor.TranslationSpline.Segments.Count == 0)
+        {
+            return false;
+        }
+
         GenerateError = null;
         _markerEvents.Clear();
         _markers.Clear();
@@ -122,12 +126,12 @@ internal sealed class Simulator : IDisposable
                 _editor.TranslationSpline,
                 0.0,
                 1.0,
-                DParameterTranslation,
-                new Twist2dIncr(Dx, Dy, DAngleTranslation),
+                PathParamIncr,
+                PathIncr,
                 int.MaxValue,
                 (t0, t1) =>
                 {
-                    if ((t0 - t1).Abs() > DParameterRotation)
+                    if ((t0 - t1).Abs() > RotParamIncr)
                     {
                         return true;
                     }
@@ -141,7 +145,7 @@ internal sealed class Simulator : IDisposable
                         _editor.RotationSpline.Evaluate(t0)[0] - 
                         _editor.RotationSpline.Evaluate(t1)[0]);
 
-                    return displacement > DAngleRotation;
+                    return displacement > SplineRotIncr;
                 }
             );
         });

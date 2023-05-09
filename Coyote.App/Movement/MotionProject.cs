@@ -58,12 +58,18 @@ public struct JsonMotionConstraints
 
 public struct JsonGenerationParameters
 {
-    public float Dx { get; set; }
-    public float Dy { get; set; }
-    public float DAngleTranslation { get; set; }
-    public float DParameterTranslation { get; set; }
-    public float DAngleRotation { get; set; }
-    public float DParameterRotation { get; set; }
+    [JsonInclude]
+    public double Dx { get; set; }
+    [JsonInclude]
+    public double Dy { get; set; }
+    [JsonInclude]
+    public double DAngleTranslation { get; set; }
+    [JsonInclude]
+    public double DParameterTranslation { get; set; }
+    [JsonInclude]
+    public double DAngleRotation { get; set; }
+    [JsonInclude]
+    public double DParameterRotation { get; set; }
 }
 
 public sealed class MotionProject
