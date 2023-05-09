@@ -61,10 +61,10 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
     private const float MinZoom = 1f;
     private const float MaxZoom = 5f;
 
-    private static readonly RgbaFloat VelocityColor = new(1, 0.1f, 0.1f, 1f);
-    private static readonly RgbaFloat AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
-    private static readonly RgbaFloat AngularVelocityColor = new(1, 0.1f, 0.5f, 1f);
-    private static readonly RgbaFloat AngularAccelerationColor = new(0.5f, 1f, 0.5f, 1f);
+    private static readonly Vector4 VelocityColor = new(1, 0.1f, 0.1f, 1f);
+    private static readonly Vector4 AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
+    private static readonly Vector4 AngularVelocityColor = new(1, 0.1f, 0.5f, 1f);
+    private static readonly Vector4 AngularAccelerationColor = new(0.5f, 1f, 0.5f, 1f);
 
     private static readonly Vector4 DisplacementColor = new(1, 1f, 1f, 1f);
     private static readonly Vector4 TimeColor = new(0, 0.5f, 1f, 1f);
@@ -579,7 +579,10 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     _simulator.Generate();
                 }
 
-                if (ImGui.CollapsingHeader("Motion Constraints"))
+                ImGui.SameLine();
+                ImGui.Text($"Points: {_simulator.Points}");
+
+                if (ImGui.CollapsingHeader("Base Constraints"))
                 {
                     ImGuiExt.InputDouble("Lin Vel(m/s)", ref _simulator.MaxLinearVelocity, step: 0.01, stepFast: 0.1, min: 10e-5);
                     ImGuiExt.InputDouble("Lin Accel(m/s²)", ref _simulator.MaxLinearAcceleration, step: 0.01, stepFast: 0.1, min: 10e-5);
@@ -589,22 +592,22 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     ImGuiExt.InputDegrees("Ang Accel(rad/s²)", ref _simulator.MaxAngularAcceleration, step: 1, stepFast: 10, minDeg: 10e-5);
                 }
 
-                if (ImGui.CollapsingHeader("Kinematics"))
+                if (ImGui.CollapsingHeader("Kinematic Analysis"))
                 {
                     ImGui.TextColored(TimeColor, $"{lastPoint.Time:F4} s ({_simulator.TotalTime:F4} s total)");
 
-                    ImGui.TextColored(VelocityColor.ToVector4(), $"{lastPoint.Velocity.Length:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
+                    ImGui.TextColored(VelocityColor, $"{lastPoint.Velocity.Length:F4}/{_simulator.MaxProfileVelocity:F4} m/s");
                     ImGui.Checkbox("Show Velocity", ref _renderPlayerVelocity);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AccelerationColor.ToVector4(), $"{lastPoint.Acceleration.Length:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
+                    ImGui.TextColored(AccelerationColor, $"{lastPoint.Acceleration.Length:F4}/{_simulator.MaxProfileAcceleration:F4} m/s²");
                     ImGui.Checkbox("Show Acceleration", ref _renderPlayerAcceleration);
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularVelocityColor.ToVector4(), $"{lastPoint.AngularVelocity:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
+                    ImGui.TextColored(AngularVelocityColor, $"{lastPoint.AngularVelocity:F4}/{_simulator.MaxProfileAngularVelocity:F4} rad/s");
                     ImGui.Separator();
 
-                    ImGui.TextColored(AngularAccelerationColor.ToVector4(), $"{lastPoint.AngularAcceleration:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
+                    ImGui.TextColored(AngularAccelerationColor, $"{lastPoint.AngularAcceleration:F4}/{_simulator.MaxProfileAngularAcceleration:F4} rad/s²");
                     ImGui.Separator();
 
                     ImGui.TextColored(DisplacementColor, $"{lastPoint.Displacement:F4} m ({_simulator.TotalLength:F4} m total)");
@@ -676,14 +679,13 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
                     ImGui.EndGroup();
                 }
 
-                if (ImGui.CollapsingHeader("Point Density"))
+                if (ImGui.CollapsingHeader("Path Generation"))
                 {
                     // I don't like these names very much, but the "proper" full name is super clunky.
                     ImGuiExt.InputTwist2dIncr("Path Incr(m, deg)", ref _simulator.PathIncr, min: 10e-5, format: "%f");
                     ImGuiExt.InputDouble("Path T Incr(%)", ref _simulator.PathParamIncr, min: 10e-5, max: 1, format: "%f");
                     ImGuiExt.InputDegrees("Rot Incr(deg)", ref _simulator.SplineRotIncr, minDeg: 10e-5, format: "%f");
                     ImGuiExt.InputDouble("Rot T Incr(%)", ref _simulator.RotParamIncr, min: 10e-5, max: 1, format: "%f");
-                    ImGui.Text($"Points: {_simulator.Points}");
                 }
             }
 
@@ -918,12 +920,12 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
             if (_renderPlayerVelocity)
             {
-                Arrow(pose.Translation, pose.Translation + _simulator.Last.Velocity / 10, VelocityColor);
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.Velocity / 10, new RgbaFloat(VelocityColor));
             }
 
             if (_renderPlayerAcceleration)
             {
-                Arrow(pose.Translation, pose.Translation + _simulator.Last.Acceleration / 10, AccelerationColor);
+                Arrow(pose.Translation, pose.Translation + _simulator.Last.Acceleration / 10, new RgbaFloat(AccelerationColor));
             }
         }
     }
