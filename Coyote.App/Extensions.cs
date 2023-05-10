@@ -1,4 +1,5 @@
-﻿using System.Drawing;
+﻿using System.Collections;
+using System.Drawing;
 using System.Numerics;
 using System.Text;
 using Arch.Core;
@@ -401,4 +402,20 @@ internal static class Extensions
 
     public static List<NodeChild> Children(this Entity entity) => entity.Get<NodeComponent>().ChildrenRef.Instance;
     public static IEnumerable<Entity> ChildrenEnt(this Entity entity) => entity.Children().Select(x => x.Entity);
+
+    /// <summary>
+    ///     Enumerates all elements that are <see cref="T"/> in this <see cref="enumerator"/>.
+    /// </summary>
+    public static IEnumerable<T> StreamMatching<T>(this IEnumerator enumerator)
+    {
+        while (enumerator.MoveNext())
+        {
+            var current = enumerator.Current;
+
+            if (current is T obj)
+            {
+                yield return obj;
+            }
+        }
+    }
 }

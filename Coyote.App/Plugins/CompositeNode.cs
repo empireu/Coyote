@@ -2,6 +2,7 @@
 using System.Numerics;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Arch.Core;
 using Arch.Core.Extensions;
 using Coyote.App.Nodes;
@@ -95,61 +96,121 @@ internal static class CompositeStructure
 
 #region Composite Data
 
-internal sealed class CompositeFlag
+internal abstract class CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Flag";
+    [StructuredMember] public string Name { get; set; } = "compositeElement";
+    [StructuredMember] public string Label { get; set; } = "";
 
-    public bool State { get; set; }
+    [JsonIgnore]
+    [YamlIgnore]
+    public string DisplayLabel => string.IsNullOrWhiteSpace(Label) ? Name : Label;
+
+    public abstract bool SubmitInspector();
+
 }
 
-internal sealed class CompositeEnum
+internal sealed class CompositeFlag : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Option";
+    public bool State { get; set; }
+
+    public override bool SubmitInspector()
+    {
+        var v = State;
+        var flag = ImGui.Checkbox(DisplayLabel, ref v);
+        State = v;
+        return flag;
+    }
+}
+
+internal sealed class CompositeEnum : CompositeBase
+{
     [StructuredMember] public string[] Options { get; set; } = { "None" };
 
     public string Selected { get; set; } = "";
+
+    public override bool SubmitInspector()
+    {
+        var selected = Selected;
+        var flag = ImGuiExt.StringComboBox(Options, ref selected, DisplayLabel);
+        Selected = selected;
+        return flag;
+    }
 }
 
-internal sealed class CompositeRealSlider
+internal sealed class CompositeRealSlider : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Real Slider";
     [StructuredMember] public float Min { get; set; } = 0;
     [StructuredMember] public float Max { get; set; } = 1;
 
     public float Value { get; set; } = 0;
+
+    public override bool SubmitInspector()
+    {
+        var value = Value;
+        var flag = ImGui.SliderFloat(DisplayLabel, ref value, Min, Max);
+        Value = value;
+        return flag;
+    }
 }
 
-internal sealed class CompositeIntegerSlider
+internal sealed class CompositeIntegerSlider : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Integer Slider";
     [StructuredMember] public int Min { get; set; } = 0;
     [StructuredMember] public int Max { get; set; } = 10;
 
     public int Value { get; set; } = 0;
+
+    public override bool SubmitInspector()
+    {
+        var value = Value;
+        var flag = ImGui.SliderInt(DisplayLabel, ref value, Min, Max);
+        Value = value;
+        return flag;
+    }
 }
 
-internal sealed class CompositeTextInputField
+internal sealed class CompositeTextInputField : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Text Input Field";
     [StructuredMember] public uint MaxLength { get; set; } = 512;
 
     public string Value { get; set; } = string.Empty;
+
+    public override bool SubmitInspector()
+    {
+        var value = Value;
+        var flag = ImGui.InputText(DisplayLabel, ref value, MaxLength);
+        Value = value;
+        return flag;
+    }
 }
 
-internal sealed class CompositeRealInputField
+internal sealed class CompositeRealInputField : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Real Input Field";
     [StructuredMember] public float Step { get; set; } = 0.01f;
 
     public float Value { get; set; } = 0;
+    public override bool SubmitInspector()
+    {
+        var value = Value;
+        var flag = ImGui.InputFloat(DisplayLabel, ref value, Step);
+        Value = value;
+        return flag;
+    }
 }
 
-internal sealed class CompositeIntegerInputField
+internal sealed class CompositeIntegerInputField : CompositeBase
 {
-    [StructuredMember] public string Name { get; set; } = "Integer Input Field";
     [StructuredMember] public int Step { get; set; } = 1;
 
     public int Value { get; set; } = 0;
+
+    public override bool SubmitInspector()
+    {
+        var value = Value;
+        var flag = ImGui.InputInt(DisplayLabel, ref value, Step);
+        Value = value;
+        return flag;
+    }
 }
 
 #endregion
@@ -163,6 +224,11 @@ internal sealed class CompositeState
     [StructuredMember] public CompositeTextInputField[] TextInputFields { get; set; } = Array.Empty<CompositeTextInputField>();
     [StructuredMember] public CompositeRealInputField[] RealInputFields { get; set; } = Array.Empty<CompositeRealInputField>();
     [StructuredMember] public CompositeIntegerInputField[] IntegerInputFields { get; set; } = Array.Empty<CompositeIntegerInputField>();
+
+    public IEnumerable<CompositeBase> PropertyScan() => typeof(CompositeState)
+        .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+        .Where(x => x.PropertyType.IsAssignableTo(typeof(IEnumerable)))
+        .SelectMany(property => Assert.Is<IEnumerable>(property.GetValue(this)).GetEnumerator().StreamMatching<CompositeBase>());
 
     [StructuredMember] public bool IsDriveBehavior { get; set; }
     [StructuredMember] public bool IsNonParallel { get; set; }
@@ -180,6 +246,28 @@ internal sealed class CompositeNode : NodeBehavior
     public CompositeNode(TextureSampler icon, Vector4 backgroundColor, string name, CompositeState structure) : base(icon, backgroundColor, name)
     {
         _structure = structure;
+
+        new HashSet<string>().Also(hs =>
+        {
+            _structure.PropertyScan().ForEach(c =>
+            {
+                if (!hs.Add(c.Name))
+                {
+                    throw new Exception($"Duplicate name \"{c.Name}\"");
+                }
+
+                if (string.IsNullOrEmpty(c.Name))
+                {
+                    throw new Exception($"Invalid name \"{c.Name}\"");
+                }
+
+                if (c.Name.Contains(' '))
+                {
+                    throw new Exception($"Invalid name \"{c.Name}\": cannot bind to remote member.");
+                }
+            });
+        });
+       
 
         if (structure.IsDriveBehavior)
         {
@@ -222,68 +310,12 @@ internal sealed class CompositeNode : NodeBehavior
         nint id = 1;
 
         var changed = false;
-        
-        foreach (var composedFlag in state.Flags)
-        {
-            var flag = composedFlag.State;
-            ImGui.PushID(id++);
-            changed |= ImGui.Checkbox(composedFlag.Name, ref flag);
-            ImGui.PopID();
-            composedFlag.State = flag;
-        }
 
-        foreach (var composedEnum in state.Enums)
+        foreach (var compositeBase in state.PropertyScan())
         {
-            var selected = composedEnum.Selected;
             ImGui.PushID(id++);
-            changed |= ImGuiExt.StringComboBox(composedEnum.Options, ref selected, composedEnum.Name);
+            changed |= compositeBase.SubmitInspector();
             ImGui.PopID();
-            composedEnum.Selected = selected;
-        }
-
-        foreach (var compositeDoubleSlider in state.RealSliders)
-        {
-            var value = compositeDoubleSlider.Value;
-            ImGui.PushID(id++);
-            changed |= ImGui.SliderFloat(compositeDoubleSlider.Name, ref value, compositeDoubleSlider.Min, compositeDoubleSlider.Max);
-            ImGui.PopID();
-            compositeDoubleSlider.Value = value;
-        }
-
-        foreach (var compositeIntegerSlider in state.IntegerSliders)
-        {
-            var value = compositeIntegerSlider.Value;
-            ImGui.PushID(id++);
-            changed |= ImGui.SliderInt(compositeIntegerSlider.Name, ref value, compositeIntegerSlider.Min, compositeIntegerSlider.Max);
-            ImGui.PopID();
-            compositeIntegerSlider.Value = value;
-        }
-
-        foreach (var compositeInputField in state.TextInputFields)
-        {
-            var value = compositeInputField.Value;
-            ImGui.PushID(id++);
-            changed |= ImGui.InputText(compositeInputField.Name, ref value, compositeInputField.MaxLength);
-            ImGui.PopID();
-            compositeInputField.Value = value;
-        }
-
-        foreach (var compositeRealInputField in state.RealInputFields)
-        {
-            var value = compositeRealInputField.Value;
-            ImGui.PushID(id++);
-            changed |= ImGui.InputFloat(compositeRealInputField.Name, ref value, compositeRealInputField.Step);
-            ImGui.PopID();
-            compositeRealInputField.Value = value;
-        }
-
-        foreach (var compositeIntegerInputField in state.IntegerInputFields)
-        {
-            var value = compositeIntegerInputField.Value;
-            ImGui.PushID(id++);
-            changed |= ImGui.InputInt(compositeIntegerInputField.Name, ref value, compositeIntegerInputField.Step);
-            ImGui.PopID();
-            compositeIntegerInputField.Value = value;
         }
 
         return changed;
