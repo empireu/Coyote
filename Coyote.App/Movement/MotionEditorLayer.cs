@@ -541,12 +541,12 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
         ImGui.End();
 
-        if (PathEditorKeys.AxisMove)
+        if (MotionEditorConfig.AxisMove)
         {
             ImGui.SetTooltip("Axis Move");
         }
 
-        if (PathEditorKeys.PolarMove)
+        if (MotionEditorConfig.PolarMove)
         {
             ImGui.SetTooltip("Polar Move");
         }

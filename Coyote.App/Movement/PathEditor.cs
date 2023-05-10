@@ -7,26 +7,13 @@ using GameFramework.Extensions;
 using GameFramework.Renderer;
 using GameFramework.Renderer.Batch;
 using GameFramework.Utilities;
-using Veldrid;
 
 namespace Coyote.App.Movement;
-
-[InputAccessor]
-public static class PathEditorKeys
-{
-    public static KeyBind PolarMove = new("Polar Move", Key.AltLeft);
-    public static KeyBind AxisMove = new("Axis Move", Key.ShiftLeft);
-}
 
 public sealed class PathEditor : IDisposable
 {
     private const float InitialTranslation = 0.1f;
     private const float InitialKnobSize = 0.025f;
-    private const float PositionKnobSize = 0.05f;
-    private const float RotationKnobSize = 0.035f;
-    private const float MarkerSize = 0.1f;
-    private const float MarkerYOffset = 0.07f;
-    private const float IndicatorSize = 0.025f;
     private const float AddToEndThreshold = 0.05f;
 
     // Required for robot code:
@@ -64,7 +51,7 @@ public sealed class PathEditor : IDisposable
 
     public int Version;
 
-    private readonly SplineRenderer _pathRenderer = new();
+    private readonly SplineRenderer _pathRenderer = new(MotionEditorConfig.PathThickness, new Twist2dIncr(MotionEditorConfig.PathXIncr, MotionEditorConfig.PathYIncr, MotionEditorConfig.PathRotIncr));
 
     public PathEditor(GameApplication app, World world)
     {
@@ -94,7 +81,7 @@ public sealed class PathEditor : IDisposable
                 Position = position,
                 UpdateCallback = (entity, pos) => OnControlPointChanged(entity, pos, RebuildTranslation, velocityKnob, accelerationKnob)
             },
-            new ScaleComponent { Scale = Vector2.One * PositionKnobSize },
+            new ScaleComponent { Scale = Vector2.One * MotionEditorConfig.PositionKnobSize },
             new TranslationPointComponent { VelocityMarker = velocityKnob, AccelerationMarker = accelerationKnob },
             new SpriteComponent { Sprite = _positionSprite });
 
@@ -178,7 +165,7 @@ public sealed class PathEditor : IDisposable
                 OnControlPointChanged(entity, pos, RebuildRotationSpline, headingKnob);
             }
         },
-            new ScaleComponent { Scale = Vector2.One * RotationKnobSize },
+            new ScaleComponent { Scale = Vector2.One * MotionEditorConfig.RotationKnobSize },
             new RotationPointComponent { HeadingMarker = headingKnob, Parameter = translationParameter },
             new SpriteComponent { Sprite = _velocitySprite });
 
@@ -203,7 +190,7 @@ public sealed class PathEditor : IDisposable
             .ToVector2()
         );
 
-        return new Pose2d(rotation * new Vector2d(0, MarkerYOffset), rotation);
+        return new Pose2d(rotation * new Vector2d(0, MotionEditorConfig.MarkerYOffset), rotation);
     }
 
     private void ProjectMarker(Entity marker)
@@ -243,7 +230,7 @@ public sealed class PathEditor : IDisposable
                 ProjectMarker(entity);
             }
         },
-        new ScaleComponent { Scale = Vector2.One * MarkerSize },
+        new ScaleComponent { Scale = Vector2.One * MotionEditorConfig.MarkerSize },
         new MarkerComponent { Parameter = translationParameter, Name = "Marker" },
         new SpriteComponent
         {
@@ -472,12 +459,12 @@ public sealed class PathEditor : IDisposable
             return targetPosWorld;
         }
 
-        if (PathEditorKeys.PolarMove)
+        if (MotionEditorConfig.PolarMove)
         {
             return parentPosWorld + Vector2.Normalize(targetPosActual) * actualDistance;
         }
 
-        if (PathEditorKeys.AxisMove)
+        if (MotionEditorConfig.AxisMove)
         {
             if ((Rotation2d.Dir(targetPosActual) / Rotation2d.Dir(actualPosActual)).Log().Abs() > Math.PI / 2)
             {
@@ -748,7 +735,7 @@ public sealed class PathEditor : IDisposable
                 TranslationSpline
                     .Project(position.ToVector()))
                 .ToVector2(),
-            Vector2.One * IndicatorSize,
+            Vector2.One * MotionEditorConfig.IndicatorSize,
             _positionSprite.Texture);
     }
 

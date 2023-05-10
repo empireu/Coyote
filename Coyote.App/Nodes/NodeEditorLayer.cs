@@ -18,21 +18,30 @@ using ImGuiNET;
 
 namespace Coyote.App.Nodes;
 
+[ConfigAccessor]
+public static class NodeEditorConfig
+{
+    public static KeyBind GridSnap = new("Grid Snap", Key.ShiftLeft);
+    public static KeyBind AlignSnap = new("Align To Neighbor", Key.ControlLeft);
+    public static KeyBind MultiDrag = new("Multi Drag", Key.AltLeft);
+    public static readonly FloatField ZoomSpeed = new("Zoom Speed", 35);
+    public static readonly FloatField RunOnceSize = new("Run Once Size", 0.035f);
+    public static readonly FloatField TerminalSize = new("Terminal Size", 0.025f);
+    public static readonly FloatField ConnectionSize = new("Connection Size", 0.008f);
+    public static readonly FloatField CamDragSpeed = new("Camera Drag Speed", 5f);
+    public static readonly FloatField DragCamInterpolateSpeed = new("Camera Drag Smoothing", 50f);
+    public static readonly FloatField ZoomInterpolateSpeed = new("Zoom Smoothing", 10f);
+    public static readonly FloatField TerminalHighlightFactor = new("Terminal Highlight Factor", 1.2f);
+
+}
+
 internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEditor, IProjectTab
 {
-    private const float ZoomSpeed = 35;
     private const float MinZoom = 2.0f;
     private const float MaxZoom = 10f;
     private const float FontSize = 0.1f;
     private const float BorderSize = 0.01f;
     private const float NodeIconSize = 0.1f;
-    private const float RunOnceSize = 0.035f;
-    private const float TerminalSize = 0.025f;
-    private const float ConnectionSize = 0.008f;
-    private const float CamDragSpeed = 5f;
-    private const float DragCamInterpolateSpeed = 50;
-
-    private const float TerminalHighlightSize = TerminalSize * 1.2f;
 
     private const float GridDragGranularity = 50f;
     private const float GridSnapDistanceX = 0.015f;
@@ -91,7 +100,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         _cameraController = new OrthographicCameraController2D(
             new OrthographicCamera(0, -1, 1),
-            translationInterpolate: DragCamInterpolateSpeed, zoomInterpolate: 10);
+            translationInterpolate: NodeEditorConfig.DragCamInterpolateSpeed, 
+            zoomInterpolate: NodeEditorConfig.ZoomInterpolateSpeed);
 
         _editorBatch = app.Resources.BatchPool.Get();
 
@@ -131,8 +141,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         var position = terminal.Type == NodeTerminalType.Parent 
             ? e.Get<NodeComponent>().Terminals.GetParentPosition(e, BorderSize) 
             : e.Get<NodeComponent>().Terminals.GetChildPosition(terminal, e, BorderSize);
-
-        return new RectangleF(position.X - TerminalSize / 2, position.Y - TerminalSize / 2, TerminalSize, TerminalSize);
+        var termSize = NodeEditorConfig.TerminalSize;
+        return new RectangleF(position.X - termSize / 2, position.Y - termSize / 2, termSize, termSize);
     }
 
     private bool IntersectsTerminal(Entity entity, NodeTerminal terminal)
@@ -527,16 +537,16 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         ImGui.End();
 
-        if (NodeEditorBinds.MultiDrag || NodeEditorBinds.AlignSnap || NodeEditorBinds.GridSnap)
+        if (NodeEditorConfig.MultiDrag || NodeEditorConfig.AlignSnap || NodeEditorConfig.GridSnap)
         {
             if (ImGui.BeginTooltip())
             {
-                if (NodeEditorBinds.AlignSnap)
+                if (NodeEditorConfig.AlignSnap)
                 {
                     ImGui.Text("Snap node");
                 }
 
-                if (NodeEditorBinds.MultiDrag)
+                if (NodeEditorConfig.MultiDrag)
                 {
                     if (_selectedEntity.HasValue)
                     {
@@ -550,7 +560,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                     }
                 }
 
-                if (NodeEditorBinds.GridSnap)
+                if (NodeEditorConfig.GridSnap)
                 {
                     ImGui.Text("Grid Snap");
                 }
@@ -662,11 +672,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         {
             if (_dragCamera)
             {
-                var delta = (_app.Input.MouseDelta / new Vector2(_app.Window.Width, _app.Window.Height)) * new Vector2(-1, 1) * _cameraController.Camera.Zoom * CamDragSpeed;
+                var delta = (_app.Input.MouseDelta / new Vector2(_app.Window.Width, _app.Window.Height)) * new Vector2(-1, 1) * _cameraController.Camera.Zoom * NodeEditorConfig.CamDragSpeed;
                 _cameraController.FuturePosition2 += delta;
             }
 
-            _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
+            _cameraController.FutureZoom += _app.Input.ScrollDelta * NodeEditorConfig.ZoomSpeed * frameInfo.DeltaTime;
             _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
         }
 
@@ -693,7 +703,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         var entity = _selectedEntity.Value;
         var newPosition = MouseWorld + _selectPoint;
 
-        if (NodeEditorBinds.GridSnap)
+        if (NodeEditorConfig.GridSnap)
         {
             // Grid drag for more accurate placement:
 
@@ -701,7 +711,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             newPosition = new Vector2(MathF.Truncate(newPosition.X) / GridDragGranularity, MathF.Truncate(newPosition.Y) / GridDragGranularity);
         }
 
-        if (NodeEditorBinds.AlignSnap)
+        if (NodeEditorConfig.AlignSnap)
         {
             // Align to closest left node:
 
@@ -742,7 +752,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
       
         entity.Move(newPosition);
 
-        if (NodeEditorBinds.MultiDrag)
+        if (NodeEditorConfig.MultiDrag)
         {
             if (entity.Children().Count > 0)
             {
@@ -786,12 +796,12 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         var height = b.Y - a.Y;
 
-        a.X -= ConnectionSize / 2f;
-        b.X -= ConnectionSize / 2f;
+        a.X -= NodeEditorConfig.ConnectionSize / 2f;
+        b.X -= NodeEditorConfig.ConnectionSize / 2f;
 
-        _editorBatch.Quad(b, new Vector2(ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
-        _editorBatch.Quad(a + new Vector2(0, height / 2), new Vector2(ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
-        _editorBatch.Quad(new Vector2(Math.Min(a.X, b.X), a.Y + height / 2), new Vector2(Math.Abs(a.X - b.X) + ConnectionSize, ConnectionSize), color, align: AlignMode.TopLeft);
+        _editorBatch.Quad(b, new Vector2(NodeEditorConfig.ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
+        _editorBatch.Quad(a + new Vector2(0, height / 2), new Vector2(NodeEditorConfig.ConnectionSize, height / 2), color, align: AlignMode.TopLeft);
+        _editorBatch.Quad(new Vector2(Math.Min(a.X, b.X), a.Y + height / 2), new Vector2(Math.Abs(a.X - b.X) + NodeEditorConfig.ConnectionSize, NodeEditorConfig.ConnectionSize), color, align: AlignMode.TopLeft);
     }
 
     protected override void Update(FrameInfo frameInfo)
@@ -891,7 +901,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         if (nodeComponent.ExecuteOnce)
         {
-            _editorBatch.TexturedQuad(position, Vector2.One * RunOnceSize, _runOnceSprite.Texture, align: AlignMode.TopLeft);
+            _editorBatch.TexturedQuad(position, Vector2.One * NodeEditorConfig.RunOnceSize, _runOnceSprite.Texture, align: AlignMode.TopLeft);
         }
 
         scaleComponent.Scale = surface;
@@ -904,7 +914,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         void SubmitTerminal(Vector2 position, NodeTerminal terminal, Entity eDeRef)
         {
-            var size = TerminalSize;
+            var size = NodeEditorConfig.TerminalSize.Value;
 
             if (
                 GetTerminalRect(eDeRef, terminal).Contains(mouseWorld) 
@@ -912,7 +922,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 && (_dragParent || terminal.Type == NodeTerminalType.Parent)/* Do not highlight child terminals if we are not dragging a parent terminal (you cannot interact with them) */
             )
             {
-                size = TerminalHighlightSize;
+                size *= NodeEditorConfig.TerminalHighlightFactor;
             }
 
             _editorBatch.TexturedQuad(
@@ -994,12 +1004,4 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         ArchWorld.Return(_world);
         _imGui.Submit -= ImGuiOnSubmit;
     }
-}
-
-[InputAccessor]
-public static class NodeEditorBinds
-{
-    public static KeyBind GridSnap = new("Grid Snap", Key.ShiftLeft);
-    public static KeyBind AlignSnap = new("Align To Neighbor", Key.ControlLeft);
-    public static KeyBind MultiDrag = new("Multi Drag", Key.AltLeft);
 }

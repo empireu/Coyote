@@ -28,7 +28,7 @@ internal class App : GameApplication
     private const string YamlDefinitionsDirectory = "./definitions/";
     private const string ProjectDirectory = "./projects/";
     private const string Extension = "awoo";
-    private const string KeyBindFile = "keybinds.json";
+    private const string KeyBindFile = "userconfig.json";
     private static readonly Vector2 TabSize = new(12, 12);
     private readonly IServiceProvider _serviceProvider;
 
@@ -54,7 +54,7 @@ internal class App : GameApplication
 
     public Project Project => _project ?? throw new Exception("Tried to get project before it was loaded/created");
 
-    private readonly InputManager _inputManager;
+    private readonly ConfigManager _configManager;
 
     private readonly OrthographicCameraController2D _fullCamera = new OrthographicCameraController2D(new OrthographicCamera(0, -1, 1));
 
@@ -95,9 +95,9 @@ internal class App : GameApplication
             Directory.CreateDirectory(ProjectDirectory);
         }
 
-        _inputManager = new InputManager(this);
-        _inputManager.Load(KeyBindFile);
-        _inputManager.OnChanged += InputManagerOnOnChanged;
+        _configManager = new ConfigManager(this);
+        _configManager.Load(KeyBindFile);
+        _configManager.OnChanged += ConfigManagerOnOnChanged;
 
         _detectedFiles = Directory.GetFiles(ProjectDirectory, $"*{Extension}");
 
@@ -118,9 +118,9 @@ internal class App : GameApplication
         ResizeCamera();
     }
 
-    private void InputManagerOnOnChanged()
+    private void ConfigManagerOnOnChanged()
     {
-        _inputManager.Save(KeyBindFile);
+        _configManager.Save(KeyBindFile);
     }
 
     private void RegisterNodes(NodeBehaviorRegistry reg)
@@ -361,7 +361,7 @@ internal class App : GameApplication
             {
                 ImGui.Text("Keys");
 
-                _inputManager.ImGuiSubmit();
+                _configManager.ImGuiSubmit();
             }
 
             ImGui.End();
