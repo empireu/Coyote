@@ -133,7 +133,7 @@ public static class TrajectoryGenerator
 
         if (v == 0)
         {
-            Assert.Fail("Velocity sum zero");
+            throw new Exception("Failed to find time solution");
         }
 
         return 2 * displacement / v;
@@ -333,7 +333,7 @@ public static class TrajectoryGenerator
 
                     if (thresh.IsNan())
                     {
-                        Assert.Fail();
+                        throw new Exception("Failed to find solution when ci=0 and ci1>0");
                     }
                 }
                 else if (ci1 < 0)
@@ -348,7 +348,7 @@ public static class TrajectoryGenerator
 
                     if (thresh.IsNan())
                     {
-                        Assert.Fail();
+                        throw new Exception("Failed to find solution when ci=0 and ci1<0");
                     }
                 }
                 else
@@ -363,7 +363,7 @@ public static class TrajectoryGenerator
 
             if (IsNaN(thresh))
             {
-                Assert.Fail("Threshold is NaN");
+                throw new Exception("Velocity solution is NaN");
             }
 
             return thresh;
@@ -517,6 +517,11 @@ public static class TrajectoryGenerator
             if (ci > 0)
             {
                 var condition = (ci + ci1).Squared() * vi1.Squared() - 8 * ci * awMax * ds;
+                
+                if (condition.IsNan())
+                {
+                    throw new Exception("Condition ci>0 is NaN");
+                }
 
                 if (condition < 0)
                 {
@@ -527,8 +532,6 @@ public static class TrajectoryGenerator
                 }
                 else
                 {
-                    Assert.IsTrue(condition >= 0);
-
                     vtAwRanges = new[]
                     {
                         new Range(V2(), V2Star()),
@@ -540,14 +543,17 @@ public static class TrajectoryGenerator
             {
                 var condition = (ci + ci1).Squared() * vi1.Squared() + 8 * ci * awMax * ds;
 
+                if (condition.IsNan())
+                {
+                    throw new Exception("Condition ci<0 is NaN");
+                }
+
                 if (condition < 0)
                 {
                     vtAwRanges = new[] { new Range(V1Star(), V2Star()) };
                 }
                 else
                 {
-                    Assert.IsTrue(condition >= 0);
-
                     vtAwRanges = new[]
                     {
                         new Range(V1Star(), V1()),
@@ -557,8 +563,6 @@ public static class TrajectoryGenerator
             }
             else
             {
-                Assert.IsTrue(ci == 0);
-
                 if (ci1 > 0)
                 {
                     vtAwRanges = new[] { new Range(V1Hat(), V2Hat()) };
@@ -577,7 +581,7 @@ public static class TrajectoryGenerator
 
             if (velocity is NaN || IsInfinity(velocity))
             {
-                Assert.Fail();
+                throw new Exception($"Velocity solution is {velocity}");
             }
 
             pi.LinearVelocity = pi.LinearVelocity.MinWith(velocity);
@@ -643,7 +647,10 @@ public static class TrajectoryGenerator
     {
         static double IntersectMidpoint(Range a, Range b, out double error)
         {
-            Assert.IsTrue(a.IsValid && b.IsValid);
+            if (!(a.IsValid && b.IsValid))
+            {
+                throw new Exception("Invalid solutions found.");
+            }
 
             if (a.Max.Equals(b.Min))
             {
@@ -660,14 +667,10 @@ public static class TrajectoryGenerator
             if (a.Max < b.Min)
             {
                 error = b.Min - a.Max;
-                Assert.IsTrue(error > 0.0);
                 return (a.Max + b.Min) / 2.0;
             }
 
-            Assert.IsTrue(b.Max < a.Min);
-
             error = a.Min - b.Max;
-            Assert.IsTrue(error > 0);
             return (b.Max + a.Min) / 2.0;
         }
 
