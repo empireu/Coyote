@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using Arch.Core.Extensions;
 using Coyote.Mathematics;
@@ -9,11 +8,6 @@ namespace Coyote.App.Movement;
 
 internal sealed class Simulator : IDisposable
 {
-    /// <summary>
-    ///     Controls how often the trajectory is updated when editing.
-    /// </summary>
-    private const double EditTimeRefreshThreshold = 1.0;
-
     private readonly App _app;
     private readonly PathEditor _editor;
     private readonly Stopwatch _editTime = Stopwatch.StartNew();
@@ -228,7 +222,7 @@ internal sealed class Simulator : IDisposable
                 return false;
             }
 
-            if (_editTime.Elapsed.TotalSeconds < EditTimeRefreshThreshold)
+            if (_editTime.Elapsed.TotalSeconds < MotionEditorConfig.TrajectoryRefreshTime)
             {
                 pose = default;
                 return false;

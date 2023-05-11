@@ -16,5 +16,5 @@ public static class MotionEditorConfig
     public static readonly FloatField PathXIncr = new("Path X Incr", 0.1f);
     public static readonly FloatField PathYIncr = new("Path Y Incr", 0.1f);
     public static readonly FloatField PathRotIncr = new("Path Rot Incr", MathF.PI / 32);
-
+    public static readonly FloatField TrajectoryRefreshTime = new("Trajectory Refresh Interval", 0.25f);
 }
