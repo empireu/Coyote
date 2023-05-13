@@ -106,7 +106,6 @@ internal abstract class CompositeBase
     public string DisplayLabel => string.IsNullOrWhiteSpace(Label) ? Name : Label;
 
     public abstract bool SubmitInspector();
-
 }
 
 internal sealed class CompositeFlag : CompositeBase
@@ -232,6 +231,14 @@ internal sealed class CompositeState
 
     [StructuredMember] public bool IsDriveBehavior { get; set; }
     [StructuredMember] public bool IsNonParallel { get; set; }
+
+    public CompositeState CreateInstance()
+    {
+        // Better implementation would use reflection:
+
+        return JsonSerializer.Deserialize<CompositeState>(JsonSerializer.Serialize(this)) 
+               ?? throw new Exception("Failed to clone state");
+    }
 }
 
 internal sealed class CompositeNode : NodeBehavior
@@ -282,7 +289,7 @@ internal sealed class CompositeNode : NodeBehavior
 
     public override void AttachComponents(Entity entity)
     {
-        entity.Add(new CompositeNodeComponent { State = _structure });
+        entity.Add(new CompositeNodeComponent { State = _structure.CreateInstance() });
     }
 
     public override void InitialLoad(Entity entity, string storedData)
