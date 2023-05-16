@@ -201,7 +201,7 @@ internal static class Inspector
                             attribute);
                     }
 
-                    if (newValue != storedInstance)
+                    if (!newValue.Equals(storedInstance))
                     {
                         changed = true;
                     }

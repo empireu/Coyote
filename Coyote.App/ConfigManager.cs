@@ -14,16 +14,16 @@ internal sealed class ConfigAccessor : Attribute { }
 
 public sealed class KeyBind
 {
-    private readonly GameApplication? _app;
+    private GameApplication? _app;
 
     [JsonInclude]
     public string Name { get; }
 
     [JsonIgnore]
-    public bool Bound { get; }
+    public bool Bound { get; private set; }
 
     [JsonInclude]
-    public Key Key { get; }
+    public Key Key { get; private set; }
 
     [JsonConstructor]
     public KeyBind(string name, Key key)
@@ -31,19 +31,6 @@ public sealed class KeyBind
         Name = name;
         Key = key;
         Bound = false;
-    }
-
-    private KeyBind(string name, Key key, GameApplication app)
-    {
-        _app = app;
-        Name = name;
-        Key = key;
-        Bound = true;
-    }
-
-    public KeyBind CreateBind(Key actualKey, GameApplication app)
-    {
-        return new KeyBind(Name, actualKey, app);
     }
 
     public bool IsDown
@@ -63,77 +50,78 @@ public sealed class KeyBind
     {
         return bind.IsDown;
     }
+
+    public void BindApp(GameApplication app)
+    {
+        _app = app;
+        Bound = true;
+    }
+
+    public void BindKey(Key k)
+    {
+        if (!Bound)
+        {
+            throw new InvalidOperationException("Cannot bind key before binding the app");
+        }
+
+        Key = k;
+    }
 }
 
-public sealed class FloatField
+public class DataField<T>
 {
     [JsonInclude]
     public string Name { get; }
 
     [JsonInclude]
-    public float Value { get; private set; }
+    public T Value { get; private set; }
 
-    // todo investigate nullable to replace the different Slider and InputField in the composite node?
-    [JsonIgnore]
-    public Vector2? Range { get; }
+    private readonly Func<T, T>? _process;
 
-
-    public FloatField(string name, float value, Vector2? range = null)
+    [JsonConstructor]
+    public DataField(string name, T value)
     {
         Name = name;
         Value = value;
-        Range = range;
     }
 
-    public void SendUpdate(float newValue)
+    public DataField(string name, T value, Func<T, T> process)
     {
-        var oldValue = Value;
-
-        if (Range.HasValue)
-        {
-            newValue = Math.Clamp(newValue, Range.Value.X, Range.Value.Y);
-        }
-
-        Value = newValue;
-
-        OnUpdate?.Invoke(oldValue, this);
+        Name = name;
+        Value = value;
+        _process = process;
     }
 
-    public event Action<float, FloatField>? OnUpdate;
+    public void Update(T value)
+    {
+        Value = _process == null ? value : _process(value);
+    }
 
-    public static implicit operator float(FloatField f) => f.Value;
+    public static implicit operator T(DataField<T> f) => f.Value;
 }
 
 internal class ConfigManager
 {
     private readonly App _app;
 
-    private class KeyBindField
-    {
-        public KeyBind BaseBind { get; set; }
-        public FieldInfo Field { get; }
-
-        public KeyBindField(KeyBind baseBind, FieldInfo field)
-        {
-            BaseBind = baseBind;
-            Field = field;
-        }
-    }
-
     private sealed class JsonStorage
     {
-        public JsonStorage(KeyBind[] keyBinds, FloatField[] floatFields)
+        public JsonStorage(KeyBind[] keyBinds, DataField<float>[] floatFields, DataField<int>[] intFields)
         {
             KeyBinds = keyBinds;
             FloatFields = floatFields;
+            IntFields = intFields;
         }
 
         public KeyBind[] KeyBinds { get; }
-        public FloatField[] FloatFields { get; }
+        public DataField<float>[] FloatFields { get; }
+        public DataField<int>[] IntFields { get; }
+
     }
 
-    private readonly List<KeyBindField> _keyBinds = new();
-    private readonly List<FloatField> _floatFields = new();
+    private readonly List<KeyBind> _keyBinds = new();
+    private readonly List<DataField<float>> _floatFields = new();
+    private readonly List<DataField<int>> _intFields = new();
 
     public ConfigManager(App app)
     {
@@ -147,22 +135,20 @@ internal class ConfigManager
             foreach (var field in fields.Where(f => f.FieldType == typeof(KeyBind)))
             {
                 var bind = field.GetValue(null) as KeyBind ?? throw new Exception($"Bind {field} is null");
-                _keyBinds.Add(new KeyBindField(bind, field).Also(bf => UpdateBoundKey(bf, bf.BaseBind.Key)));
+                bind.BindApp(app);
+                _keyBinds.Add(bind);
             }
 
-            foreach (var field in fields.Where(f => f.FieldType == typeof(FloatField)))
+            void BindFields<T>(List<DataField<T>> list)
             {
-                var bind = field.GetValue(null) as FloatField ?? throw new Exception($"Bind {field} is null");
-                _floatFields.Add(bind);
+                list.AddRange(fields
+                        .Where(f => f.FieldType == typeof(DataField<T>))
+                        .Select(field => field.GetValue(null) as DataField<T> ?? throw new Exception($"Bind {field} is null")));
             }
-        }
-    }
 
-    private void UpdateBoundKey(KeyBindField keyBindField, Key newKey)
-    {
-        var bind = keyBindField.BaseBind.CreateBind(newKey, _app);
-        keyBindField.Field.SetValue(null, bind);
-        keyBindField.BaseBind = bind;
+            BindFields(_floatFields);
+            BindFields(_intFields);
+        }
     }
 
     public void Load(string path)
@@ -182,21 +168,23 @@ internal class ConfigManager
         foreach (var bindSaved in storage.KeyBinds)
         {
             _keyBinds
-                .FirstOrDefault(bindActual => bindActual.BaseBind.Name.Equals(bindSaved.Name))
-                ?.Also(bindActual => UpdateBoundKey(bindActual, bindSaved.Key));
+                .FirstOrDefault(bindActual => bindActual.Name.Equals(bindSaved.Name))
+                ?.Also(bindActual => bindActual.BindKey(bindSaved.Key));
         }
 
         foreach (var fieldSaved in storage.FloatFields)
         {
             _floatFields
                 .FirstOrDefault(fieldActual => fieldActual.Name.Equals(fieldSaved.Name))
-                ?.Also(fieldActual => fieldActual.SendUpdate(fieldSaved.Value));
+                ?.Also(fieldActual => fieldActual.Update(fieldSaved.Value));
         }
     }
 
     public void Save(string path)
     {
-        File.WriteAllText(path, JsonSerializer.Serialize(new JsonStorage(_keyBinds.Select(x => x.BaseBind).ToArray(), _floatFields.ToArray())));
+        File.WriteAllText(path, JsonSerializer.Serialize(
+            new JsonStorage(_keyBinds.ToArray(), _floatFields.ToArray(), _intFields.ToArray()))
+        );
     }
 
     public void ImGuiSubmit()
@@ -206,13 +194,12 @@ internal class ConfigManager
         nint id = 1;
         foreach (var bindField in _keyBinds)
         {
-            var key = bindField.BaseBind.Key;
+            var key = bindField.Key;
             
             ImGui.PushID(id++);
-            if (ImGuiExt.EnumComboBox(ref key, bindField.BaseBind.Name))
+            if (ImGuiExt.EnumComboBox(ref key, bindField.Name))
             {
-                UpdateBoundKey(bindField, key);
-
+                bindField.BindKey(key);
                 changed = true;
             }
             ImGui.PopID();
@@ -221,26 +208,24 @@ internal class ConfigManager
         foreach (var floatField in _floatFields)
         {
             var v = floatField.Value;
-
-            var flag = false;
-
             ImGui.PushID(id++);
-            if (floatField.Range.HasValue)
+            if ((changed |= ImGui.InputFloat(floatField.Name, ref v)))
             {
-                flag |= ImGui.SliderFloat(floatField.Name, ref v, floatField.Range.Value.X, floatField.Range.Value.Y);
-            }
-            else
-            {
-                flag |= ImGui.InputFloat(floatField.Name, ref v);
+                floatField.Update(v);
             }
             ImGui.PopID();
 
-            changed |= flag;
+        }
 
-            if (flag)
+        foreach (var intField in _intFields)
+        {
+            var v = intField.Value;
+            ImGui.PushID(id++);
+            if ((changed |= ImGui.InputInt(intField.Name, ref v)))
             {
-                floatField.SendUpdate(v);
+                intField.Update(v);
             }
+            ImGui.PopID();
         }
 
         if (changed)

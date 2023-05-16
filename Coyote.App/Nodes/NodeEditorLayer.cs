@@ -21,19 +21,24 @@ namespace Coyote.App.Nodes;
 [ConfigAccessor]
 public static class NodeEditorConfig
 {
-    public static KeyBind GridSnap = new("Grid Snap", Key.ShiftLeft);
-    public static KeyBind ConnectionSnap = new("Connection Snap", Key.Space);
-    public static KeyBind AlignSnap = new("Align To Neighbor", Key.ControlLeft);
-    public static KeyBind MultiDrag = new("Multi Drag", Key.AltLeft);
-    public static readonly FloatField ZoomSpeed = new("Zoom Speed", 35);
-    public static readonly FloatField RunOnceSize = new("Run Once Size", 0.035f);
-    public static readonly FloatField TerminalSize = new("Terminal Size", 0.025f);
-    public static readonly FloatField ConnectionSize = new("Connection Size", 0.008f);
-    public static readonly FloatField CamDragSpeed = new("Camera Drag Speed", 5f);
-    public static readonly FloatField DragCamInterpolateSpeed = new("Camera Drag Smoothing", 50f);
-    public static readonly FloatField ZoomInterpolateSpeed = new("Zoom Smoothing", 10f);
-    public static readonly FloatField TerminalHighlightFactor = new("Terminal Highlight Factor", 1.2f);
+    public static readonly KeyBind ConnectionSnap = new("Connection Snap", Key.Space);
+    public static readonly KeyBind NodeSnap = new("Align To Neighbor", Key.A);
+    public static readonly KeyBind TreeDrag = new("Tree Drag", Key.AltLeft);
+    public static readonly KeyBind LevelDrag = new("Neighbor Drag", Key.Grave);
+    public static readonly KeyBind ControlKey = new("Control", Key.ControlLeft);
+    public static readonly KeyBind MaskKey = new("Mask", Key.ShiftLeft);
+    public static readonly KeyBind UndoKey = new("Control Undo", Key.Z);
 
+    public static readonly DataField<float> ZoomSpeed = new("Zoom Speed", 35);
+    public static readonly DataField<float> RunOnceSize = new("Run Once Size", 0.035f);
+    public static readonly DataField<float> TerminalSize = new("Terminal Size", 0.025f);
+    public static readonly DataField<float> ConnectionSize = new("Connection Size", 0.008f);
+    public static readonly DataField<float> CamDragSpeed = new("Camera Drag Speed", 5f);
+    public static readonly DataField<float> DragCamInterpolateSpeed = new("Camera Drag Smoothing", 50f);
+    public static readonly DataField<float> ZoomInterpolateSpeed = new("Zoom Smoothing", 10f);
+    public static readonly DataField<float> TerminalHighlightFactor = new("Terminal Highlight Factor", 1.2f);
+    public static readonly DataField<float> GridSnapDistanceX = new("Grid Snap Distance X", 0.015f);
+    public static readonly DataField<int> UndoBufferSize = new("Undo history size", 100);
 }
 
 internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEditor, IProjectTab
@@ -45,9 +50,6 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
     private const float NodeIconSize = 0.1f;
 
-    private const float GridDragGranularity = 50f;
-    private const float GridSnapDistanceX = 0.015f;
-  
     private static readonly RgbaFloat ClearColor = new(0.05f, 0.05f, 0.05f, 0.95f);
     private static readonly Vector4 SelectedTint = new(1.1f, 1.1f, 1.1f, 1.2f);
     private static readonly RgbaFloat PreviewConnection = new(0.5f, 0.5f, 0.1f, 0.5f);
@@ -94,6 +96,9 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private string _nodeProjectName = "My Project";
     private int _selectedProject;
 
+    private readonly List<NodeProject> _historyForward = new();
+    private readonly List<NodeProject> _historyBackward = new();
+    
     public NodeEditorLayer(App app, ImGuiLayer imGui, NodeBehaviorRegistry behaviorRegistry)
     {
         _app = app;
@@ -121,6 +126,44 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         app.Project.OnMotionProjectChanged += ProjectOnOnMotionProjectChanged;
 
         UpdateEditorPipeline();
+    }
+    
+    protected override void OnAdded()
+    {
+        RegisterHandler<MouseEvent>(OnMouseEvent);
+        RegisterHandler<KeyEvent>(OnKeyEvent);
+    }
+
+    private void PushState()
+    {
+        _historyForward.Add(NodeProject.FromNodeWorld(_world));
+
+        if (_historyForward.Count > NodeEditorConfig.UndoBufferSize)
+        {
+            _historyForward.RemoveAt(0);
+        }
+    }
+
+    private void PopState()
+    {
+        _historyForward.RemoveAt(_historyForward.Count - 1);
+    }
+
+    private void RestoreState(List<NodeProject> direct, List<NodeProject> inverse)
+    {
+        _selectedEntity = null;
+        if (direct.Count > 0)
+        {
+            var project = direct.Last();
+            LoadNodeProject(project);
+            direct.RemoveAt(direct.Count - 1);
+            inverse.Add(project);
+
+            if (inverse.Count > NodeEditorConfig.UndoBufferSize)
+            {
+                inverse.RemoveAt(0);
+            }
+        }
     }
 
     private void ProjectOnOnMotionProjectChanged(MotionProject obj)
@@ -256,6 +299,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         if (@event is { MouseButton: MouseButton.Left, Down: true })
         {
+            PushState();
             SelectEntity();
 
             _dragLock = false;
@@ -278,10 +322,30 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         }
         else if (@event is { MouseButton: MouseButton.Middle, Down: false })
         {
+            PushState();
             FocusNode();
         }
 
         return true;
+    }
+
+    private bool OnKeyEvent(KeyEvent arg)
+    {
+        if (arg is { Down: false } @event && @event.Key == NodeEditorConfig.UndoKey.Key && NodeEditorConfig.ControlKey)
+        {
+            if (NodeEditorConfig.MaskKey)
+            {
+                RestoreState(_historyBackward, _historyForward);
+            }
+            else
+            {
+                RestoreState(_historyForward, _historyBackward);
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     private void FocusNode()
@@ -292,7 +356,6 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         if (_selectedEntity != null)
         {
             var entity = Assert.NotNull(_selectedEntity);
-
             _cameraController.FuturePosition2 = entity.Position() + entity.Scale() * new Vector2(1, -1) / 2;
         }
     }
@@ -341,11 +404,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         parentEntity.LinkTo(childEntity, parentTerm);
         SendEntitiesChanged(parentEntity, childEntity);
-    }
 
-    protected override void OnAdded()
-    {
-        RegisterHandler<MouseEvent>(OnMouseEvent);
+        PushState();
     }
 
     private NodeAnalysis GetAnalysis(Entity e)
@@ -391,6 +451,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
             if (ImGui.Button("Place"))
             {
+                PushState();
                 Place();
                 Analyze();
             }
@@ -401,6 +462,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
                 if (ImGui.Button("Delete"))
                 {
+                    PushState();
                     _selectedEntity?.Also(e => _transientMessages.Remove(e));
                     _selectedEntity?.Also(SendEntityDeleting);
                     _selectedEntity?.Destroy();
@@ -411,6 +473,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 ImGui.SameLine();
                 if (ImGui.Button("-Parent"))
                 {
+                    PushState();
                     _selectedEntity?.Get<NodeComponent>().Parent?.UnlinkFrom(_selectedEntity.Value);
                     _selectedEntity?.Also(e => SendEntitiesChanged(e));
                     Analyze();
@@ -420,6 +483,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
                 if (ImGui.Button("-Children"))
                 {
+                    PushState();
                     var children = _selectedEntity?.ChildrenEnt().ToArray() ?? Array.Empty<Entity>();
 
                     _selectedEntity?.UnlinkChildren();
@@ -501,6 +565,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                         if (!string.IsNullOrEmpty(_nodeProjectName))
                         {
                             SaveProject();
+                            _app.ToastInfo($"Saved nodes {_nodeProjectName}");
                         }
                         else
                         {
@@ -541,50 +606,52 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             }
             else
             {
+                PushState();
+
                 var entity = _selectedEntity.Value;
+
+                var changed = false;
 
                 if (Inspector.SubmitEditor(entity))
                 {
                     Analyze();
                     SendEntitiesChanged(entity);
+                    changed = true;
                 }
 
                 if (entity.Get<NodeComponent>().Behavior.SubmitInspector(entity, this))
                 {
                     Analyze();
                     SendEntitiesChanged(entity);
+                    changed = true;
+                }
+
+                if (!changed)
+                {
+                    PopState();
                 }
             }
         }
 
         ImGui.End();
 
-        if (NodeEditorConfig.MultiDrag || NodeEditorConfig.AlignSnap || NodeEditorConfig.GridSnap || NodeEditorConfig.ConnectionSnap)
+        if (!NodeEditorConfig.ControlKey && (NodeEditorConfig.TreeDrag || NodeEditorConfig.NodeSnap || NodeEditorConfig.ConnectionSnap || NodeEditorConfig.LevelDrag))
         {
             if (ImGui.BeginTooltip())
             {
-                if (NodeEditorConfig.AlignSnap)
+                if (NodeEditorConfig.NodeSnap)
                 {
                     ImGui.Text("Snap node");
                 }
 
-                if (NodeEditorConfig.MultiDrag)
+                if (NodeEditorConfig.TreeDrag)
                 {
-                    if (_selectedEntity.HasValue)
-                    {
-                        var entity = _selectedEntity.Value;
-
-                        ImGui.Text(entity.Children().Count == 0 ? "Drag entire level" : "Drag tree");
-                    }
-                    else
-                    {
-                        ImGui.Text("Multi-drag");
-                    }
+                    ImGui.Text("Tree Drag");
                 }
 
-                if (NodeEditorConfig.GridSnap)
+                if (NodeEditorConfig.LevelDrag)
                 {
-                    ImGui.Text("Grid Snap");
+                    ImGui.Text("Level Drag");
                 }
 
                 if (NodeEditorConfig.ConnectionSnap)
@@ -647,22 +714,22 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
         var project = NodeProject.FromNodeWorld(_world);
         _app.Project.NodeProjects[_nodeProjectName] = project;
         _app.Project.Save();
+    }
 
-        _app.ToastInfo($"Saved nodes {_nodeProjectName}");
+    private void LoadNodeProject(NodeProject project)
+    {
+        _transientMessages.Clear();
+        _world.Clear();
+        _selectedEntity = null;
+
+        project.Load(_world, _nodeBehaviors);
+
+        Analyze();
     }
 
     private void LoadProject(string nodeProjectName)
     {
-        _transientMessages.Clear();
-
-        var nodeProject = _app.Project.NodeProjects[nodeProjectName];
-
-        _world.Clear();
-        _selectedEntity = null;
-
-        nodeProject.Load(_world, _nodeBehaviors);
-
-        Analyze();
+        LoadNodeProject(_app.Project.NodeProjects[nodeProjectName]);
     }
 
     private void Place()
@@ -727,95 +794,90 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             return;
         }
 
-        var entity = _selectedEntity.Value;
-        var newPosition = MouseWorld + _selectPoint;
-
-        if (NodeEditorConfig.GridSnap)
+        if (!NodeEditorConfig.ControlKey)
         {
-            // Grid drag for more accurate placement:
+            var entity = _selectedEntity.Value;
+            var initialPos = entity.Position();
+            entity.Move(MouseWorld + _selectPoint);
 
-            newPosition *= GridDragGranularity;
-            newPosition = new Vector2(MathF.Truncate(newPosition.X) / GridDragGranularity, MathF.Truncate(newPosition.Y) / GridDragGranularity);
-        }
+            // Make sure the order of these transformations is preserved.
 
-        if (NodeEditorConfig.AlignSnap)
-        {
-            // Align to closest left node:
-
-            var entities = new List<Entity>();
-
-            _world.GetEntities(new QueryDescription().WithAll<PositionComponent, ScaleComponent, NodeComponent>(), entities);
-
-            entities.Remove(entity);
-
-            if (entities.Count > 0)
+            if (NodeEditorConfig.ConnectionSnap)
             {
-                var actualPos = entity.Position();
+                var node = entity.Node();
 
-                while (entities.Count > 0)
+                if (node.Parent == null)
                 {
-                    var closest = 
-                        entities.MinBy(e =>
-                            Vector2.DistanceSquared( // Closest distance between the left node's right corner and our left corner
-                                new Vector2(
-                                    e.Position().X + e.Scale().X, 
-                                    e.Position().Y
-                                ), 
-                                actualPos));
-
-                    newPosition = closest.Position() with { X = closest.Position().X + closest.Scale().X + GridSnapDistanceX };
-
-                    if (_world.Clip(newPosition).All(c => c == entity))
+                    if (!(NodeEditorConfig.TreeDrag || NodeEditorConfig.LevelDrag))
                     {
-                        break;
+                        if (entity.Children().Count > 0)
+                        {
+                            entity.Move(entity.Position() with
+                            {
+                                X = entity.ChildrenEnt().Sum(c => c.Position().X + c.Scale().X / 2) / entity.Children().Count - entity.Scale().X / 2
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    var parent = Assert.NotNull(node.Parent);
+                    var parentTerm = GetChildTermPos(parent.Children().First(x => x.Entity == entity).Terminal, parent);
+                    entity.Move(entity.Position() with { X = parentTerm.X - entity.Scale().X / 2 });
+                }
+            }
+
+            if (NodeEditorConfig.NodeSnap)
+            {
+                // Align to closest left node:
+
+                var entities = new List<Entity>();
+
+                _world.GetEntities(
+                    new QueryDescription()
+                        .WithAll<PositionComponent, ScaleComponent, NodeComponent>(), entities);
+
+                entities.Remove(entity);
+
+                var mouse = MouseWorld;
+                var centerOffset = entity.Scale() * new Vector2(0.5f, -0.5f);
+
+                entities
+                    .SelectMany(e => new[]
+                    {
+                        e.Position() with { X = e.Position().X + e.Scale().X + NodeEditorConfig.GridSnapDistanceX },
+                        e.Position() with { X = e.Position().X - entity.Scale().X - NodeEditorConfig.GridSnapDistanceX }
+                    })
+                    .Where(s => _world.Clip(s).All(c => c == entity))
+                    .OrderBy(s => Vector2.DistanceSquared(s + centerOffset, mouse))
+                    .IfPresent(solution => entity.Move(solution));
+            }
+
+            if (NodeEditorConfig.TreeDrag)
+            {
+                if (entity.Children().Count > 0)
+                {
+                    void Traverse(Entity e)
+                    {
+                        e.Move(e.Position() + (entity.Position() - initialPos));
+                        e.ChildrenEnt().ForEach(Traverse);
                     }
 
-                    entities.Remove(closest);
+                    entity.ChildrenEnt().ForEach(Traverse);
                 }
             }
-        }
 
-        var deltaPos = newPosition - entity.Position();
-      
-        entity.Move(newPosition);
-
-        if (NodeEditorConfig.MultiDrag)
-        {
-            if (entity.Children().Count > 0)
-            {
-                void Traverse(Entity e)
-                {
-                    e.Move(e.Position() + deltaPos);
-                    e.ChildrenEnt().ForEach(Traverse);
-                }
-
-                entity.ChildrenEnt().ForEach(Traverse);
-            }
-            else
+            if (NodeEditorConfig.LevelDrag)
             {
                 entity.Get<NodeComponent>()
                     .Parent
                     ?.ChildrenEnt()
                     .Where(c => c != entity)
-                    .ForEach(sibling => sibling.Move(sibling.Position() + deltaPos));
-            }
-        }
-
-        if (NodeEditorConfig.ConnectionSnap)
-        {
-            var node = entity.Node();
-
-            if (node.Parent != null)
-            {
-                var parent = node.Parent.Value;
-
-                var parentTermPos = GetChildTermPos(parent.Children().First(x => x.Entity == entity).Terminal, parent);
-
-                entity.Move(entity.Position() with { X = parentTermPos.X - entity.Scale().X / 2});
+                    .ForEach(sibling => sibling.Move(sibling.Position() + (entity.Position() - initialPos)));
             }
         }
     }
-
+   
     private void RenderConnectionPreview()
     {
         if (!_dragParent)
