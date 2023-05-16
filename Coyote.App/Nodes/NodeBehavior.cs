@@ -89,6 +89,11 @@ public class NodeTerminalSet
 
     public IReadOnlyList<NodeTerminal> ChildTerminals => _childTerminals;
 
+    public int Find(NodeTerminal terminal)
+    {
+        return _childTerminals.IndexOf(terminal);
+    }
+
     /// <summary>
     ///     Adds a child terminal to this collection. The child terminal must be of type <see cref="NodeTerminalType.Children"/>;
     ///     its ID must not be in use already in this collection (which implies that the terminal must not be in this collection already).
@@ -119,33 +124,6 @@ public class NodeTerminalSet
         {
             throw new InvalidOperationException("This set didn't have the specified child terminal");
         }
-    }
-
-    // Maybe get rid of this borderSize
-
-    public Vector2 GetParentPosition(Entity entity, float borderSize)
-    {
-        return entity.Get<PositionComponent>().Position + entity.Get<ScaleComponent>().Scale with { Y = borderSize / 2f } / 2f;
-    }
-
-    public Vector2 GetChildPosition(NodeTerminal terminal, Entity entity, float borderSize)
-    {
-        var i = _childTerminals.IndexOf(terminal);
-
-        if (i == -1)
-        {
-            throw new ArgumentException("Invalid child terminal", nameof(terminal));
-        }
-
-        var positionComponent = entity.Get<PositionComponent>();
-        var scaleComponent = entity.Get<ScaleComponent>();
-
-        var startX = positionComponent.Position.X + scaleComponent.Scale.X * 0.1f;
-        var endX = positionComponent.Position.X + scaleComponent.Scale.X * 0.9f;
-
-        var x = MathUtilities.MapRange((i + 0.5f) / ChildTerminals.Count, 0f, 1f, startX, endX);
-        
-        return new Vector2(x, positionComponent.Position.Y - scaleComponent.Scale.Y - borderSize / 4f);
     }
 }
 
@@ -438,7 +416,7 @@ public abstract class NodeBehavior
             .Stream()
             .Append(node.Terminals.ChildTerminals)
             .Where(t => NodeEditorLayer
-                .GetTerminalRect(entity, t)
+                .GetTermRect(entity, t)
                 .Contains(mousePos.ToPointF()))
             .IfPresent(terminal => terminal.Hover(entity, mousePos, editor));
     }
@@ -1160,9 +1138,12 @@ public sealed class CallNode : NodeBehavior
     }
 }
 
-public sealed class RepeatNode : ProxyNode
+public sealed class RepeatNode : DecoratorNode
 {
-    public RepeatNode(TextureSampler icon, string name) : base(icon, new Vector4(0.4f, 0.9f, 0.2f, 0.6f), name) { }
+    public RepeatNode(TextureSampler icon, string name) : base(icon, name)
+    {
+        BackgroundColor = new Vector4(0.4f, 0.9f, 0.2f, 0.6f);
+    }
 
     private struct RepeatNodeComponent
     {

@@ -22,6 +22,7 @@ namespace Coyote.App.Nodes;
 public static class NodeEditorConfig
 {
     public static KeyBind GridSnap = new("Grid Snap", Key.ShiftLeft);
+    public static KeyBind ConnectionSnap = new("Connection Snap", Key.Space);
     public static KeyBind AlignSnap = new("Align To Neighbor", Key.ControlLeft);
     public static KeyBind MultiDrag = new("Multi Drag", Key.AltLeft);
     public static readonly FloatField ZoomSpeed = new("Zoom Speed", 35);
@@ -41,6 +42,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     private const float MaxZoom = 10f;
     private const float FontSize = 0.1f;
     private const float BorderSize = 0.01f;
+
     private const float NodeIconSize = 0.1f;
 
     private const float GridDragGranularity = 50f;
@@ -136,38 +138,62 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
     private Vector2 _selectPoint;
 
-    public static RectangleF GetTerminalRect(Entity e, NodeTerminal terminal)
+    private static Vector2 GetParentTermPos(Entity entity)
     {
-        var position = terminal.Type == NodeTerminalType.Parent 
-            ? e.Get<NodeComponent>().Terminals.GetParentPosition(e, BorderSize) 
-            : e.Get<NodeComponent>().Terminals.GetChildPosition(terminal, e, BorderSize);
-        var termSize = NodeEditorConfig.TerminalSize;
-        return new RectangleF(position.X - termSize / 2, position.Y - termSize / 2, termSize, termSize);
+        return entity.Get<PositionComponent>().Position + entity.Get<ScaleComponent>().Scale with { Y = BorderSize / 2f } / 2f;
     }
 
-    private bool IntersectsTerminal(Entity entity, NodeTerminal terminal)
+    private static Vector2 GetChildTermPos(NodeTerminal terminal, Entity entity)
     {
-        return GetTerminalRect(entity, terminal).Contains(MouseWorld.ToPointF());
+        var terminals = entity.Node().Terminals;
+        var i = terminals.Find(terminal);
+
+        if (i == -1)
+        {
+            throw new ArgumentException("Invalid child terminal", nameof(terminal));
+        }
+
+        var positionComponent = entity.Get<PositionComponent>();
+        var scaleComponent = entity.Get<ScaleComponent>();
+
+        var startX = positionComponent.Position.X + scaleComponent.Scale.X * 0.1f;
+        var endX = positionComponent.Position.X + scaleComponent.Scale.X * 0.9f;
+
+        var x = MathUtilities.MapRange((i + 0.5f) / terminals.ChildTerminals.Count, 0f, 1f, startX, endX);
+
+        return new Vector2(x, positionComponent.Position.Y - scaleComponent.Scale.Y - BorderSize / 4f);
+    }
+
+    public static RectangleF GetTermRect(Entity e, NodeTerminal terminal)
+    {
+        var position = terminal.Type == NodeTerminalType.Parent 
+            ? GetParentTermPos(e)
+            : GetChildTermPos(terminal, e);
+
+        var termSz = NodeEditorConfig.TerminalSize;
+
+        return new RectangleF(
+            position.X - termSz / 2, 
+            position.Y - termSz / 2,
+            termSz, 
+            termSz);
+    }
+
+    private bool IntersectsTerm(Entity entity, NodeTerminal terminal)
+    {
+        return GetTermRect(entity, terminal).Contains(MouseWorld.ToPointF());
     }
 
     private void SelectEntity()
     {
         bool IntersectsParentTerminal(Entity entity)
         {
-            return IntersectsTerminal(entity, entity.Get<NodeComponent>().Terminals.ParentTerminal);
+            return IntersectsTerm(entity, entity.Get<NodeComponent>().Terminals.ParentTerminal);
         }
 
         List<Entity> ClipTerminalEntities()
         {
-            return _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, rectangle, check) =>
-            {
-                if (check)
-                {
-                    return true;
-                }
-
-                return IntersectsParentTerminal(entity);
-            });
+            return _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, _, i) => i || IntersectsParentTerminal(entity));
         }
 
         var entities = ClipTerminalEntities();
@@ -192,12 +218,13 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             if (IntersectsParentTerminal(_selectedEntity.Value))
             {
                 _dragParent = true;
-                CreateTerminalEffects();
+            
+                ScanTermEffects();
             }
         }
     }
 
-    private void CreateTerminalEffects()
+    private void ScanTermEffects()
     {
         _terminalEffects.Clear();
         
@@ -281,12 +308,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         var clipped = _world.Clip(MouseWorld, AlignMode.TopLeft, condition: (entity, rectangle, check) =>
         {
-            if (check)
-            {
-                return true;
-            }
-
-            return entity.Get<NodeComponent>().Terminals.ChildTerminals.Any(x => IntersectsTerminal(entity, x));
+            return check || entity.Get<NodeComponent>().Terminals.ChildTerminals.Any(x => IntersectsTerm(entity, x));
         }).Where(x => x != childEntity).ToArray();
 
         if (clipped.Length == 0)
@@ -305,7 +327,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         var parentTerm =
             parentComp.Terminals.ChildTerminals.FirstOrDefault(t =>
-                GetTerminalRect(parentEntity, t).Contains(MouseWorld.ToPointF()));
+                GetTermRect(parentEntity, t).Contains(MouseWorld.ToPointF()));
 
         if (parentTerm == null)
         {
@@ -352,8 +374,8 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
             var terminals = entity.Get<NodeComponent>().Terminals;
 
-            return IntersectsTerminal(entity, terminals.ParentTerminal) || terminals.ChildTerminals
-                .Any(childTerm => IntersectsTerminal(entity, childTerm));
+            return IntersectsTerm(entity, terminals.ParentTerminal) || terminals.ChildTerminals
+                .Any(childTerm => IntersectsTerm(entity, childTerm));
 
         }).IfPresent(entity => entity.Behavior().Hover(entity, MouseWorld, this));
 
@@ -537,7 +559,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         ImGui.End();
 
-        if (NodeEditorConfig.MultiDrag || NodeEditorConfig.AlignSnap || NodeEditorConfig.GridSnap)
+        if (NodeEditorConfig.MultiDrag || NodeEditorConfig.AlignSnap || NodeEditorConfig.GridSnap || NodeEditorConfig.ConnectionSnap)
         {
             if (ImGui.BeginTooltip())
             {
@@ -563,6 +585,11 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 if (NodeEditorConfig.GridSnap)
                 {
                     ImGui.Text("Grid Snap");
+                }
+
+                if (NodeEditorConfig.ConnectionSnap)
+                {
+                    ImGui.Text("Connection Snap");
                 }
             }
 
@@ -773,6 +800,20 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                     .ForEach(sibling => sibling.Move(sibling.Position() + deltaPos));
             }
         }
+
+        if (NodeEditorConfig.ConnectionSnap)
+        {
+            var node = entity.Node();
+
+            if (node.Parent != null)
+            {
+                var parent = node.Parent.Value;
+
+                var parentTermPos = GetChildTermPos(parent.Children().First(x => x.Entity == entity).Terminal, parent);
+
+                entity.Move(entity.Position() with { X = parentTermPos.X - entity.Scale().X / 2});
+            }
+        }
     }
 
     private void RenderConnectionPreview()
@@ -784,7 +825,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
 
         var entity = Assert.NotNull(_selectedEntity);
 
-        RenderLineConnection(entity.Get<NodeComponent>().Terminals.GetParentPosition(entity, BorderSize), MouseWorld, PreviewConnection);
+        RenderLineConnection(GetParentTermPos(entity), MouseWorld, PreviewConnection);
     }
 
     private void RenderLineConnection(Vector2 a, Vector2 b, RgbaFloat4 color)
@@ -917,7 +958,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
             var size = NodeEditorConfig.TerminalSize.Value;
 
             if (
-                GetTerminalRect(eDeRef, terminal).Contains(mouseWorld) 
+                GetTermRect(eDeRef, terminal).Contains(mouseWorld) 
                 && (!_dragParent || terminal.Type == NodeTerminalType.Children) /* Do not highlight if we are dragging a connection and this terminal is a parent terminal.*/
                 && (_dragParent || terminal.Type == NodeTerminalType.Parent)/* Do not highlight child terminals if we are not dragging a parent terminal (you cannot interact with them) */
             )
@@ -931,7 +972,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 terminal.Type == NodeTerminalType.Children ? _childTerminalSprite.Texture : _parentTerminalSprite.Texture);
         }
 
-        SubmitTerminal(set.GetParentPosition(e, BorderSize), set.ParentTerminal, e);
+        SubmitTerminal(GetParentTermPos(e), set.ParentTerminal, e);
 
         for (var index = 0; index < set.ChildTerminals.Count; index++)
         {
@@ -945,7 +986,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
                 }
             }
 
-            SubmitTerminal(set.GetChildPosition(terminal, e, BorderSize), terminal, e);
+            SubmitTerminal(GetChildTermPos(terminal, e), terminal, e);
         }
     }
 
@@ -953,7 +994,7 @@ internal sealed class NodeEditorLayer : Layer, ITabStyle, IDisposable, INodeEdit
     {
         foreach (var childNode in nodeComponent.ChildrenRef.Instance)
         {
-            RenderLineConnection(nodeComponent.Terminals.GetChildPosition(childNode.Terminal, e, BorderSize), childNode.Entity.Get<NodeComponent>().Terminals.GetParentPosition(childNode.Entity, BorderSize), RealizedConnection);
+            RenderLineConnection(GetChildTermPos(childNode.Terminal, e), GetParentTermPos(childNode.Entity), RealizedConnection);
         }
     }
 
