@@ -94,26 +94,28 @@ public sealed class PathEditor : IDisposable
 
             var projection = TranslationSpline.Project(position.ToVector());
 
-            // It is close enough to the ends that we can add it there:
-            if (projection < AddToEndThreshold)
+            switch (projection)
             {
-                _translationPoints.Insert(0, entity);
-            }
-            else if (projection > 1 - AddToEndThreshold)
-            {
-                _translationPoints.Add(entity);
-            }
-            else
-            {
-                // Place between two other points.
-                var closestTwo = _translationPoints
-                    .OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, position)).Take(2).ToArray();
+                // It is close enough to the ends that we can add it there:
+                case < AddToEndThreshold:
+                    _translationPoints.Insert(0, entity);
+                    break;
+                case > 1 - AddToEndThreshold:
+                    _translationPoints.Add(entity);
+                    break;
+                default:
+                {
+                    // Place between two other points.
+                    var closestTwo = _translationPoints
+                        .OrderBy(x => Vector2.Distance(x.Get<PositionComponent>().Position, position)).Take(2).ToArray();
 
-                var index = Math.Clamp(
-                    (_translationPoints.IndexOf(closestTwo[0]) + _translationPoints.IndexOf(closestTwo[1])) / 2 + 1, 0,
-                    _translationPoints.Count);
+                    var index = Math.Clamp(
+                        (_translationPoints.IndexOf(closestTwo[0]) + _translationPoints.IndexOf(closestTwo[1])) / 2 + 1, 0,
+                        _translationPoints.Count);
 
-                _translationPoints.Insert(index, entity);
+                    _translationPoints.Insert(index, entity);
+                    break;
+                }
             }
         }
         else
@@ -159,7 +161,7 @@ public sealed class PathEditor : IDisposable
                 // Remap position after projection.
                 pos = entity.Get<PositionComponent>().Position;
 
-                ReProjectPathElement(entity, param => entity.Get<RotationPointComponent>().Parameter = param);
+                ProjectPathElement(entity, param => entity.Get<RotationPointComponent>().Parameter = param);
 
                 // Also move the knob to the re-projected position and re-build the spline.
                 OnControlPointChanged(entity, pos, RebuildRotationSpline, headingKnob);
@@ -185,7 +187,8 @@ public sealed class PathEditor : IDisposable
 
     private Pose2d GetMarkerSpriteTransform(double parameter)
     {
-        var rotation = Rotation2d.Dir(TranslationSpline
+        var rotation = Rotation2d
+            .Dir(TranslationSpline
             .EvaluateVelocity(parameter)
             .ToVector2()
         );
@@ -195,7 +198,7 @@ public sealed class PathEditor : IDisposable
 
     private void ProjectMarker(Entity marker)
     {
-        ReProjectPathElement(marker, param =>
+        ProjectPathElement(marker, param =>
         {
             marker.Get<MarkerComponent>().Parameter = param;
             marker.Get<SpriteComponent>().Transform = GetMarkerSpriteTransform(param);
@@ -523,13 +526,16 @@ public sealed class PathEditor : IDisposable
             UnpackTranslation(_translationPoints[i - 1], out var p0, out var v0, out var a0);
             UnpackTranslation(_translationPoints[i], out var p1, out var v1, out var a1);
 
-            TranslationSpline.Add(new QuinticSplineSegment(
-                p0.ToVector(), 
-                v0.ToVector(), 
-                a0.ToVector(), 
-                a1.ToVector(), 
-                v1.ToVector(), 
-                p1.ToVector()));
+            TranslationSpline.Add(
+                new QuinticSplineSegment(
+                    p0.ToVector(), 
+                    v0.ToVector(), 
+                    a0.ToVector(), 
+                    a1.ToVector(), 
+                    v1.ToVector(), 
+                    p1.ToVector()
+                )
+            );
         }
 
         if (TranslationSpline.Segments.Count > 0)
@@ -541,20 +547,19 @@ public sealed class PathEditor : IDisposable
 
         RefitRotationPoints();
         RefitMarkers();
-
         RebuildRotationSpline();
 
         OnTranslationChanged?.Invoke();
     }
 
     /// <summary>
-    ///     Refits rotation points using <see cref="ReProjectPathElement"/> and moves the control knobs to updated positions.
+    ///     Refits rotation points using <see cref="ProjectPathElement"/> and moves the control knobs to updated positions.
     /// </summary>
     private void RefitRotationPoints()
     {
         if (TranslationSpline.Segments.Count == 0)
         {
-            Assert.Fail();
+            Assert.Fail("Refit rotation points but translation spline is empty");
             return;
         }
 
@@ -562,7 +567,7 @@ public sealed class PathEditor : IDisposable
         {
             var oldPosition = rotationPoint.Get<PositionComponent>().Position;
 
-            ReProjectPathElement(rotationPoint, param => rotationPoint.Get<RotationPointComponent>().Parameter = param);
+            ProjectPathElement(rotationPoint, param => rotationPoint.Get<RotationPointComponent>().Parameter = param);
 
             // Move knob to new position:
             OnControlPointChanged(rotationPoint, oldPosition, () => { }, rotationPoint.Get<RotationPointComponent>().HeadingMarker);
@@ -594,13 +599,14 @@ public sealed class PathEditor : IDisposable
     ///         - The rotation point's parameter is updated to the re-projected one using <see cref="applyUpdate"/>
     ///         - The rotation point's world position is updated to the re-projected position
     /// </summary>
-    private void ReProjectPathElement(Entity point, Action<double> applyUpdate)
+    private void ProjectPathElement(Entity element, Action<double> applyUpdate)
     {
-        var position = point.Get<PositionComponent>().Position;
+        var position = element.Get<PositionComponent>().Position;
         var parameter = TranslationSpline.Project(position.ToVector());
 
         applyUpdate(parameter);
-        point.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
+
+        element.Get<PositionComponent>().Position = TranslationSpline.Evaluate(parameter).ToVector2();
     }
 
     /// <summary>

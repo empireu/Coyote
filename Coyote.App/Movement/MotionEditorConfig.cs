@@ -5,8 +5,13 @@ namespace Coyote.App.Movement;
 [ConfigAccessor]
 public static class MotionEditorConfig
 {
-    public static KeyBind PolarMove = new("Polar Move", Key.AltLeft);
-    public static KeyBind AxisMove = new("Axis Move", Key.ShiftLeft);
+    public static readonly KeyBind PolarMove = new("Polar Move", Key.AltLeft);
+    public static readonly KeyBind AxisMove = new("Axis Move", Key.ShiftLeft);
+
+    public static readonly DataField<float> MoveSpeed = new("Move Speed", 2f, x => Math.Max(x, 0));
+    public static readonly DataField<float> ZoomSpeed = new("Zoom Speed", 25, x => Math.Max(x, 0));
+    public static readonly DataField<float> MinZoom = new("Min Zoom", 1f, x => Math.Max(x, 0));
+    public static readonly DataField<float> MaxZoom = new("Max Zoom", 5f, x => Math.Max(x, 0));
     public static readonly DataField<float> PositionKnobSize = new("Position Knob Size", 0.05f);
     public static readonly DataField<float> RotationKnobSize = new("Rotation Knob Size", 0.035f);
     public static readonly DataField<float> MarkerSize = new("Marker Size", 0.1f);

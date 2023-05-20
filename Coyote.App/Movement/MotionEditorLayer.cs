@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Numerics;
 using Arch.Core;
 using Arch.Core.Extensions;
@@ -23,8 +22,6 @@ namespace Coyote.App.Movement;
 
 internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 {
-    private const double ClearForceThreshold = 0.25;
-
     private enum ToolType
     {
         TranslateAdd,
@@ -56,10 +53,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
     };
 
     private const float FieldSize = 3.66f;
-    private const float MoveSpeed = 2f;
-    private const float ZoomSpeed = 25;
-    private const float MinZoom = 1f;
-    private const float MaxZoom = 5f;
 
     private static readonly Vector4 VelocityColor = new(1, 0.1f, 0.1f, 1f);
     private static readonly Vector4 AccelerationColor = new(0.5f, 1f, 0.1f, 1f);
@@ -98,7 +91,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
     private readonly OrthographicCameraController2D _cameraController;
 
-    private readonly World _world;
+    private readonly World _pathWorld;
     private readonly PathEditor _path;
 
     private ToolType _selectedTool = ToolType.TranslateAdd;
@@ -117,7 +110,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
     private bool _renderRotationTangents = true;
     private bool _renderPlayerVelocity;
     private bool _renderPlayerAcceleration;
-    private readonly Stopwatch _clearTimer = Stopwatch.StartNew();
 
     private readonly Simulator _simulator;
 
@@ -160,8 +152,8 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         _robotSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Robot.png"));
         _arrowSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Arrow.png"));
 
-        _world = ArchWorld.Get();
-        _path = new PathEditor(app, _world);
+        _pathWorld = ArchWorld.Get();
+        _path = new PathEditor(app, _pathWorld);
         _simulator = new Simulator(app, _path);
 
         UpdateEditorPipeline();
@@ -178,7 +170,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
     private void SelectEntity()
     {
-        var entities = _world.Clip(MouseWorld);
+        var entities = _pathWorld.Clip(MouseWorld);
 
         if (entities.Count == 0)
         {
@@ -193,7 +185,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
             _selectedEntity = entities[_pickIndex++];
 
-            var entityPosition = _world.Get<PositionComponent>(_selectedEntity.Value).Position;
+            var entityPosition = _pathWorld.Get<PositionComponent>(_selectedEntity.Value).Position;
 
             _selectPoint = entityPosition - MouseWorld;
         }
@@ -308,8 +300,6 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         component.Name = name;
     }
 
-    private bool HasUnsavedChanges => !_app.Project.MotionProjects.ContainsKey(_motionProjectName) ||
-                                      _app.Project.MotionProjects[_motionProjectName].Version != _path.Version;
     private void ImGuiLayerOnSubmit(ImGuiRenderer obj)
     {
         if (_disposed)
@@ -322,7 +312,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
             return;
         }
         
-        var hoveredMarkersEntities = _world.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
+        var hoveredMarkersEntities = _pathWorld.Clip(MouseWorld).Where(x => x.Has<MarkerComponent>()).ToArray();
 
         if (hoveredMarkersEntities.Length > 0)
         {
@@ -401,18 +391,9 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
             if (ImGui.Button("Clear"))
             {
-                if (_clearTimer.Elapsed.TotalSeconds > ClearForceThreshold && HasUnsavedChanges)
-                {
-                    _app.ToastInfo("You have unsaved changes! Click \"Clear\" faster to discard!");
-                }
-                else
-                {
-                    _world.Clear();
-                    _path.Clear();
-                    _selectedEntity = null;
-                }
-
-                _clearTimer.Restart();
+                _pathWorld.Clear();
+                _path.Clear();
+                _selectedEntity = null;
             }
         }
 
@@ -779,16 +760,16 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
         motionProject.Version = _path.Version;
 
-        var constr = _simulator.Constraints;
+        var baseConstraints = _simulator.Constraints;
 
         motionProject.Constraints = new JsonMotionConstraints
         {
-            LinearVelocity = constr.LinearVelocity,
-            LinearAcceleration = constr.LinearAcceleration,
-            LinearDeacceleration = constr.LinearDeacceleration,
-            AngularVelocity = constr.AngularVelocity,
-            AngularAcceleration = constr.AngularAcceleration,
-            CentripetalAcceleration = constr.CentripetalAcceleration
+            LinearVelocity = baseConstraints.LinearVelocity,
+            LinearAcceleration = baseConstraints.LinearAcceleration,
+            LinearDeacceleration = baseConstraints.LinearDeacceleration,
+            AngularVelocity = baseConstraints.AngularVelocity,
+            AngularAcceleration = baseConstraints.AngularAcceleration,
+            CentripetalAcceleration = baseConstraints.CentripetalAcceleration
         };
 
         motionProject.Parameters = new JsonGenerationParameters
@@ -813,7 +794,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
     {
         var motionProject = _app.Project.MotionProjects[motionProjectName];
 
-        _world.Clear();
+        _pathWorld.Clear();
         _selectedEntity = null;
 
         motionProject.Load(_path);
@@ -937,18 +918,18 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
             foreach (var inputDownKey in _app.Input.DownKeys)
             {
                 _cameraController.ProcessKey(inputDownKey,
-                    MoveSpeed * frameInfo.DeltaTime,
+                    MotionEditorConfig.MoveSpeed * frameInfo.DeltaTime,
                     0);
             }
 
-            _cameraController.FutureZoom += _app.Input.ScrollDelta * ZoomSpeed * frameInfo.DeltaTime;
-            _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MinZoom, MaxZoom);
+            _cameraController.FutureZoom += _app.Input.ScrollDelta * MotionEditorConfig.ZoomSpeed * frameInfo.DeltaTime;
+            _cameraController.FutureZoom = Math.Clamp(_cameraController.FutureZoom, MotionEditorConfig.MinZoom, MotionEditorConfig.MaxZoom);
         }
 
         _cameraController.Update(frameInfo.DeltaTime);
     }
 
-    private void UpdateSelection(FrameInfo frameInfo)
+    private void UpdateSelection()
     {
         if (_imGuiLayer.Captured)
         {
@@ -977,7 +958,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         _dt = frameInfo.DeltaTime;
 
         UpdateCamera(frameInfo);
-        UpdateSelection(frameInfo);
+        UpdateSelection();
     }
 
     private void RenderEditor()
@@ -1004,7 +985,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         _path.SubmitPath(_editorBatch);
         Draw();
         Systems.RenderConnections(
-            _world,
+            _pathWorld,
             _editorBatch,
             _renderPositionPoints,
             _renderRotationPoints,
@@ -1014,7 +995,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         Draw();
         _path.SubmitIndicator(_editorBatch, MouseWorld);
         Draw();
-        Systems.RenderSprites(_world, _editorBatch);
+        Systems.RenderSprites(_pathWorld, _editorBatch);
         Draw();
     }
 
@@ -1061,6 +1042,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
         _commandList.Dispose();
         _path.Dispose();
         _simulator.Dispose();
-        ArchWorld.Return(_world);
+
+        ArchWorld.Return(_pathWorld);
     }
 }
