@@ -235,8 +235,15 @@ internal class App : GameApplication
             // pre-load
             // This is the lazy solution.
 
+            if (!File.Exists("Field.png"))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("NO FIELD IMAGE! Please add Field.png");
+                Thread.Sleep(-1);
+            }
+
             ToastManager.StopWatch.Stop();
-            Resources.AssetManager.GetSpriteForTexture(Asset("Images.PowerPlayField.jpg"));
+            Resources.AssetManager.GetSpriteForTexture(new FileResourceKey("Field.png"));
             Resources.AssetManager.GetSpriteForTexture(Asset("Images.Robot.png"));
             Resources.AssetManager.GetSpriteForTexture(Asset("Images.Arrow.png"));
             ToastManager.StopWatch.Start();

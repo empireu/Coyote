@@ -37,7 +37,6 @@
     <None Remove="Assets\Images\Nodes\Sequence.png" />
     <None Remove="Assets\Images\Nodes\Success.png" />
     <None Remove="Assets\Images\PositionMarker.png" />
-    <None Remove="Assets\Images\PowerPlayField.jpg" />
     <None Remove="Assets\Images\Robot.png" />
     <None Remove="Assets\Images\RunOnce.png" />
     <None Remove="Assets\Images\Slideshow0.png" />
@@ -75,7 +74,6 @@
     <EmbeddedResource Include="Assets\Images\Nodes\Sequence.png" />
     <EmbeddedResource Include="Assets\Images\Nodes\Success.png" />
     <EmbeddedResource Include="Assets\Images\PositionMarker.png" />
-    <EmbeddedResource Include="Assets\Images\PowerPlayField.jpg" />
     <EmbeddedResource Include="Assets\Images\Robot.png" />
     <EmbeddedResource Include="Assets\Images\RunOnce.png" />
     <EmbeddedResource Include="Assets\Images\Slideshow0.png" />

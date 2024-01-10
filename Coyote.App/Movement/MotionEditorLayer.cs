@@ -148,7 +148,7 @@ internal class MotionEditorLayer : Layer, ITabStyle, IDisposable, IProjectTab
 
         _commandList = app.Device.ResourceFactory.CreateCommandList();
 
-        _fieldSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.PowerPlayField.jpg"));
+        _fieldSprite = app.Resources.AssetManager.GetSpriteForTexture(new FileResourceKey("Field.png"));
         _robotSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Robot.png"));
         _arrowSprite = app.Resources.AssetManager.GetSpriteForTexture(App.Asset("Images.Arrow.png"));
 
